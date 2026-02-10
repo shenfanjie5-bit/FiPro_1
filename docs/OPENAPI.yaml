@@ -1,0 +1,206 @@
+openapi: 3.1.0
+info:
+  title: FiPro_1 API
+  version: 0.1.0
+  description: Minimal API contract for MVP.
+servers:
+  - url: http://localhost:8000
+security:
+  - bearerAuth: []
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+  schemas:
+    Error:
+      type: object
+      required: [code, message]
+      properties:
+        code: { type: string, example: INVALID_ARGUMENT }
+        message: { type: string }
+        retryable: { type: boolean, default: false }
+    GenerateReportRequest:
+      type: object
+      required: [ticker, asof, strategy_version_id, tier]
+      properties:
+        ticker: { type: string, example: 600519.SH }
+        asof: { type: string, format: date-time }
+        strategy_version_id: { type: string, example: stg_v1 }
+        tier:
+          type: string
+          enum: [TIER0, TIER1, TIER2]
+    GenerateReportResponse:
+      type: object
+      required: [report_id, status]
+      properties:
+        report_id: { type: string, example: rpt_20260210_600519 }
+        status: { type: string, enum: [QUEUED, RUNNING, DONE, FAILED] }
+    WatchlistItem:
+      type: object
+      required: [ticker, tier]
+      properties:
+        ticker: { type: string }
+        tier: { type: string, enum: [TIER0, TIER1, TIER2] }
+paths:
+  /strategies:
+    post:
+      summary: Create strategy
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name]
+              properties:
+                name: { type: string }
+      responses:
+        '201': { description: Created }
+        '400':
+          description: Bad Request
+          content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } }
+  /strategies/{id}/versions:
+    post:
+      summary: Create strategy version
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string }
+      responses:
+        '201': { description: Created }
+  /strategies/{id}/versions/{version}:
+    get:
+      summary: Get strategy version detail
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string }
+        - in: path
+          name: version
+          required: true
+          schema: { type: string }
+      responses:
+        '200': { description: OK }
+  /tickers/{ticker}/snapshot:
+    get:
+      summary: Get market snapshot
+      parameters:
+        - in: path
+          name: ticker
+          required: true
+          schema: { type: string }
+        - in: query
+          name: asof
+          required: true
+          schema: { type: string, format: date-time }
+        - in: query
+          name: strategy_version
+          required: true
+          schema: { type: string }
+      responses:
+        '200': { description: OK }
+  /reports/generate:
+    post:
+      summary: Trigger report workflow
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/GenerateReportRequest' }
+      responses:
+        '202':
+          description: Accepted
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/GenerateReportResponse' }
+  /reports/{report_id}:
+    get:
+      summary: Get report detail
+      parameters:
+        - in: path
+          name: report_id
+          required: true
+          schema: { type: string }
+      responses:
+        '200': { description: OK }
+        '404':
+          description: Not Found
+          content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } }
+  /watchlist:
+    get:
+      summary: Get watchlist
+      responses:
+        '200': { description: OK }
+    post:
+      summary: Add/update watchlist tier
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/WatchlistItem' }
+      responses:
+        '200': { description: OK }
+  /graph/subtree:
+    get:
+      summary: Query supply chain subtree
+      parameters:
+        - in: query
+          name: ticker
+          required: true
+          schema: { type: string }
+        - in: query
+          name: depth
+          required: true
+          schema: { type: integer, minimum: 1, maximum: 6 }
+      responses:
+        '200': { description: OK }
+  /graph/paths:
+    get:
+      summary: Query impact paths
+      parameters:
+        - in: query
+          name: entity
+          required: true
+          schema: { type: string }
+        - in: query
+          name: ticker
+          required: true
+          schema: { type: string }
+      responses:
+        '200': { description: OK }
+  /memory/search:
+    get:
+      summary: Search memory
+      parameters:
+        - in: query
+          name: ticker
+          required: true
+          schema: { type: string }
+        - in: query
+          name: q
+          required: true
+          schema: { type: string }
+      responses:
+        '200': { description: OK }
+  /memory/write:
+    post:
+      summary: Write memory note
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [ticker, content]
+              properties:
+                ticker: { type: string }
+                content: { type: string }
+                tags:
+                  type: array
+                  items: { type: string }
+      responses:
+        '201': { description: Created }
