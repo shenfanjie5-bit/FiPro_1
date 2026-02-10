@@ -3,7 +3,7 @@
 - Version: 0.1
 - Status: Draft
 - Last Updated: 2026-02-09 (America/Los_Angeles)
-- Owner: (填写你/团队)
+- Owner: fanjie/codex
 - Audience: 后端 / Agent 编排（LangGraph）/ 数据 / 测试 / 前端
 
 > 目的：定义 LLM 工作流的“输入/输出/状态”强结构合约（Contract）。
