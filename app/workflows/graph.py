@@ -1,6 +1,10 @@
 from __future__ import annotations
 
-from app.workflows.checkpoint import save_checkpoint
+from typing import Literal
+
+from langgraph.graph import END, START, StateGraph
+
+from app.workflows.checkpoint import get_checkpointer, get_latest_checkpoint
 from app.workflows.nodes import (
     build_context,
     build_facts,
@@ -9,6 +13,7 @@ from app.workflows.nodes import (
     generate_price_bands_node,
     init_data_quality,
     load_strategy_config,
+    mark_invalid_node,
     persist_node,
     publish_node,
     repair_report_node,
@@ -17,43 +22,76 @@ from app.workflows.nodes import (
     score_signal_node,
     validate_node,
 )
+from app.workflows.state import ResearchState
+
+
+def _route_need_repair(state: ResearchState) -> Literal['persist', 'repair', 'invalid']:
+    has_errors = bool(state.get('validation_errors') or state.get('consistency_errors'))
+    if not has_errors:
+        return 'persist'
+    if state.get('repair_attempts', 0) >= state.get('max_repairs', 2):
+        return 'invalid'
+    return 'repair'
+
+
+def _build_graph():
+    builder = StateGraph(ResearchState)
+    builder.add_node('load_strategy_config', load_strategy_config)
+    builder.add_node('init_data_quality', init_data_quality)
+    builder.add_node('build_facts', build_facts)
+    builder.add_node('build_features', build_features)
+    builder.add_node('score_signal_node', score_signal_node)
+    builder.add_node('generate_price_bands_node', generate_price_bands_node)
+    builder.add_node('retrieve_memory_node', retrieve_memory_node)
+    builder.add_node('build_context', build_context)
+    builder.add_node('draft_report_node', draft_report_node)
+    builder.add_node('risk_gate_node', risk_gate_node)
+    builder.add_node('validate_node', validate_node)
+    builder.add_node('repair_report_node', repair_report_node)
+    builder.add_node('mark_invalid_node', mark_invalid_node)
+    builder.add_node('persist_node', persist_node)
+    builder.add_node('publish_node', publish_node)
+
+    builder.add_edge(START, 'load_strategy_config')
+    builder.add_edge('load_strategy_config', 'init_data_quality')
+    builder.add_edge('init_data_quality', 'build_facts')
+    builder.add_edge('build_facts', 'build_features')
+    builder.add_edge('build_features', 'score_signal_node')
+    builder.add_edge('score_signal_node', 'generate_price_bands_node')
+    builder.add_edge('generate_price_bands_node', 'retrieve_memory_node')
+    builder.add_edge('retrieve_memory_node', 'build_context')
+    builder.add_edge('build_context', 'draft_report_node')
+    builder.add_edge('draft_report_node', 'risk_gate_node')
+    builder.add_edge('risk_gate_node', 'validate_node')
+    builder.add_conditional_edges(
+        'validate_node',
+        _route_need_repair,
+        {
+            'persist': 'persist_node',
+            'repair': 'repair_report_node',
+            'invalid': 'mark_invalid_node',
+        },
+    )
+    builder.add_edge('repair_report_node', 'risk_gate_node')
+    builder.add_edge('mark_invalid_node', 'persist_node')
+    builder.add_edge('persist_node', 'publish_node')
+    builder.add_edge('publish_node', END)
+    return builder.compile(checkpointer=get_checkpointer())
+
+
+RESEARCH_GRAPH = _build_graph()
+
+
+def recover_research_state(thread_id: str) -> dict | None:
+    return get_latest_checkpoint(thread_id)
 
 
 def run_research_workflow(request_data: dict, thread_id: str) -> dict:
-    """Run MVP workflow.
-
-    TODO:
-    - Replace linear runner with full LangGraph StateGraph + conditional edges.
-    - Add reviewer path for TIER2.
-    """
-    state: dict = {'request': request_data}
-
-    for step_name, step_fn in [
-        ('load_strategy_config', load_strategy_config),
-        ('init_data_quality', init_data_quality),
-        ('build_facts', build_facts),
-        ('build_features', build_features),
-        ('score_signal_node', score_signal_node),
-        ('generate_price_bands_node', generate_price_bands_node),
-        ('retrieve_memory_node', retrieve_memory_node),
-        ('build_context', build_context),
-        ('draft_report_node', draft_report_node),
-        ('risk_gate_node', risk_gate_node),
-    ]:
-        state = step_fn(state)
-        save_checkpoint(thread_id, step_name, state)
-
-    state = validate_node(state)
-    save_checkpoint(thread_id, 'validate_node', state)
-
-    while (state.get('validation_errors') or state.get('consistency_errors')) and state['repair_attempts'] < state['max_repairs']:
-        state = repair_report_node(state)
-        state = risk_gate_node(state)
-        state = validate_node(state)
-        save_checkpoint(thread_id, f"repair_loop_{state['repair_attempts']}", state)
-
-    state = persist_node(state)
-    state = publish_node(state)
-    save_checkpoint(thread_id, 'publish_node', state)
-
-    return {'final_report': state['final_report']}
+    state = RESEARCH_GRAPH.invoke(
+        {'thread_id': thread_id, 'request': request_data},
+        config={'configurable': {'thread_id': thread_id}},
+    )
+    return {
+        'final_report': state['final_report'],
+        'persist_refs': state.get('persist_refs', {}),
+    }

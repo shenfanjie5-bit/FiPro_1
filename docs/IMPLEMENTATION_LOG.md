@@ -222,3 +222,37 @@
 - `python3 -m compileall app tests` passed.
 - `python3 -m pytest -q` failed at collection due missing dependencies (`fastapi`, `pydantic`, `yaml`, `jsonschema`).
 - `docker compose config` not executable (`docker: command not found`).
+
+## 2026-02-10 - Batch 11 (M2 Completion + Gate Verification + Logging Discipline)
+
+### Completed Operations
+- Completed M2 core implementation in code:
+  - Replaced linear runner with LangGraph `StateGraph` and conditional `validate -> repair/invalid/persist` routing.
+  - Wired sqlite checkpointer for thread-level replay (`thread_id`) and latest state recovery.
+  - Implemented `persist` path for `reports` / `decision_logs` / `tool_traces` / `memory_notes` in runtime sqlite store.
+  - Updated report read path: `GET /reports/{id}` falls back to persisted storage when not found in memory.
+  - Added traceability IDs in TIER0 path (`trace_id`, `score_id`, `price_band_set_id`, `feature_id`).
+  - Added `mark_invalid` fallback after max repair attempts.
+- Extended E2E coverage (`tests/test_e2e_tier0.py`) to assert:
+  - `/reports/generate` output schema + consistency pass,
+  - persisted artifacts are created,
+  - checkpoint latest state matches generated report.
+- Updated backlog bookkeeping:
+  - Marked M2-01 ~ M2-10 as `DONE` in `docs/BACKLOG.md`.
+  - Added delivery rule: every `push` must update `docs/IMPLEMENTATION_LOG.md`.
+- Re-checked M0-M2 gate status with current workspace/runtime evidence.
+
+### Validation Evidence
+- `.venv/bin/python -m pytest -q` passed (`18 passed`).
+- Manual runtime check: launched `uvicorn app.main:app` with test env vars and confirmed `/health` returns `200`.
+- M2 acceptance sampling:
+  - 20 consecutive `POST /reports/generate` runs: schema pass `20/20`, consistency pass `20/20`, required fields pass `20/20`.
+- Replay behavior verified:
+  - Two consecutive generates with same `x-thread-id`, latest checkpoint report id matches the second run result.
+- Environment limitation remains:
+  - `docker` unavailable, so `docker compose up -d` gate cannot be executed in this environment.
+
+### Pending Follow-up (Next Operations)
+- Update `README.md` outdated TODO line that still mentions replacing linear workflow.
+- For strict M0 gate closure, verify `docker compose up -d` and CI green in a docker-enabled / remote CI environment.
+- Start M3 implementation (replace facts/memory mocks with real data adapters as planned).

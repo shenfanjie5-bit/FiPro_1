@@ -1,5 +1,13 @@
 from __future__ import annotations
 
+import hashlib
+import json
+
+
+def _stable_id(prefix: str, payload: dict) -> str:
+    raw = json.dumps(payload, sort_keys=True, ensure_ascii=True, default=str)
+    return f"{prefix}_{hashlib.sha256(raw.encode('utf-8')).hexdigest()[:10]}"
+
 
 def score_signal(features: dict, weights: dict) -> dict:
     hotness = features.get('hotness', 50)
@@ -22,7 +30,12 @@ def score_signal(features: dict, weights: dict) -> dict:
     elif score < 45:
         action = 'AVOID'
 
-    return {'overall_score': score, 'confidence': confidence, 'proposed_action': action}
+    return {
+        'score_id': _stable_id('score', {'features': features, 'weights': weights}),
+        'overall_score': score,
+        'confidence': confidence,
+        'proposed_action': action,
+    }
 
 
 def generate_price_bands(base_price: float, score: int) -> dict:
@@ -56,7 +69,10 @@ def generate_price_bands(base_price: float, score: int) -> dict:
             'exit_conditions': [{'type': 'RISK', 'description': 'Catalyst invalidated', 'priority': 'HIGH'}],
         },
     ]
-    return {'price_bands': bands}
+    return {
+        'price_band_set_id': _stable_id('bands', {'base_price': base_price, 'score': score}),
+        'price_bands': bands,
+    }
 
 
 def risk_gate(report: dict, risk_profile: str = 'LOW') -> dict:

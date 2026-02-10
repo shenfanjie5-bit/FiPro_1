@@ -3,6 +3,7 @@ from __future__ import annotations
 import hashlib
 import json
 import time
+import uuid
 from typing import Any, Callable
 
 
@@ -35,6 +36,7 @@ def execute_tool(tool_name: str, payload: dict[str, Any], fn: Callable[..., dict
         'ok': ok,
         'output': output,
         'trace': {
+            'trace_id': f"trace_{uuid.uuid4().hex[:12]}",
             'tool_name': tool_name,
             'input_digest': input_digest,
             'latency_ms': latency_ms,

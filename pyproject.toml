@@ -19,6 +19,7 @@ dependencies = [
   "redis>=5.0.6",
   "neo4j>=5.22.0",
   "langgraph>=0.2.20",
+  "langgraph-checkpoint-sqlite>=3.0.0",
   "jsonschema>=4.23.0",
   "python-dotenv>=1.0.1",
   "pyyaml>=6.0.0",

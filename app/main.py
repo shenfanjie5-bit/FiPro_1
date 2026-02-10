@@ -1,3 +1,4 @@
+from contextlib import asynccontextmanager
 import logging
 from uuid import uuid4
 
@@ -9,6 +10,7 @@ from starlette.responses import Response
 from app.core.config import get_settings
 from app.api.routes import router
 from app.core.logging import configure_logging
+from app.db.session import initialize_database_schema
 
 
 logger = logging.getLogger(__name__)
@@ -24,12 +26,17 @@ class RequestIDMiddleware(BaseHTTPMiddleware):
         return response
 
 
+@asynccontextmanager
+async def app_lifespan(_: FastAPI):
+    initialize_database_schema()
+    yield
+
+
 def create_app() -> FastAPI:
     configure_logging()
     get_settings()
-    app = FastAPI(title='FiPro_1 API', version='0.1.0')
+    app = FastAPI(title='FiPro_1 API', version='0.1.0', lifespan=app_lifespan)
     app.add_middleware(RequestIDMiddleware)
-
 
     app.include_router(router)
     return app

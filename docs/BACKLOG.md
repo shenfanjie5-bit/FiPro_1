@@ -5,6 +5,7 @@
 - 状态字段：`TODO` / `IN_PROGRESS` / `DONE` / `BLOCKED`
 - 优先级字段：`P0`（最高）/ `P1` / `P2`
 - 分支策略：`main` 仅合并通过验收门的任务；日常开发在 `codex/mvp-implementation`
+- 交付纪律：每次 `push` 必须同步更新 `docs/IMPLEMENTATION_LOG.md`，记录本次变更、验证结果与待跟进事项。
 
 ## M0：基座就绪（可运行）
 
@@ -54,16 +55,16 @@
 
 | ID | Task | Priority | Status | Est | Depends On | Acceptance |
 |---|---|---|---|---|---|---|
-| M2-01 | 定义 `ResearchState`（TypedDict/Pydantic） | P0 | TODO | 0.5d | M1 | 状态字段覆盖全链路 |
-| M2-02 | 构建 TIER0 StateGraph 主路径 | P0 | TODO | 1d | M2-01 | 图可执行 |
-| M2-03 | 实现 TIER0 tools stubs（facts/features/score/price_bands/memory） | P0 | TODO | 1d | M1-05 | 返回可追溯 ID |
-| M2-04 | `draft_report` 节点（先 dummy JSON） | P0 | TODO | 0.5d | M2-03 | 生成可校验 report |
-| M2-05 | `risk_gate` 节点（可覆盖 action/confidence） | P0 | TODO | 1d | M2-04 | 风控可强制降级 |
-| M2-06 | `validate + repair loop`（最大 N 次） | P0 | TODO | 1d | M2-04 | 不合规能修复或标 invalid |
-| M2-07 | `persist` 节点（reports/decision_logs/memory/traces） | P0 | TODO | 1d | M2-05 | 结果可查询与回放 |
-| M2-08 | checkpointer 接入（thread_id + sqlite） | P0 | TODO | 0.5d | M2-02 | 同 thread 可恢复 |
-| M2-09 | API 实装：`POST /reports/generate`, `GET /reports/{id}` | P0 | TODO | 0.5d | M2-07 | 返回 `{report_id, final_report}` |
-| M2-10 | E2E 测试：一次 generate 全链路 | P0 | TODO | 1d | M2-09 | 自动化测试可重复通过 |
+| M2-01 | 定义 `ResearchState`（TypedDict/Pydantic） | P0 | DONE | 0.5d | M1 | 状态字段覆盖全链路 |
+| M2-02 | 构建 TIER0 StateGraph 主路径 | P0 | DONE | 1d | M2-01 | 图可执行 |
+| M2-03 | 实现 TIER0 tools stubs（facts/features/score/price_bands/memory） | P0 | DONE | 1d | M1-05 | 返回可追溯 ID |
+| M2-04 | `draft_report` 节点（先 dummy JSON） | P0 | DONE | 0.5d | M2-03 | 生成可校验 report |
+| M2-05 | `risk_gate` 节点（可覆盖 action/confidence） | P0 | DONE | 1d | M2-04 | 风控可强制降级 |
+| M2-06 | `validate + repair loop`（最大 N 次） | P0 | DONE | 1d | M2-04 | 不合规能修复或标 invalid |
+| M2-07 | `persist` 节点（reports/decision_logs/memory/traces） | P0 | DONE | 1d | M2-05 | 结果可查询与回放 |
+| M2-08 | checkpointer 接入（thread_id + sqlite） | P0 | DONE | 0.5d | M2-02 | 同 thread 可恢复 |
+| M2-09 | API 实装：`POST /reports/generate`, `GET /reports/{id}` | P0 | DONE | 0.5d | M2-07 | 返回 `{report_id, final_report}` |
+| M2-10 | E2E 测试：一次 generate 全链路 | P0 | DONE | 1d | M2-09 | 自动化测试可重复通过 |
 
 ### M2 验收门
 

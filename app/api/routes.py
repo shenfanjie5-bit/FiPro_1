@@ -4,7 +4,11 @@ import uuid
 from fastapi import APIRouter, Header, HTTPException
 from pydantic import BaseModel, Field
 
+from app.tools.facts import get_market_snapshot
+from app.tools.graph import find_impact_paths
+from app.tools.memory import write_memory_note
 from app.workflows.graph import run_research_workflow
+from app.workflows.persistence import get_report as get_persisted_report
 
 router = APIRouter()
 
@@ -19,6 +23,16 @@ class GenerateReportRequest(BaseModel):
     strategy_version_id: str
     tier: str = Field(pattern='^(TIER0|TIER1|TIER2)$')
     run_mode: str = Field(default='LIVE', pattern='^(LIVE|SHADOW|BACKTEST)$')
+
+
+class CreateStrategyRequest(BaseModel):
+    name: str
+
+
+class MemoryWriteRequest(BaseModel):
+    ticker: str
+    content: str
+    tags: list[str] = Field(default_factory=list)
 
 
 @router.get('/health')
@@ -45,29 +59,46 @@ def generate_report(payload: GenerateReportRequest, x_thread_id: str | None = He
 
 @router.get('/reports/{report_id}')
 def get_report(report_id: str) -> dict:
-    if report_id not in REPORT_STORE:
+    report = REPORT_STORE.get(report_id)
+    if report is None:
+        report = get_persisted_report(report_id)
+        if report is not None:
+            REPORT_STORE[report_id] = report
+    if report is None:
         raise HTTPException(status_code=404, detail='report not found')
-    return {'report_id': report_id, 'final_report': REPORT_STORE[report_id]}
+    return {'report_id': report_id, 'final_report': report}
 
 
-@router.post('/strategies/{strategy_id}/versions')
-def create_strategy_version(strategy_id: str, payload: dict) -> dict:
+@router.post('/strategies', status_code=201)
+def create_strategy(payload: CreateStrategyRequest) -> dict:
+    strategy_id = f'strategy_{uuid.uuid4().hex[:8]}'
+    return {'strategy_id': strategy_id, 'name': payload.name, 'status': 'created'}
+
+
+@router.post('/strategies/{id}/versions', status_code=201)
+def create_strategy_version(id: str, payload: dict) -> dict:
     return {
-        'strategy_id': strategy_id,
+        'strategy_id': id,
         'version_id': payload.get('version_id', f'strategy_{uuid.uuid4().hex[:8]}'),
         'status': 'created'
     }
 
 
-@router.get('/strategies/{strategy_id}/versions/{version_id}')
-def get_strategy_version(strategy_id: str, version_id: str) -> dict:
+@router.get('/strategies/{id}/versions/{version}')
+def get_strategy_version(id: str, version: str) -> dict:
     # TODO: read from DB after persistence layer is wired.
     return {
-        'strategy_id': strategy_id,
-        'version_id': version_id,
+        'strategy_id': id,
+        'version_id': version,
         'weights_hash': 'w_mock_hash_v1',
         'risk_profile': 'LOW'
     }
+
+
+@router.get('/tickers/{ticker}/snapshot')
+def get_snapshot(ticker: str, asof: datetime, strategy_version: str) -> dict:
+    snapshot = get_market_snapshot(ticker=ticker, asof=asof.isoformat())
+    return {'ticker': ticker, 'strategy_version': strategy_version, 'snapshot': snapshot}
 
 
 @router.post('/watchlist')
@@ -92,6 +123,23 @@ def graph_subtree(ticker: str, depth: int = 2) -> dict:
     return {'ticker': ticker, 'depth': depth, 'graph_id': f'graph_{ticker}_{depth}', 'nodes': [], 'edges': []}
 
 
+@router.get('/graph/paths')
+def graph_paths(entity: str, ticker: str) -> dict:
+    result = find_impact_paths(entity=entity, ticker=ticker)
+    return {'entity': entity, 'ticker': ticker, **result}
+
+
 @router.get('/memory/search')
 def memory_search(ticker: str, q: str) -> dict:
     return {'ticker': ticker, 'query': q, 'items': []}
+
+
+@router.post('/memory/write', status_code=201)
+def memory_write(payload: MemoryWriteRequest) -> dict:
+    note = {
+        'ticker': payload.ticker,
+        'summary': payload.content,
+        'tags': payload.tags,
+    }
+    result = write_memory_note(note)
+    return {'ok': result.get('ok', False), 'note_id': result.get('note_id')}
