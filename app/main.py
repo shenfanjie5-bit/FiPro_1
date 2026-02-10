@@ -9,7 +9,6 @@ from starlette.responses import Response
 from app.core.config import get_settings
 from app.api.routes import router
 from app.core.logging import configure_logging
-from app.db.session import initialize_database_schema
 
 
 logger = logging.getLogger(__name__)
@@ -31,9 +30,6 @@ def create_app() -> FastAPI:
     app = FastAPI(title='FiPro_1 API', version='0.1.0')
     app.add_middleware(RequestIDMiddleware)
 
-    @app.on_event('startup')
-    def _initialize_database() -> None:
-        initialize_database_schema()
 
     app.include_router(router)
     return app
