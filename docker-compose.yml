@@ -1,0 +1,35 @@
+services:
+  postgres:
+    image: ankane/pgvector:latest
+    container_name: fipro-postgres
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: fipro1
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d fipro1"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  redis:
+    image: redis:7-alpine
+    container_name: fipro-redis
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  neo4j:
+    image: neo4j:5
+    container_name: fipro-neo4j
+    environment:
+      NEO4J_AUTH: neo4j/neo4jpass
+    ports:
+      - "7474:7474"
+      - "7687:7687"

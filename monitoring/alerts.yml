@@ -1,0 +1,26 @@
+groups:
+  - name: fipro-alerts
+    rules:
+      - alert: HighApiErrorRate
+        expr: api_error_rate_5m > 0.05
+        for: 10m
+        labels:
+          severity: page
+        annotations:
+          summary: "API error rate is above 5%"
+
+      - alert: HighReportLatency
+        expr: report_generate_p95_ms > 12000
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Report generation latency p95 is above threshold"
+
+      - alert: SchemaValidationFailures
+        expr: report_schema_fail_rate_15m > 0.01
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Schema validation failure rate is high"

@@ -2,30 +2,39 @@
 
 ## Prerequisites
 - Python 3.11+
-- PostgreSQL 15+ (with pgvector)
-- Redis 7+
-- Neo4j (optional in MVP, can be mocked)
+- Docker + Docker Compose
 
-## Environment
-1. Copy `.env.example` to `.env`
-2. Fill required API keys and DB connection strings
-
-## Boot Services (example)
+## 1) Environment
 ```bash
-# postgres / redis / neo4j can be started by docker compose (to be added)
+cp .env.example .env
 ```
 
-## Apply DB Migration
+## 2) Start dependencies
+```bash
+docker compose up -d
+```
+
+## 3) Install app
+```bash
+python -m pip install -U pip
+python -m pip install -e .
+```
+
+## 4) Init DB
 ```bash
 psql "$DATABASE_URL" -f sql/001_init.sql
 ```
 
-## Run App (planned FastAPI)
+## 5) Run API
 ```bash
 uvicorn app.main:app --reload --port 8000
 ```
 
-## Smoke Test
+## 6) Smoke test
 ```bash
 curl http://localhost:8000/health
 ```
+
+## TODO
+- 接入 Alembic 迁移流。
+- 增加本地一键初始化脚本（seed + smoke test）。
