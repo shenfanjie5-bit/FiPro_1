@@ -34,13 +34,13 @@
 
 | ID | Task | Priority | Status | Est | Depends On | Acceptance |
 |---|---|---|---|---|---|---|
-| M1-01 | 将 `docs/SCHEMA.md` 落地为机器可读 schema 文件 | P0 | TODO | 1d | M0 | schema 可被程序加载 |
-| M1-02 | 实现 `schema_validator`（jsonschema） | P0 | TODO | 0.5d | M1-01 | 合法样例 pass，非法样例 fail |
-| M1-03 | 实现 `consistency_check`（证据引用一致性等） | P0 | TODO | 1d | M1-01 | 核心规则有自动检查 |
-| M1-04 | 修订 OpenAPI（`/reports/generate` 返回 `final_report`） | P0 | TODO | 0.5d | M1-01 | OpenAPI lint 通过 |
-| M1-05 | 工具统一 wrapper（trace/error/cost） | P0 | TODO | 1d | M0 | 每次工具调用有 trace |
-| M1-06 | DB 字段补齐（`weights_hash`/回放字段等） | P0 | TODO | 1d | M0-04 | migration 后字段齐全 |
-| M1-07 | 合约测试（schema/api/db）进入 CI | P0 | TODO | 1d | M1-02,M1-03,M1-04,M1-06 | CI 自动通过 |
+| M1-01 | 将 `docs/SCHEMA.md` 落地为机器可读 schema 文件 | P0 | DONE | 1d | M0 | schema 可被程序加载 |
+| M1-02 | 实现 `schema_validator`（jsonschema） | P0 | DONE | 0.5d | M1-01 | 合法样例 pass，非法样例 fail |
+| M1-03 | 实现 `consistency_check`（证据引用一致性等） | P0 | DONE | 1d | M1-01 | 核心规则有自动检查 |
+| M1-04 | 修订 OpenAPI（`/reports/generate` 返回 `final_report`） | P0 | DONE | 0.5d | M1-01 | OpenAPI lint 通过 |
+| M1-05 | 工具统一 wrapper（trace/error/cost） | P0 | DONE | 1d | M0 | 每次工具调用有 trace |
+| M1-06 | DB 字段补齐（`weights_hash`/回放字段等） | P0 | DONE | 1d | M0-04 | migration 后字段齐全 |
+| M1-07 | 合约测试（schema/api/db）进入 CI | P0 | DONE | 1d | M1-02,M1-03,M1-04,M1-06 | CI 自动通过 |
 
 ### M1 验收门
 

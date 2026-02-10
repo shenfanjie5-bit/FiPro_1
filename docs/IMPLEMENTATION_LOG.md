@@ -101,3 +101,33 @@
 - M2 readiness:
   - Move from linear workflow runner to true LangGraph `StateGraph` + conditional edges.
   - Persist report/decision/tool traces into Postgres (current persist is placeholder).
+
+## 2026-02-10 - Batch 05 (M1 Implementation)
+
+### Completed Operations
+- Aligned API docs contract:
+  - Updated `docs/API_SPEC.md` to match OpenAPI and runtime response semantics.
+  - Updated `docs/OPENAPI.yaml` to define report generation response as `{report_id, final_report}`.
+- Introduced migration versioning via Alembic:
+  - Added `alembic.ini`.
+  - Added Alembic environment files under `app/db/migrations/`.
+  - Added baseline migration `app/db/migrations/versions/20260210_0001_m1_contract_baseline.py`.
+- Backfilled SQL baseline fields in `sql/001_init.sql` for M1 replay/trace contract.
+- Synced ORM definitions in `app/db/models.py` with M1 fields.
+- Added/extended contract tests:
+  - `tests/test_contract_openapi.py`
+  - `tests/test_contract_sql_schema.py`
+  - `tests/test_contract_migrations.py`
+- Updated project dependencies and commands:
+  - Added `alembic` to `pyproject.toml`.
+  - Updated `Makefile`, `README.md`, and `docs/LOCAL_DEV.md` to use Alembic migration path.
+- Updated backlog status for M1 tasks to `DONE`.
+
+### Validation Evidence
+- `.venv/bin/python -m pytest -q` passed.
+- `.venv/bin/alembic heads` returned `20260210_0001 (head)`.
+
+### Pending Follow-up (Next Operations)
+- Start M2 implementation:
+  - Replace linear workflow runner with true LangGraph `StateGraph` and conditional edges.
+  - Implement DB-backed persistence in `persist_node` (reports/decision_logs/tool_traces).

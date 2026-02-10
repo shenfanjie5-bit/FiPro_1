@@ -20,9 +20,9 @@ python -m pip install -e .
 cp .env.example .env
 ```
 
-4. Apply DB init SQL
+4. Apply migrations
 ```bash
-psql "$DATABASE_URL" -f sql/001_init.sql
+alembic upgrade head
 ```
 
 5. Run API
@@ -50,15 +50,22 @@ curl -X POST http://localhost:8000/reports/generate \
   }'
 ```
 
+## Contract & Schema
+
+- API machine-readable contract: `docs/OPENAPI.yaml`
+- Report schema: `app/schemas/report.schema.json`
+- Request schema: `app/schemas/request.schema.json`
+- DB migration baseline: `app/db/migrations/versions/20260210_0001_m1_contract_baseline.py`
+
 ## Current Scope
 
 - TIER0 end-to-end workflow with mock tools
 - JSON schema validation + consistency checks
 - SQLite checkpoint for replay seed (thread-level)
-- API contracts aligned with docs/OPENAPI.yaml (skeleton level)
+- M1 contract tests for OpenAPI + SQL baseline
 
 ## TODO
 
-- Replace mock data tools with real adapters (M3)
-- Add TIER1 RAG + memory deepening (M4)
-- Add TIER2 graph + reviewer flows (M5)
+- Replace linear workflow with LangGraph StateGraph conditional routing
+- Replace mock tool adapters with real data integrations
+- Add reviewer path and TIER2 graph flow
