@@ -131,3 +131,18 @@
 - Start M2 implementation:
   - Replace linear workflow runner with true LangGraph `StateGraph` and conditional edges.
   - Implement DB-backed persistence in `persist_node` (reports/decision_logs/tool_traces).
+
+## 2026-02-10 - Batch 06 (Data Source Decision)
+
+### Completed Operations
+- Applied data source decision: Tushare Pro as primary provider.
+- Updated `docs/DATA_SOURCES.md` source registry and traceability notes.
+- Updated `.env.example` to include `TUSHARE_TOKEN`.
+- Updated `docs/BACKLOG.md` M3 task wording to prioritize Tushare Pro adapters.
+
+### Pending Follow-up (Next Operations)
+- Confirm exact Tushare endpoints for:
+  - market snapshots (kline/adj factor/volume)
+  - fundamentals (income/balance/cashflow/indicator)
+  - macro/commodity proxy fields
+- Confirm refresh cadence by tier (TIER0/TIER1/TIER2) under Tushare limits.
