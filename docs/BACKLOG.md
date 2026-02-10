@@ -12,14 +12,14 @@
 
 | ID | Task | Priority | Status | Est | Depends On | Acceptance |
 |---|---|---|---|---|---|---|
-| M0-01 | 建立 Python 工程骨架（`app/`, `tests/`, `pyproject.toml`） | P0 | TODO | 0.5d | - | `uvicorn app.main:app` 可启动 |
-| M0-02 | 新增 `docker-compose.yml`（postgres/redis/neo4j） | P0 | TODO | 0.5d | M0-01 | `docker compose up -d` 成功 |
-| M0-03 | 配置管理（`.env` 加载与必填校验） | P0 | TODO | 0.5d | M0-01 | 关键 env 缺失时报错清晰 |
-| M0-04 | 数据库初始化链路（执行 `sql/001_init.sql`） | P0 | TODO | 0.5d | M0-02 | 应用连库成功，表存在 |
-| M0-05 | 基础接口（`/health`, `/version`） | P0 | TODO | 0.5d | M0-03 | curl 返回 200 |
-| M0-06 | 结构化日志 + request_id 中间件 | P1 | TODO | 0.5d | M0-01 | 每次请求日志带 request_id |
-| M0-07 | CI 基线（lint + test 占位） | P1 | TODO | 0.5d | M0-01 | PR 自动检查通过 |
-| M0-08 | 重写 `README.md` 启动文档 | P0 | TODO | 0.5d | M0-02 | 新人可按文档完成启动 |
+| M0-01 | 建立 Python 工程骨架（`app/`, `tests/`, `pyproject.toml`） | P0 | DONE | 0.5d | - | `uvicorn app.main:app` 可启动 |
+| M0-02 | 新增 `docker-compose.yml`（postgres/redis/neo4j） | P0 | DONE | 0.5d | M0-01 | `docker compose up -d` 成功 |
+| M0-03 | 配置管理（`.env` 加载与必填校验） | P0 | DONE | 0.5d | M0-01 | 关键 env 缺失时报错清晰 |
+| M0-04 | 数据库初始化链路（执行 `sql/001_init.sql`） | P0 | DONE | 0.5d | M0-02 | 应用连库成功，表存在 |
+| M0-05 | 基础接口（`/health`, `/version`） | P0 | DONE | 0.5d | M0-03 | curl 返回 200 |
+| M0-06 | 结构化日志 + request_id 中间件 | P1 | DONE | 0.5d | M0-01 | 每次请求日志带 request_id |
+| M0-07 | CI 基线（lint + test 占位） | P1 | DONE | 0.5d | M0-01 | PR 自动检查通过 |
+| M0-08 | 重写 `README.md` 启动文档 | P0 | DONE | 0.5d | M0-02 | 新人可按文档完成启动 |
 
 ### M0 验收门
 
