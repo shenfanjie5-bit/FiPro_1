@@ -1,0 +1,105 @@
+{
+  "alert_lines": {
+    "cost_usd": {
+      "critical_p95": 2.5,
+      "warn_p95": 2.125
+    },
+    "latency_ms": {
+      "critical_p95": 12000.0,
+      "warn_p95": 10200.0
+    },
+    "tool_calls": {
+      "critical_p95": 90.0,
+      "warn_p95": 76.5
+    }
+  },
+  "effective_sample_size": 9,
+  "generated_at": "2026-02-11T10:06:55.832771+00:00",
+  "governance": {
+    "sample_topup": {
+      "effective_sample_after": 9,
+      "enabled": true,
+      "rounds": [
+        {
+          "effective_sample_before": 1,
+          "latest_report_id": "fde0f6ba-b08a-4312-bb7b-f3f2e0d80852",
+          "round": 1,
+          "seed_count": 8
+        }
+      ],
+      "target_min_sample_size": 8
+    }
+  },
+  "overall_status": "PASS",
+  "raw_sample_size": 12,
+  "summary": {
+    "avg_cost_usd": 0.0,
+    "avg_latency_ms": 9.444444,
+    "avg_tool_calls": 15.0,
+    "cost_p95_usd": 0.0,
+    "latency_p95_ms": 15.6,
+    "sample_size": 9,
+    "tool_calls_p95": 15.0,
+    "violation_rates": {
+      "any": 0.0,
+      "cost": 0.0,
+      "latency": 0.0,
+      "tool_calls": 0.0
+    },
+    "violation_reports": [],
+    "violations": {
+      "any": 0,
+      "cost": 0,
+      "latency": 0,
+      "tool_calls": 0
+    }
+  },
+  "threshold_checks": [
+    {
+      "actual": 9.0,
+      "metric": "sample_size",
+      "operator": ">=",
+      "pass": true,
+      "threshold": 8.0
+    },
+    {
+      "actual": 15.0,
+      "metric": "tool_calls_p95",
+      "operator": "<=",
+      "pass": true,
+      "threshold": 90.0
+    },
+    {
+      "actual": 0.0,
+      "metric": "cost_p95_usd",
+      "operator": "<=",
+      "pass": true,
+      "threshold": 2.5
+    },
+    {
+      "actual": 15.6,
+      "metric": "latency_p95_ms",
+      "operator": "<=",
+      "pass": true,
+      "threshold": 12000.0
+    },
+    {
+      "actual": 0.0,
+      "metric": "budget_violation_rate",
+      "operator": "<=",
+      "pass": true,
+      "threshold": 0.05
+    }
+  ],
+  "thresholds": {
+    "latency_p95_ms_max": 12000.0,
+    "max_cost_usd": 2.5,
+    "max_tool_calls": 90.0,
+    "max_violation_rate": 0.05,
+    "min_sample_size": 8.0
+  },
+  "window": {
+    "dedupe_latest": true,
+    "lookback_days": 14
+  }
+}

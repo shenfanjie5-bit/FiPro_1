@@ -45,6 +45,23 @@
   - `monitoring/dashboards/m4_low_coverage_replay.json`
   - `monitoring/dashboards/m4_low_coverage_replay.md`
 
+### 1.3 M5 TIER2 预算校准（tool_calls/cost/latency）
+- 目标：校准并守门 TIER2 的预算指标，保证图谱与复核链路不超预算。
+- 数据来源：`reports` + `decision_logs`（Postgres 优先，sqlite runtime 兜底）。
+- 统计口径：默认近 `14` 天，按场景最新报告去重（ticker+asof+strategy_version_id+tier+run_mode）。
+- 阈值与告警线（由 tier2 budget 推导）：
+  - `tool_calls_p95 <= 90`（warning line `76.5`）
+  - `cost_p95_usd <= 2.50`（warning line `2.125`）
+  - `latency_p95_ms <= 12000`（warning line `10200`）
+  - `budget_violation_rate <= 0.05`
+- 生成命令：
+  - `make eval-m5`
+  - 或 `python scripts/m5_tier2_calibration.py --lookback-days 14 --auto-topup-samples --enforce-thresholds`
+  - 样本量治理：`--auto-topup-samples` 会在 TIER2 样本不足时自动补样并重算校准结果
+- 产物：
+  - `monitoring/dashboards/m5_tier2_calibration.json`
+  - `monitoring/dashboards/m5_tier2_calibration.md`
+
 ## 2. 在线评估（Online）
 - 指标：用户有用率、报告生成成功率、SLA 命中率。
 - 策略：小流量灰度 + 阈值守门。

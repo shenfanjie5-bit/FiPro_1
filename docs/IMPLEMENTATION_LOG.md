@@ -622,3 +622,35 @@
 
 ### Pending Follow-up (Next Operations)
 - Finish M5-10 calibration artifact for TIER2 cost/latency/tool-call guardrail thresholds and alert cut lines.
+
+## 2026-02-11 - Batch 22 (M0-M5 Audit + M5-10 Budget Calibration Closure)
+
+### Completed Operations
+- Performed M0-M5 acceptance audit against `docs/BACKLOG.md` and executable repository evidence.
+- Closed remaining M5-10 gap (TIER2 budget calibration + alert lines):
+  - Added calibration module: `app/eval/m5_tier2_calibration.py`
+    - computes Tier2 `tool_calls/cost/latency` p95/avg metrics,
+    - computes budget violation rates,
+    - evaluates threshold gates and emits alert cut lines.
+  - Added calibration script: `scripts/m5_tier2_calibration.py`
+    - outputs JSON/Markdown artifacts under `monitoring/dashboards/`,
+    - supports threshold enforcement and sample auto-topup.
+  - Added test coverage: `tests/test_m5_tier2_calibration.py`
+    - pass scenario (within budget),
+    - fail scenario (high violation rate).
+- Operationalized M5 calibration in developer workflow:
+  - `Makefile` adds `eval-m5` target (`--auto-topup-samples --enforce-thresholds`).
+  - `docs/EVAL_PLAN.md` adds M5 Tier2 calibration section and command usage.
+  - `monitoring/dashboards/README.md` includes M5 artifact references.
+  - `monitoring/alerts.yml` adds Tier2 warning/critical alerts for tool calls, cost, and latency.
+- Milestone bookkeeping:
+  - `docs/BACKLOG.md` marks `M5-10` as `DONE`.
+
+### Validation Evidence
+- `.venv/bin/python -m pytest -q` passed.
+- `.venv/bin/ruff check app tests scripts` passed.
+- `.venv/bin/python scripts/m5_tier2_calibration.py --lookback-days 14 --auto-topup-samples --enforce-thresholds` passed.
+
+### Artifacts
+- `monitoring/dashboards/m5_tier2_calibration.json`
+- `monitoring/dashboards/m5_tier2_calibration.md`
