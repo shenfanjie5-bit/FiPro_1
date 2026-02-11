@@ -49,7 +49,6 @@ jobs:
           python -m pip install -U pip
           python -m pip install -e .
       - name: Seed baseline samples
-        if: ${{ github.event.inputs.mode != 'replay_repair' }}
         run: |
           python scripts/seed_m4_baseline_samples.py \
             --count "${{ github.event.inputs.seed_count || '12' }}" \
