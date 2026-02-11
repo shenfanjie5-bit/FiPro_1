@@ -1,0 +1,521 @@
+{
+  "by_tier": {
+    "TIER0": {
+      "avg_cost_usd": 0.0,
+      "avg_evidence_refs": 5.0,
+      "avg_latency_ms": 4.0,
+      "avg_tool_calls": 8.0,
+      "citation_consistency_rate": 1.0,
+      "consistency_pass_rate": 1.0,
+      "cost_budget_max_usd": 0.2,
+      "cost_budget_ok": true,
+      "cost_p95_usd": 0.0,
+      "evidence_coverage_pass_rate": 1.0,
+      "failures": {
+        "citation_inconsistent": 0,
+        "consistency_failed": 0,
+        "evidence_coverage_failed": 0,
+        "schema_failed": 0
+      },
+      "latency_p95_ms": 4.0,
+      "low_coverage_reports": [],
+      "sample_size": 1,
+      "schema_pass_rate": 1.0
+    },
+    "TIER1": {
+      "avg_cost_usd": 0.0,
+      "avg_evidence_refs": 14.0,
+      "avg_latency_ms": 11.0,
+      "avg_tool_calls": 12.0,
+      "citation_consistency_rate": 1.0,
+      "consistency_pass_rate": 1.0,
+      "cost_budget_max_usd": 0.8,
+      "cost_budget_ok": true,
+      "cost_p95_usd": 0.0,
+      "evidence_coverage_pass_rate": 1.0,
+      "failures": {
+        "citation_inconsistent": 0,
+        "consistency_failed": 0,
+        "evidence_coverage_failed": 0,
+        "schema_failed": 0
+      },
+      "latency_p95_ms": 11.0,
+      "low_coverage_reports": [],
+      "sample_size": 1,
+      "schema_pass_rate": 1.0
+    },
+    "TIER2": {
+      "avg_cost_usd": 0.0,
+      "avg_evidence_refs": 0.0,
+      "avg_latency_ms": 0.0,
+      "avg_tool_calls": 0.0,
+      "citation_consistency_rate": 0.0,
+      "consistency_pass_rate": 0.0,
+      "cost_budget_max_usd": 2.5,
+      "cost_budget_ok": true,
+      "cost_p95_usd": 0.0,
+      "evidence_coverage_pass_rate": 0.0,
+      "failures": {
+        "citation_inconsistent": 0,
+        "consistency_failed": 0,
+        "evidence_coverage_failed": 0,
+        "schema_failed": 0
+      },
+      "latency_p95_ms": 0.0,
+      "sample_size": 0,
+      "schema_pass_rate": 0.0
+    }
+  },
+  "effective_sample_size": 2,
+  "generated_at": "2026-02-11T08:24:03.872689+00:00",
+  "overall": {
+    "avg_cost_usd": 0.0,
+    "avg_evidence_refs": 9.5,
+    "avg_latency_ms": 7.5,
+    "avg_tool_calls": 10.0,
+    "citation_consistency_rate": 1.0,
+    "consistency_pass_rate": 1.0,
+    "cost_p95_usd": 0.0,
+    "evidence_coverage_pass_rate": 1.0,
+    "failures": {
+      "citation_inconsistent": 0,
+      "consistency_failed": 0,
+      "evidence_coverage_failed": 0,
+      "schema_failed": 0
+    },
+    "latency_p95_ms": 10.65,
+    "low_coverage_reports": [],
+    "sample_size": 2,
+    "schema_pass_rate": 1.0
+  },
+  "overall_status": "FAIL",
+  "raw_sample_size": 206,
+  "raw_tier1_low_coverage_reports": [
+    {
+      "created_at": "2026-02-11T08:23:50.152860+00:00",
+      "evidence_refs": 5,
+      "missing_rules": [
+        "missing_type=NEWS_DOC"
+      ],
+      "present_types": [
+        "MANUAL_NOTE",
+        "SNAPSHOT_FIELD"
+      ],
+      "report_id": "73f2affe-3331-45a9-974f-8db166750289",
+      "tier": "TIER1"
+    },
+    {
+      "created_at": "2026-02-11T08:22:30.228129+00:00",
+      "evidence_refs": 5,
+      "missing_rules": [
+        "missing_type=NEWS_DOC"
+      ],
+      "present_types": [
+        "MANUAL_NOTE",
+        "SNAPSHOT_FIELD"
+      ],
+      "report_id": "07d2528e-d8ae-416b-90c9-dfd708f93deb",
+      "tier": "TIER1"
+    },
+    {
+      "created_at": "2026-02-11T08:21:10.058614+00:00",
+      "evidence_refs": 5,
+      "missing_rules": [
+        "missing_type=NEWS_DOC"
+      ],
+      "present_types": [
+        "MANUAL_NOTE",
+        "SNAPSHOT_FIELD"
+      ],
+      "report_id": "92d8b1f3-e6ce-4e2b-92d1-d1bcf6f5cb67",
+      "tier": "TIER1"
+    },
+    {
+      "created_at": "2026-02-11T08:20:17.417192+00:00",
+      "evidence_refs": 5,
+      "missing_rules": [
+        "missing_type=NEWS_DOC"
+      ],
+      "present_types": [
+        "MANUAL_NOTE",
+        "SNAPSHOT_FIELD"
+      ],
+      "report_id": "2841a66c-c459-449f-b6c4-a8fe67cd0891",
+      "tier": "TIER1"
+    },
+    {
+      "created_at": "2026-02-11T08:20:01.149394+00:00",
+      "evidence_refs": 5,
+      "missing_rules": [
+        "missing_type=NEWS_DOC"
+      ],
+      "present_types": [
+        "MANUAL_NOTE",
+        "SNAPSHOT_FIELD"
+      ],
+      "report_id": "c23aa0e4-7f9b-4707-98ad-c1d044ce9bbd",
+      "tier": "TIER1"
+    },
+    {
+      "created_at": "2026-02-11T08:14:55.484060+00:00",
+      "evidence_refs": 5,
+      "missing_rules": [
+        "missing_type=NEWS_DOC"
+      ],
+      "present_types": [
+        "MANUAL_NOTE",
+        "SNAPSHOT_FIELD"
+      ],
+      "report_id": "93114c5f-7514-4d78-801a-8752812ba035",
+      "tier": "TIER1"
+    },
+    {
+      "created_at": "2026-02-11T08:13:53.123110+00:00",
+      "evidence_refs": 5,
+      "missing_rules": [
+        "missing_type=NEWS_DOC"
+      ],
+      "present_types": [
+        "MANUAL_NOTE",
+        "SNAPSHOT_FIELD"
+      ],
+      "report_id": "d77390e6-bb6e-489f-8707-bc704764ecce",
+      "tier": "TIER1"
+    },
+    {
+      "created_at": "2026-02-11T08:06:12.767099+00:00",
+      "evidence_refs": 5,
+      "missing_rules": [
+        "missing_type=NEWS_DOC"
+      ],
+      "present_types": [
+        "MANUAL_NOTE",
+        "SNAPSHOT_FIELD"
+      ],
+      "report_id": "fc7cc721-9d81-4d3e-b1ce-9f5809021825",
+      "tier": "TIER1"
+    },
+    {
+      "created_at": "2026-02-11T07:56:08.787921+00:00",
+      "evidence_refs": 5,
+      "missing_rules": [
+        "missing_type=NEWS_DOC"
+      ],
+      "present_types": [
+        "MANUAL_NOTE",
+        "SNAPSHOT_FIELD"
+      ],
+      "report_id": "f9dbdc19-8853-462b-be69-a7b01aded776",
+      "tier": "TIER1"
+    },
+    {
+      "created_at": "2026-02-11T07:54:54.544926+00:00",
+      "evidence_refs": 6,
+      "missing_rules": [
+        "missing_type=NEWS_DOC"
+      ],
+      "present_types": [
+        "MANUAL_NOTE",
+        "SNAPSHOT_FIELD"
+      ],
+      "report_id": "e5b72a97-2933-430b-9021-722ccfad43e0",
+      "tier": "TIER1"
+    },
+    {
+      "created_at": "2026-02-11T07:54:04.837121+00:00",
+      "evidence_refs": 6,
+      "missing_rules": [
+        "missing_type=NEWS_DOC"
+      ],
+      "present_types": [
+        "MANUAL_NOTE",
+        "SNAPSHOT_FIELD"
+      ],
+      "report_id": "c53bfbcb-0a84-4c7e-9956-41fadfb8aea2",
+      "tier": "TIER1"
+    },
+    {
+      "created_at": "2026-02-11T07:08:09.912888+00:00",
+      "evidence_refs": 9,
+      "missing_rules": [
+        "missing_type=NEWS_DOC"
+      ],
+      "present_types": [
+        "DOC",
+        "SNAPSHOT_FIELD"
+      ],
+      "report_id": "1ad6e0ed-fec6-4b32-bd83-cb94f84410f2",
+      "tier": "TIER1"
+    },
+    {
+      "created_at": "2026-02-11T07:06:03.820877+00:00",
+      "evidence_refs": 9,
+      "missing_rules": [
+        "missing_type=NEWS_DOC"
+      ],
+      "present_types": [
+        "DOC",
+        "SNAPSHOT_FIELD"
+      ],
+      "report_id": "34edcd78-7055-48b9-8f09-c34d7da75e45",
+      "tier": "TIER1"
+    },
+    {
+      "created_at": "2026-02-11T06:20:51.778015+00:00",
+      "evidence_refs": 9,
+      "missing_rules": [
+        "missing_type=NEWS_DOC"
+      ],
+      "present_types": [
+        "DOC",
+        "SNAPSHOT_FIELD"
+      ],
+      "report_id": "dd252a4f-89b7-49f2-9c5e-c47083a55739",
+      "tier": "TIER1"
+    },
+    {
+      "created_at": "2026-02-10T20:12:56.581278+00:00",
+      "evidence_refs": 9,
+      "missing_rules": [
+        "missing_type=NEWS_DOC"
+      ],
+      "present_types": [
+        "DOC",
+        "SNAPSHOT_FIELD"
+      ],
+      "report_id": "c15cbf66-97df-4e84-bddc-b4e7db3e426f",
+      "tier": "TIER1"
+    },
+    {
+      "created_at": "2026-02-10T20:10:23.946655+00:00",
+      "evidence_refs": 9,
+      "missing_rules": [
+        "missing_type=NEWS_DOC"
+      ],
+      "present_types": [
+        "DOC",
+        "SNAPSHOT_FIELD"
+      ],
+      "report_id": "1bf2463c-6464-4a0d-a769-3360710e0b24",
+      "tier": "TIER1"
+    },
+    {
+      "created_at": "2026-02-10T20:08:15.882867+00:00",
+      "evidence_refs": 9,
+      "missing_rules": [
+        "missing_type=NEWS_DOC"
+      ],
+      "present_types": [
+        "DOC",
+        "SNAPSHOT_FIELD"
+      ],
+      "report_id": "c290eea5-3189-4c65-a527-a9ca49ab3fba",
+      "tier": "TIER1"
+    },
+    {
+      "created_at": "2026-02-10T19:29:19.120042+00:00",
+      "evidence_refs": 9,
+      "missing_rules": [
+        "missing_type=NEWS_DOC"
+      ],
+      "present_types": [
+        "DOC",
+        "SNAPSHOT_FIELD"
+      ],
+      "report_id": "7057fb62-3856-4c2c-ae0b-0105dbde52ad",
+      "tier": "TIER1"
+    },
+    {
+      "created_at": "2026-02-10T19:25:19.405061+00:00",
+      "evidence_refs": 9,
+      "missing_rules": [
+        "missing_type=NEWS_DOC"
+      ],
+      "present_types": [
+        "DOC",
+        "SNAPSHOT_FIELD"
+      ],
+      "report_id": "4795e6bd-4efa-401e-9850-9924fae8a1ff",
+      "tier": "TIER1"
+    },
+    {
+      "created_at": "2026-02-10T19:09:34.888958+00:00",
+      "evidence_refs": 9,
+      "missing_rules": [
+        "missing_type=NEWS_DOC"
+      ],
+      "present_types": [
+        "DOC",
+        "SNAPSHOT_FIELD"
+      ],
+      "report_id": "3381d73d-1417-4a9a-9146-65fcdaf8ac58",
+      "tier": "TIER1"
+    },
+    {
+      "created_at": "2026-02-10T19:09:34.738795+00:00",
+      "evidence_refs": 9,
+      "missing_rules": [
+        "missing_type=NEWS_DOC"
+      ],
+      "present_types": [
+        "DOC",
+        "SNAPSHOT_FIELD"
+      ],
+      "report_id": "790f2dcc-0719-4bd9-8581-89cd0b9d7feb",
+      "tier": "TIER1"
+    },
+    {
+      "created_at": "2026-02-10T19:08:25.079524+00:00",
+      "evidence_refs": 9,
+      "missing_rules": [
+        "missing_type=NEWS_DOC"
+      ],
+      "present_types": [
+        "DOC",
+        "SNAPSHOT_FIELD"
+      ],
+      "report_id": "856cbb01-9317-4574-a27a-c7e1e2e6770b",
+      "tier": "TIER1"
+    },
+    {
+      "created_at": "2026-02-10T19:08:05.613683+00:00",
+      "evidence_refs": 9,
+      "missing_rules": [
+        "missing_type=NEWS_DOC"
+      ],
+      "present_types": [
+        "DOC",
+        "SNAPSHOT_FIELD"
+      ],
+      "report_id": "d60c3f3f-0211-40dc-b1a5-6fd84f0da394",
+      "tier": "TIER1"
+    },
+    {
+      "created_at": "2026-02-10T19:07:57.963787+00:00",
+      "evidence_refs": 9,
+      "missing_rules": [
+        "missing_type=NEWS_DOC"
+      ],
+      "present_types": [
+        "DOC",
+        "SNAPSHOT_FIELD"
+      ],
+      "report_id": "6f9b8307-d1de-4532-84cb-fbe9ca2591e6",
+      "tier": "TIER1"
+    },
+    {
+      "created_at": "2026-02-10T18:57:06.656397+00:00",
+      "evidence_refs": 9,
+      "missing_rules": [
+        "missing_type=NEWS_DOC"
+      ],
+      "present_types": [
+        "DOC",
+        "SNAPSHOT_FIELD"
+      ],
+      "report_id": "rpt_ce6d098057d2",
+      "tier": "TIER1"
+    },
+    {
+      "created_at": "2026-02-10T18:55:00.825490+00:00",
+      "evidence_refs": 9,
+      "missing_rules": [
+        "missing_type=NEWS_DOC"
+      ],
+      "present_types": [
+        "DOC",
+        "SNAPSHOT_FIELD"
+      ],
+      "report_id": "rpt_b810e98a5ee5",
+      "tier": "TIER1"
+    },
+    {
+      "created_at": "2026-02-10T18:54:24.514293+00:00",
+      "evidence_refs": 9,
+      "missing_rules": [
+        "missing_type=NEWS_DOC"
+      ],
+      "present_types": [
+        "DOC",
+        "SNAPSHOT_FIELD"
+      ],
+      "report_id": "rpt_b975edee8dd2",
+      "tier": "TIER1"
+    },
+    {
+      "created_at": "2026-02-10T18:53:26.990755+00:00",
+      "evidence_refs": 9,
+      "missing_rules": [
+        "missing_type=NEWS_DOC"
+      ],
+      "present_types": [
+        "DOC",
+        "SNAPSHOT_FIELD"
+      ],
+      "report_id": "rpt_ff5db5c132b5",
+      "tier": "TIER1"
+    }
+  ],
+  "source": {
+    "database_url": "",
+    "mode": "sqlite_runtime",
+    "runtime_db": "checkpoint.db"
+  },
+  "threshold_checks": [
+    {
+      "actual": 1.0,
+      "metric": "schema_pass_rate",
+      "operator": ">=",
+      "pass": true,
+      "threshold": 1.0
+    },
+    {
+      "actual": 1.0,
+      "metric": "citation_consistency_rate",
+      "operator": ">=",
+      "pass": true,
+      "threshold": 0.98
+    },
+    {
+      "actual": 1.0,
+      "metric": "evidence_coverage_pass_rate",
+      "operator": ">=",
+      "pass": true,
+      "threshold": 0.9
+    },
+    {
+      "actual": 10.65,
+      "metric": "latency_p95_ms",
+      "operator": "<=",
+      "pass": true,
+      "threshold": 7000.0
+    },
+    {
+      "actual": 0.0,
+      "metric": "avg_cost_usd",
+      "operator": "<=",
+      "pass": true,
+      "threshold": 0.9
+    },
+    {
+      "actual": 2.0,
+      "metric": "sample_size",
+      "operator": ">=",
+      "pass": false,
+      "threshold": 10.0
+    }
+  ],
+  "thresholds": {
+    "avg_cost_usd_max": 0.9,
+    "citation_consistency_rate_min": 0.98,
+    "evidence_coverage_pass_rate_min": 0.9,
+    "latency_p95_ms_max": 7000,
+    "min_sample_size": 10,
+    "schema_pass_rate_min": 1.0
+  },
+  "tier1_low_coverage_reports": [],
+  "window": {
+    "dedupe_latest": true,
+    "lookback_days": 14
+  }
+}

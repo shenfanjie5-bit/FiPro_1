@@ -1,0 +1,15 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "GenerateReportRequest",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["ticker", "asof", "strategy_version_id", "tier"],
+  "properties": {
+    "ticker": { "type": "string", "minLength": 1 },
+    "market": { "type": "string", "enum": ["CN_A", "US", "HK", "CRYPTO", "OTHER"] },
+    "asof": { "type": "string", "format": "date-time" },
+    "strategy_version_id": { "type": "string", "minLength": 1 },
+    "tier": { "type": "string", "enum": ["TIER0", "TIER1", "TIER2"] },
+    "run_mode": { "type": "string", "enum": ["LIVE", "SHADOW", "BACKTEST"] }
+  }
+}

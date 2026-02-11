@@ -1,2 +1,8 @@
 .localized
 .DS_Store
+__pycache__/
+.pytest_cache/
+.venv/
+.env
+*.egg-info/
+checkpoint.db

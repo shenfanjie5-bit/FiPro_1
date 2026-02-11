@@ -33,10 +33,70 @@ components:
           enum: [TIER0, TIER1, TIER2]
     GenerateReportResponse:
       type: object
-      required: [report_id, status]
+      required: [report_id, final_report]
       properties:
         report_id: { type: string, example: rpt_20260210_600519 }
-        status: { type: string, enum: [QUEUED, RUNNING, DONE, FAILED] }
+        final_report: { $ref: '#/components/schemas/Report' }
+    Report:
+      type: object
+      required:
+        - schema_version
+        - report_id
+        - generated_at
+        - ticker
+        - asof
+        - strategy_version_id
+        - tier
+        - decision
+        - price_bands
+        - key_drivers_to_watch
+        - thesis
+        - risk_flags
+        - invalidations
+        - evidence_refs
+        - data_quality
+        - provenance
+        - memory_update
+      properties:
+        schema_version: { type: string, example: "0.1" }
+        report_id: { type: string }
+        generated_at: { type: string, format: date-time }
+        ticker: { type: string }
+        market: { type: string, enum: [CN_A, US, HK, CRYPTO, OTHER] }
+        asof: { type: string, format: date-time }
+        strategy_version_id: { type: string }
+        tier: { type: string, enum: [TIER0, TIER1, TIER2] }
+        decision: { type: object }
+        price_bands:
+          type: array
+          items: { type: object }
+        key_drivers_to_watch:
+          type: array
+          items: { type: object }
+        thesis: { type: object }
+        risk_flags:
+          type: array
+          items: { type: object }
+        invalidations:
+          type: array
+          items: { type: object }
+        evidence_refs:
+          type: array
+          items:
+            type: object
+            required: [evidence_id, type, title, source, captured_at]
+            properties:
+              evidence_id: { type: string }
+              type: { type: string, enum: [SNAPSHOT_FIELD, NEWS_DOC, FILINGS, MACRO_SERIES, GRAPH_QUERY, MANUAL_NOTE] }
+              title: { type: string }
+              source: { type: string }
+              captured_at: { type: string, format: date-time }
+              uri: { type: string }
+              snippet: { type: string }
+              checksum: { type: string }
+        data_quality: { type: object }
+        provenance: { type: object }
+        memory_update: { type: object }
     WatchlistItem:
       type: object
       required: [ticker, tier]
@@ -112,8 +172,8 @@ paths:
           application/json:
             schema: { $ref: '#/components/schemas/GenerateReportRequest' }
       responses:
-        '202':
-          description: Accepted
+        '200':
+          description: OK
           content:
             application/json:
               schema: { $ref: '#/components/schemas/GenerateReportResponse' }
@@ -126,7 +186,11 @@ paths:
           required: true
           schema: { type: string }
       responses:
-        '200': { description: OK }
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/GenerateReportResponse' }
         '404':
           description: Not Found
           content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } }

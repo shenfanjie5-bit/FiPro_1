@@ -1,0 +1,161 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Report",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "report_id",
+    "generated_at",
+    "ticker",
+    "asof",
+    "strategy_version_id",
+    "tier",
+    "decision",
+    "price_bands",
+    "key_drivers_to_watch",
+    "thesis",
+    "risk_flags",
+    "invalidations",
+    "evidence_refs",
+    "data_quality",
+    "provenance",
+    "memory_update"
+  ],
+  "properties": {
+    "schema_version": { "type": "string", "const": "0.1" },
+    "report_id": { "type": "string", "minLength": 1 },
+    "generated_at": { "type": "string", "format": "date-time" },
+    "ticker": { "type": "string", "minLength": 1 },
+    "market": { "type": "string", "enum": ["CN_A", "US", "HK", "CRYPTO", "OTHER"] },
+    "asof": { "type": "string", "format": "date-time" },
+    "strategy_version_id": { "type": "string", "minLength": 1 },
+    "tier": { "type": "string", "enum": ["TIER0", "TIER1", "TIER2"] },
+    "decision": {
+      "type": "object",
+      "required": ["action", "overall_score", "confidence", "time_horizon", "summary"],
+      "properties": {
+        "action": { "type": "string", "enum": ["BUY", "WATCH", "AVOID"] },
+        "overall_score": { "type": "integer", "minimum": 0, "maximum": 100 },
+        "confidence": { "type": "number", "minimum": 0, "maximum": 1 },
+        "time_horizon": { "type": "string", "enum": ["INTRADAY", "SWING", "POSITION"] },
+        "summary": { "type": "string", "minLength": 1 }
+      }
+    },
+    "price_bands": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": ["band_id", "range", "score", "confidence", "rationale", "entry_conditions", "exit_conditions"],
+        "properties": {
+          "band_id": { "type": "string" },
+          "range": {
+            "type": "object",
+            "required": ["currency", "min", "max"],
+            "properties": {
+              "currency": { "type": "string" },
+              "min": { "type": "number" },
+              "max": { "type": "number" }
+            }
+          },
+          "score": { "type": "integer", "minimum": 0, "maximum": 100 },
+          "confidence": { "type": "number", "minimum": 0, "maximum": 1 },
+          "rationale": { "type": "string" },
+          "entry_conditions": { "type": "array", "minItems": 1 },
+          "exit_conditions": { "type": "array", "minItems": 1 }
+        }
+      }
+    },
+    "key_drivers_to_watch": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": ["driver_id", "type", "what", "direction", "urgency", "impact_hypothesis", "monitor"],
+        "properties": {
+          "driver_id": { "type": "string" },
+          "type": { "type": "string" },
+          "what": { "type": "string" },
+          "direction": { "type": "string" },
+          "urgency": { "type": "string" },
+          "impact_hypothesis": { "type": "string" },
+          "monitor": { "type": "object" },
+          "evidence_ids": { "type": "array", "items": { "type": "string" } },
+          "graph_refs": { "type": "array", "items": { "type": "string" } }
+        }
+      }
+    },
+    "thesis": {
+      "type": "object",
+      "required": ["base_case", "bull_case", "bear_case", "next_steps"],
+      "properties": {
+        "base_case": { "type": "string" },
+        "bull_case": { "type": "string" },
+        "bear_case": { "type": "string" },
+        "next_steps": { "type": "array", "minItems": 1, "items": { "type": "string" } }
+      }
+    },
+    "risk_flags": { "type": "array", "items": { "type": "object" } },
+    "invalidations": { "type": "array", "minItems": 1, "items": { "type": "object" } },
+    "evidence_refs": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": ["evidence_id", "type", "title", "source", "captured_at"],
+        "properties": {
+          "evidence_id": { "type": "string" },
+          "type": {
+            "type": "string",
+            "enum": ["SNAPSHOT_FIELD", "NEWS_DOC", "FILINGS", "MACRO_SERIES", "GRAPH_QUERY", "MANUAL_NOTE"]
+          },
+          "title": { "type": "string" },
+          "source": { "type": "string" },
+          "captured_at": { "type": "string", "format": "date-time" },
+          "uri": { "type": ["string", "null"] },
+          "snippet": { "type": ["string", "null"] },
+          "checksum": { "type": ["string", "null"] }
+        }
+      }
+    },
+    "data_quality": {
+      "type": "object",
+      "required": ["status", "missing_fields", "notes"],
+      "properties": {
+        "status": { "type": "string", "enum": ["OK", "DEGRADED", "PARTIAL"] },
+        "missing_fields": { "type": "array", "items": { "type": "string" } },
+        "notes": { "type": "string" }
+      }
+    },
+    "provenance": {
+      "type": "object",
+      "required": ["model", "router_policy", "snapshot_ids", "weights_hash", "run_mode"],
+      "properties": {
+        "model": {
+          "type": "object",
+          "required": ["primary", "reviewer"],
+          "properties": {
+            "primary": { "type": "string" },
+            "reviewer": { "type": "string" }
+          }
+        },
+        "router_policy": { "type": "string" },
+        "snapshot_ids": { "type": "array", "items": { "type": "string" } },
+        "weights_hash": { "type": "string" },
+        "run_mode": { "type": "string", "enum": ["LIVE", "SHADOW", "BACKTEST"] },
+        "tool_call_stats": { "type": "object" }
+      }
+    },
+    "memory_update": {
+      "type": "object",
+      "required": ["summary", "tags", "importance", "followups"],
+      "properties": {
+        "summary": { "type": "string" },
+        "tags": { "type": "array", "items": { "type": "string" } },
+        "importance": { "type": "integer", "minimum": 0, "maximum": 100 },
+        "followups": { "type": "array", "items": { "type": "string" } }
+      }
+    }
+  }
+}
