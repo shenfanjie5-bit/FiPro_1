@@ -26,6 +26,15 @@ class LLMProvider:
         price_bands = context['price_bands']
         evidence = context['evidence_refs']
         router_policy = context.get('router_policy', 'default-v1')
+        graph_refs = [str(item).strip() for item in context.get('graph_refs', []) if str(item).strip()]
+        graph_evidence_ids = [
+            str(ref.get('evidence_id', '')).strip()
+            for ref in evidence
+            if isinstance(ref, dict) and str(ref.get('type', '')).upper() == 'GRAPH_QUERY' and str(ref.get('evidence_id', '')).strip()
+        ]
+        primary_evidence_ids = [evidence[0]['evidence_id']]
+        if graph_evidence_ids and graph_evidence_ids[0] not in primary_evidence_ids:
+            primary_evidence_ids.append(graph_evidence_ids[0])
 
         return {
             'schema_version': '0.1',
@@ -56,8 +65,8 @@ class LLMProvider:
                         'signals': [{'name': 'inventory_days', 'source': 'snapshot'}],
                         'triggers': [{'description': 'inventory_days rises > 15% WoW', 'severity': 'HIGH'}]
                     },
-                    'evidence_ids': [evidence[0]['evidence_id']],
-                    'graph_refs': []
+                    'evidence_ids': primary_evidence_ids,
+                    'graph_refs': graph_refs[:6]
                 }
             ],
             'thesis': {
