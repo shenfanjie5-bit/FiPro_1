@@ -256,3 +256,110 @@
 - Update `README.md` outdated TODO line that still mentions replacing linear workflow.
 - For strict M0 gate closure, verify `docker compose up -d` and CI green in a docker-enabled / remote CI environment.
 - Start M3 implementation (replace facts/memory mocks with real data adapters as planned).
+
+## 2026-02-10 - Batch 12 (M3 Data Layer MVP Completion)
+
+### Completed Operations
+- Implemented M3 facts data adapters in `app/tools/facts.py`:
+  - Added Tushare Pro adapter path (when `TUSHARE_TOKEN` is configured) for market/fundamentals/flow/macro snapshots.
+  - Added deterministic fallback path for upstream failure or missing credentials with explicit degraded `data_quality`.
+  - Added snapshot normalization (UTC timestamps, unified fields, source/source_id/checksum/snapshot_type).
+  - Added quality gates (freshness/null-ratio/outlier) and merged gate outputs into `data_quality`.
+  - Added snapshot cache with TTL + hit/miss observability metadata.
+- Implemented M3 event docs ingest/search adapter in `app/tools/rag.py`:
+  - Added runtime sqlite ingestion table (`event_docs`) with upsert.
+  - Added query + time-window retrieval with cache TTL and cache observability.
+  - Added upstream News API path (`NEWS_DATA_API_KEY`) and deterministic fallback source.
+- Upgraded workflow integration:
+  - `build_facts` now merges per-tool `data_quality` and preserves explicit upstream failure notes.
+  - Tier>=1 context build now calls `search_event_docs` and converts docs to report `evidence_refs`.
+  - Added `event_docs` state wiring and strengthened risk gate confidence caps for `PARTIAL/DEGRADED`.
+- Enhanced runtime persistence in `app/workflows/persistence.py`:
+  - Added `daily_snapshots` runtime table and per-run snapshot persistence with trace fields.
+  - Added runtime `event_docs` table initialization and persistence support.
+  - Extended artifact counters with snapshot count.
+- Updated configuration surface:
+  - Added `TUSHARE_BASE_URL` and `DATASOURCE_TIMEOUT_SECONDS` to `.env.example`.
+  - Added corresponding optional settings in `app/core/config.py`.
+- Updated milestone bookkeeping:
+  - Marked M3-01 ~ M3-10 as `DONE` in `docs/BACKLOG.md`.
+
+### Test Coverage Added
+- Added `tests/test_m3_data_layer.py` for M3 integration scenarios:
+  - successful market snapshot with full traceability,
+  - upstream timeout downgrade behavior,
+  - missing-field propagation to `data_quality`,
+  - outlier detection downgrade,
+  - snapshot cache hit validation,
+  - event docs ingest/search cache behavior,
+  - tier1 workflow evidence + snapshot artifact persistence checks.
+- Extended `tests/test_e2e_tier0.py` to assert snapshot artifacts are persisted.
+
+### Validation Evidence
+- `.venv/bin/python -m pytest -q` passed (`25 passed`).
+- `.venv/bin/ruff check app tests` passed (`All checks passed`).
+
+## 2026-02-10 - Batch 13 (M0-M3 Compliance Gap Remediation)
+
+### Completed Operations
+- Closed facts idempotency gap:
+  - Stabilized `snapshot_id` generation by removing volatile ingestion fields from snapshot identity material.
+  - Added deterministic snapshot identity test across cache reset.
+- Closed traceability completeness gap for Tushare:
+  - Added upstream trace payload (`ts_code`, `endpoints`, `params_digest`) into snapshot metadata.
+  - Built `source_id` from upstream trace to preserve request-digest-level replay context.
+- Closed explicit-degradation visibility gap:
+  - Added `meta.upstream_error` structure for fallback-success cases in facts and event-doc adapters.
+  - Updated tool wrapper to mark degraded traces with `error_code` while keeping `ok=true` when fallback succeeded.
+- Closed persistence backend alignment gap:
+  - Added PostgreSQL-primary persistence path when `DATABASE_URL` is PostgreSQL.
+  - Kept sqlite runtime persistence as local/test fallback path.
+  - Mapped invalid workflow persistence status to `FAILED` (schema-aligned) instead of custom `INVALID`.
+- Closed CI quality-gate mismatch:
+  - Added coverage gate in CI (`pytest --cov=app --cov-fail-under=70`).
+  - Added `.coveragerc` omit rules for migration/model declaration files to align coverage with executable core modules.
+
+### Test Coverage Added
+- Added `tests/test_tool_wrapper.py`:
+  - degraded-success trace error code propagation,
+  - explicit error payload handling.
+- Extended `tests/test_m3_data_layer.py`:
+  - deterministic snapshot ID validation,
+  - upstream params digest/source_id traceability assertions,
+  - fallback upstream error metadata assertions.
+
+### Validation Evidence
+- `.venv/bin/python -m pytest -q` passed (`29 passed`).
+- `.venv/bin/python -m pytest --cov=app --cov-report=term --cov-fail-under=70 -q` passed (`72.12%`).
+- `.venv/bin/ruff check app tests` passed (`All checks passed`).
+
+## 2026-02-10 - Batch 14 (Docker Re-Verification + DB URL Driver Normalization)
+
+### Completed Operations
+- Installed and configured local Docker runtime for this environment:
+  - Installed `docker`, `docker-compose`, `colima`.
+  - Configured Docker CLI plugin path in `~/.docker/config.json`.
+  - Started `colima` runtime and verified Docker daemon connectivity.
+  - Added registry mirror in Colima config to avoid intermittent `auth.docker.io` EOF during image pulls.
+- Re-ran previously blocked M0 docker-related checks:
+  - `docker compose up -d` executed successfully for project dependencies.
+  - Verified service states for `postgres`, `redis`, `neo4j` are up (and healthchecks pass where defined).
+  - Re-verified API startup and `/health` response under docker-backed dependency environment.
+- Normalized database URL driver handling to prevent `psycopg2` import errors:
+  - Updated `.env.example` `DATABASE_URL` to `postgresql+psycopg://...`.
+  - Added runtime URL normalization in `app/db/session.py` (`postgresql://` and `postgres://` auto-convert to `postgresql+psycopg://`).
+  - Added same normalization in Alembic env (`app/db/migrations/env.py`) for migration command consistency.
+  - Updated docs (`README.md`, `docs/LOCAL_DEV.md`) with explicit driver guidance.
+
+### Test Coverage Added
+- Added `tests/test_db_url_normalization.py` to lock URL normalization behavior for:
+  - `postgresql://` conversion,
+  - `postgres://` alias conversion,
+  - already driver-qualified URLs unchanged,
+  - non-Postgres URLs unchanged.
+
+### Validation Evidence
+- `docker --version` and `docker compose version` passed.
+- `docker run --rm hello-world` passed.
+- `docker compose up -d` for project stack passed.
+- `.venv/bin/python -m pytest -q` passed after URL normalization changes.

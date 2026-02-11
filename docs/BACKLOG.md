@@ -79,16 +79,16 @@
 
 | ID | Task | Owner | Priority | Status | Est | Depends On | Acceptance |
 |---|---|---|---|---|---|---|---|
-| M3-01 | 数据源接入清单冻结（以 Tushare Pro 为主） | Product + Data | P0 | TODO | 0.5d | M2 | 明确 Tushare 接口映射、频率、鉴权、限流策略 |
-| M3-02 | 实现 Tushare Pro market ingest adapter（替换 `get_market_snapshot` mock） | Data Eng | P0 | TODO | 1d | M3-01 | 可按 ticker+asof 拉取并生成 `snapshot_id` |
-| M3-03 | 实现 event docs ingest adapter（替换 search mock 数据） | Data Eng | P0 | TODO | 1d | M3-01 | 文档可入库并可按 query/time 检索 |
-| M3-04 | 实现 Tushare Pro 宏观/商品字段 ingest adapter（MVP最小字段） | Data Eng | P1 | TODO | 1d | M3-01 | tier>=1 时可返回宏观/运价核心字段 |
-| M3-05 | 数据标准化与映射层（统一字段/时区/单位） | Data Eng | P0 | TODO | 1d | M3-02,M3-03,M3-04 | 所有快照字段满足内部命名与 UTC 规范 |
-| M3-06 | 快照落库增强（`snapshot_id`,`type`,`data_quality_json`） | BE | P0 | TODO | 1d | M3-05 | 每次运行均可追溯到快照记录 |
-| M3-07 | 质量门禁（freshness/null ratio/outlier）并接入 `data_quality` | Data Eng + BE | P0 | TODO | 1d | M3-05 | 缺失/异常会显式标记 `DEGRADED/PARTIAL` |
-| M3-08 | 缓存策略落地（snapshot/search cache + TTL） | BE | P1 | TODO | 0.5d | M3-02,M3-03 | 重复请求命中缓存且可观测 |
-| M3-09 | 数据源失败降级策略（超时/限流/无数据） | BE | P0 | TODO | 1d | M3-07 | 工具失败不沉默，报告保守降级 |
-| M3-10 | 数据层集成测试（成功/超时/缺失/脏数据） | QA + BE | P0 | TODO | 1d | M3-09 | CI 中可稳定复现并通过 |
+| M3-01 | 数据源接入清单冻结（以 Tushare Pro 为主） | Product + Data | P0 | DONE | 0.5d | M2 | 明确 Tushare 接口映射、频率、鉴权、限流策略 |
+| M3-02 | 实现 Tushare Pro market ingest adapter（替换 `get_market_snapshot` mock） | Data Eng | P0 | DONE | 1d | M3-01 | 可按 ticker+asof 拉取并生成 `snapshot_id` |
+| M3-03 | 实现 event docs ingest adapter（替换 search mock 数据） | Data Eng | P0 | DONE | 1d | M3-01 | 文档可入库并可按 query/time 检索 |
+| M3-04 | 实现 Tushare Pro 宏观/商品字段 ingest adapter（MVP最小字段） | Data Eng | P1 | DONE | 1d | M3-01 | tier>=1 时可返回宏观/运价核心字段 |
+| M3-05 | 数据标准化与映射层（统一字段/时区/单位） | Data Eng | P0 | DONE | 1d | M3-02,M3-03,M3-04 | 所有快照字段满足内部命名与 UTC 规范 |
+| M3-06 | 快照落库增强（`snapshot_id`,`type`,`data_quality_json`） | BE | P0 | DONE | 1d | M3-05 | 每次运行均可追溯到快照记录 |
+| M3-07 | 质量门禁（freshness/null ratio/outlier）并接入 `data_quality` | Data Eng + BE | P0 | DONE | 1d | M3-05 | 缺失/异常会显式标记 `DEGRADED/PARTIAL` |
+| M3-08 | 缓存策略落地（snapshot/search cache + TTL） | BE | P1 | DONE | 0.5d | M3-02,M3-03 | 重复请求命中缓存且可观测 |
+| M3-09 | 数据源失败降级策略（超时/限流/无数据） | BE | P0 | DONE | 1d | M3-07 | 工具失败不沉默，报告保守降级 |
+| M3-10 | 数据层集成测试（成功/超时/缺失/脏数据） | QA + BE | P0 | DONE | 1d | M3-09 | CI 中可稳定复现并通过 |
 
 ### M3 验收门
 

@@ -19,6 +19,7 @@ python -m pip install -e .
 ```bash
 cp .env.example .env
 ```
+`DATABASE_URL` 推荐使用 `postgresql+psycopg://...`（代码也兼容旧的 `postgresql://...`）。
 
 4. Apply migrations
 ```bash
@@ -59,13 +60,14 @@ curl -X POST http://localhost:8000/reports/generate \
 
 ## Current Scope
 
-- TIER0 end-to-end workflow with mock tools
+- TIER0/TIER1 facts tools with Tushare-first adapters and degraded fallback path
+- Event docs ingest/search adapter with runtime sqlite persistence + cache
 - JSON schema validation + consistency checks
 - SQLite checkpoint for replay seed (thread-level)
 - M1 contract tests for OpenAPI + SQL baseline
 
 ## TODO
 
-- Replace linear workflow with LangGraph StateGraph conditional routing
-- Replace mock tool adapters with real data integrations
+- Expand event/docs extraction and rerank path for richer TIER1 evidence coverage
+- Replace in-memory memory store with pgvector + keyword retrieval
 - Add reviewer path and TIER2 graph flow
