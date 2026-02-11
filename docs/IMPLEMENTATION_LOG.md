@@ -581,3 +581,44 @@
 - `.venv/bin/python -m pytest -q` passed.
 - `.venv/bin/python scripts/lint_openapi.py docs/OPENAPI.yaml` passed.
 - `.venv/bin/python scripts/m4_quality_baseline.py --lookback-days 14 --auto-topup-samples --enforce-thresholds` passed with `overall_status=PASS`.
+
+## 2026-02-11 - Batch 21 (M5 TIER2 Graph + Reviewer Closure)
+
+### Completed Operations
+- Completed graph tool implementation in `app/tools/graph.py`:
+  - Replaced placeholders with deterministic graph logic for:
+    - `query_supply_chain_subtree`
+    - `find_impact_paths`
+    - `compute_exposure_score`
+  - Added stable `graph_id/path_id` generation and explainable path payload (`impact_direction/confidence/weight/explanation`).
+  - Added Neo4j-first optional query path with automatic synthetic fallback and runtime cache.
+- Completed M5 workflow routing and reviewer integration:
+  - Added graph nodes and routing chain in `app/workflows/graph.py`:
+    - `graph_subtree_node -> impact_paths_node`
+  - Added reviewer routing policy (`_route_need_review`) with:
+    - TIER2 forced review
+    - BUY/high-risk/non-OK data-quality conditional review.
+  - Added reviewer node in `app/workflows/nodes.py` to produce `reviewer_notes` and enforce conservative downgrade when needed.
+- Completed graph evidence linkage:
+  - Added graph evidence refs (`GRAPH_QUERY`) and `graph_refs` propagation in context builder.
+  - Updated LLM draft adapter (`app/llm/provider.py`) to write driver-level `graph_refs` and graph-linked `evidence_ids`.
+- Completed consistency checks and API alignment:
+  - Extended consistency rules to validate `key_drivers_to_watch[].graph_refs` are resolvable in graph evidence.
+  - Updated graph API routes (`/graph/subtree`, `/graph/paths`) to call real graph tools.
+- Completed Neo4j seed script:
+  - Implemented schema/index bootstrap and minimal dataset import in `scripts/load_graph_seed.py`.
+- Updated milestone bookkeeping:
+  - `docs/BACKLOG.md` marks M5-01~M5-09 as `DONE`, M5-10 as `IN_PROGRESS`.
+
+### Test Coverage Added/Updated
+- Added `tests/test_m5_graph_tools.py` for graph tool behavior and determinism.
+- Added `tests/test_m5_tier2_graph_reviewer.py` for Tier2 graph+reviewer E2E and route assertions.
+- Extended `tests/test_consistency.py` with graph-ref consistency assertion.
+- Updated `tests/test_m4_tier1_enhancement.py` router policy assertion to `router_m5_v1`.
+
+### Validation Evidence
+- `.venv/bin/python -m pytest -q` passed (`60 passed`).
+- `.venv/bin/ruff check app tests scripts` passed (`All checks passed`).
+
+### Pending Follow-up (Next Operations)
+- Finish M5-10 calibration artifact for TIER2 cost/latency/tool-call guardrail thresholds and alert cut lines.

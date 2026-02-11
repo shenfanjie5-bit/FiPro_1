@@ -5,7 +5,7 @@ from fastapi import APIRouter, Header, HTTPException
 from pydantic import BaseModel, Field
 
 from app.tools.facts import get_market_snapshot
-from app.tools.graph import find_impact_paths
+from app.tools.graph import compute_exposure_score, find_impact_paths, query_supply_chain_subtree
 from app.tools.memory import retrieve_memory_notes, write_memory_note
 from app.workflows.graph import run_research_workflow
 from app.workflows.persistence import get_report as get_persisted_report
@@ -119,14 +119,19 @@ def get_watchlist() -> dict:
 
 
 @router.get('/graph/subtree')
-def graph_subtree(ticker: str, depth: int = 2) -> dict:
-    return {'ticker': ticker, 'depth': depth, 'graph_id': f'graph_{ticker}_{depth}', 'nodes': [], 'edges': []}
+def graph_subtree(ticker: str, depth: int = 2, include_competitors: bool = True) -> dict:
+    result = query_supply_chain_subtree(ticker=ticker, depth=depth, include_competitors=include_competitors)
+    return {'ticker': ticker, 'depth': depth, **result}
 
 
 @router.get('/graph/paths')
-def graph_paths(entity: str, ticker: str) -> dict:
-    result = find_impact_paths(entity=entity, ticker=ticker)
-    return {'entity': entity, 'ticker': ticker, **result}
+def graph_paths(entity: str, ticker: str, max_hops: int = 5) -> dict:
+    result = find_impact_paths(entity=entity, ticker=ticker, max_hops=max_hops)
+    exposure = compute_exposure_score(ticker=ticker, entity=entity)
+    payload = {'entity': entity, 'ticker': ticker, **result}
+    if not isinstance(exposure.get('error'), dict):
+        payload['exposure'] = exposure
+    return payload
 
 
 @router.get('/memory/search')

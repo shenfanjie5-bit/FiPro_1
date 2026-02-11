@@ -10,13 +10,16 @@ from app.workflows.nodes import (
     build_facts,
     build_features,
     draft_report_node,
+    graph_subtree_node,
     generate_price_bands_node,
+    impact_paths_node,
     init_data_quality,
     load_strategy_config,
     mark_invalid_node,
     persist_node,
     publish_node,
     repair_report_node,
+    reviewer_node,
     rerank_docs_node,
     retrieve_memory_node,
     search_docs_node,
@@ -37,7 +40,7 @@ def _route_need_repair(state: ResearchState) -> Literal['persist', 'repair', 'in
     return 'repair'
 
 
-def _route_after_memory(state: ResearchState) -> Literal['direct_context', 'rag_chain']:
+def _route_after_memory(state: ResearchState) -> Literal['direct_context', 'rag_chain', 'graph_chain']:
     req = state.get('request', {})
     tier = str(req.get('tier', 'TIER0'))
     config = state.get('config', {})
@@ -51,7 +54,33 @@ def _route_after_memory(state: ResearchState) -> Literal['direct_context', 'rag_
     budget_exhausted = max_calls > 0 and used_calls >= max_calls
     if tier in ('TIER1', 'TIER2') and rag_enabled and not budget_degraded and not budget_exhausted:
         return 'rag_chain'
+    if tier in ('TIER1', 'TIER2'):
+        return 'graph_chain'
     return 'direct_context'
+
+
+def _route_need_review(state: ResearchState) -> Literal['review', 'validate']:
+    req = state.get('request', {})
+    tier = str(req.get('tier', 'TIER0'))
+    policies = state.get('config', {}).get('tier_policy', {})
+    reviewer_cfg = dict((policies.get(tier, {}) or {}).get('reviewer', {}))
+    if not reviewer_cfg.get('enabled', False):
+        return 'validate'
+    if reviewer_cfg.get('force', False):
+        return 'review'
+
+    report = state.get('report_draft', {})
+    decision = report.get('decision', {})
+    if reviewer_cfg.get('buy_requires_review', True) and str(decision.get('action', '')) == 'BUY':
+        return 'review'
+    if reviewer_cfg.get('high_risk_requires_review', True):
+        for risk_item in report.get('risk_flags', []):
+            if isinstance(risk_item, dict) and str(risk_item.get('severity', '')).upper() == 'HIGH':
+                return 'review'
+    dq_status = str(report.get('data_quality', {}).get('status', 'OK'))
+    if reviewer_cfg.get('data_quality_requires_review', True) and dq_status != 'OK':
+        return 'review'
+    return 'validate'
 
 
 def _build_graph():
@@ -66,9 +95,12 @@ def _build_graph():
     builder.add_node('search_docs_node', search_docs_node)
     builder.add_node('rerank_docs_node', rerank_docs_node)
     builder.add_node('extract_events_node', extract_events_node)
+    builder.add_node('graph_subtree_node', graph_subtree_node)
+    builder.add_node('impact_paths_node', impact_paths_node)
     builder.add_node('build_context', build_context)
     builder.add_node('draft_report_node', draft_report_node)
     builder.add_node('risk_gate_node', risk_gate_node)
+    builder.add_node('reviewer_node', reviewer_node)
     builder.add_node('validate_node', validate_node)
     builder.add_node('repair_report_node', repair_report_node)
     builder.add_node('mark_invalid_node', mark_invalid_node)
@@ -88,14 +120,25 @@ def _build_graph():
         {
             'direct_context': 'build_context',
             'rag_chain': 'search_docs_node',
+            'graph_chain': 'graph_subtree_node',
         },
     )
     builder.add_edge('search_docs_node', 'rerank_docs_node')
     builder.add_edge('rerank_docs_node', 'extract_events_node')
-    builder.add_edge('extract_events_node', 'build_context')
+    builder.add_edge('extract_events_node', 'graph_subtree_node')
+    builder.add_edge('graph_subtree_node', 'impact_paths_node')
+    builder.add_edge('impact_paths_node', 'build_context')
     builder.add_edge('build_context', 'draft_report_node')
     builder.add_edge('draft_report_node', 'risk_gate_node')
-    builder.add_edge('risk_gate_node', 'validate_node')
+    builder.add_conditional_edges(
+        'risk_gate_node',
+        _route_need_review,
+        {
+            'review': 'reviewer_node',
+            'validate': 'validate_node',
+        },
+    )
+    builder.add_edge('reviewer_node', 'validate_node')
     builder.add_conditional_edges(
         'validate_node',
         _route_need_repair,

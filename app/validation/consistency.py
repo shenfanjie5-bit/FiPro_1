@@ -6,9 +6,24 @@ def _collect_evidence_ids(report_json: dict) -> set[str]:
     return {x.get('evidence_id') for x in refs if x.get('evidence_id')}
 
 
+def _collect_graph_artifact_ids(report_json: dict) -> set[str]:
+    refs = report_json.get('evidence_refs', [])
+    graph_ids: set[str] = set()
+    for ref in refs:
+        if not isinstance(ref, dict):
+            continue
+        if str(ref.get('type', '')).upper() != 'GRAPH_QUERY':
+            continue
+        checksum = str(ref.get('checksum', '')).strip()
+        if checksum:
+            graph_ids.add(checksum)
+    return graph_ids
+
+
 def check_consistency(report_json: dict) -> list[str]:
     errors: list[str] = []
     evidence_ids = _collect_evidence_ids(report_json)
+    graph_artifact_ids = _collect_graph_artifact_ids(report_json)
 
     if not evidence_ids:
         errors.append('evidence_refs must contain at least 1 item')
@@ -22,6 +37,14 @@ def check_consistency(report_json: dict) -> list[str]:
     _check_ids('risk_flags', report_json.get('risk_flags', []))
     _check_ids('invalidations', report_json.get('invalidations', []))
     _check_ids('key_drivers_to_watch', report_json.get('key_drivers_to_watch', []))
+
+    for idx, item in enumerate(report_json.get('key_drivers_to_watch', [])):
+        if not isinstance(item, dict):
+            continue
+        for graph_ref in item.get('graph_refs', []):
+            graph_id = str(graph_ref).strip()
+            if graph_id and graph_id not in graph_artifact_ids:
+                errors.append(f'key_drivers_to_watch[{idx}] references missing graph_ref={graph_id}')
 
     for idx, band in enumerate(report_json.get('price_bands', [])):
         rng = band.get('range', {})

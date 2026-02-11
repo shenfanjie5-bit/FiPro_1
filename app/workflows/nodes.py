@@ -12,6 +12,7 @@ from app.tools.facts import (
     get_macro_commodity_logistics_snapshot,
     get_market_snapshot,
 )
+from app.tools.graph import compute_exposure_score, find_impact_paths, query_supply_chain_subtree
 from app.tools.memory import retrieve_memory_notes, write_memory_note
 from app.tools.qa import consistency_check, validate_report_schema_tool
 from app.tools.rag import extract_events_from_docs, rerank_docs, search_event_docs
@@ -50,21 +51,24 @@ def _default_tier_policy() -> dict[str, dict[str, Any]]:
             'budget': {'max_tool_calls': 20, 'max_cost_usd': 0.2},
             'memory': {'top_k': 5, 'time_range_days': 120},
             'rag': {'enabled': False, 'search_top_k': 0, 'rerank_top_k': 0, 'query_count': 0, 'time_window_days': 0},
-            'graph': {'depth': 1},
+            'graph': {'enabled': False, 'depth': 0, 'include_competitors': False, 'impact_top_entities': 0, 'max_hops': 0},
+            'reviewer': {'enabled': False, 'force': False, 'buy_requires_review': False, 'high_risk_requires_review': False, 'data_quality_requires_review': False},
             'coverage': {'min_total_refs': 1, 'min_type_count': 1, 'required_types': ['SNAPSHOT_FIELD']},
         },
         'TIER1': {
             'budget': {'max_tool_calls': 45, 'max_cost_usd': 0.8},
             'memory': {'top_k': 8, 'time_range_days': 180},
             'rag': {'enabled': True, 'search_top_k': 12, 'rerank_top_k': 8, 'query_count': 3, 'time_window_days': 7},
-            'graph': {'depth': 2},
+            'graph': {'enabled': True, 'depth': 2, 'include_competitors': True, 'impact_top_entities': 3, 'max_hops': 5},
+            'reviewer': {'enabled': True, 'force': False, 'buy_requires_review': True, 'high_risk_requires_review': True, 'data_quality_requires_review': True},
             'coverage': {'min_total_refs': 4, 'min_type_count': 2, 'required_types': ['SNAPSHOT_FIELD', 'NEWS_DOC']},
         },
         'TIER2': {
             'budget': {'max_tool_calls': 90, 'max_cost_usd': 2.5},
             'memory': {'top_k': 10, 'time_range_days': 365},
             'rag': {'enabled': True, 'search_top_k': 16, 'rerank_top_k': 12, 'query_count': 4, 'time_window_days': 14},
-            'graph': {'depth': 3},
+            'graph': {'enabled': True, 'depth': 3, 'include_competitors': True, 'impact_top_entities': 6, 'max_hops': 6},
+            'reviewer': {'enabled': True, 'force': True, 'buy_requires_review': True, 'high_risk_requires_review': True, 'data_quality_requires_review': True},
             'coverage': {'min_total_refs': 6, 'min_type_count': 2, 'required_types': ['SNAPSHOT_FIELD', 'NEWS_DOC']},
         },
     }
@@ -125,7 +129,7 @@ def load_strategy_config(state: dict) -> dict:
             'event_impact': 0.10,
         },
         'risk_profile': 'LOW',
-        'router_policy_version': 'router_m4_v1',
+        'router_policy_version': 'router_m5_v1',
         'tier_policy': tier_policy,
     }
     state['weights_hash'] = 'w_mock_hash_v1'
@@ -157,6 +161,11 @@ def init_data_quality(state: dict) -> dict:
     state['validation_errors'] = []
     state['consistency_errors'] = []
     state['risk_gate_hard_blocks'] = []
+    state['graph_subtree'] = {}
+    state['impact_paths'] = []
+    state['exposure_scores'] = []
+    state['graph_refs'] = []
+    state['reviewer_notes'] = []
     state['persist_refs'] = {}
     return state
 
@@ -459,6 +468,191 @@ def extract_events_node(state: dict) -> dict:
     return state
 
 
+def _graph_cfg(state: dict) -> dict[str, Any]:
+    return dict(_tier_params(state).get('graph', {}))
+
+
+def graph_subtree_node(state: dict) -> dict:
+    req = state.get('request', {})
+    tier = str(req.get('tier', 'TIER0'))
+    graph_cfg = _graph_cfg(state)
+    if tier not in ('TIER1', 'TIER2') or not graph_cfg.get('enabled', False):
+        state['graph_subtree'] = {}
+        state['graph_refs'] = []
+        return state
+    if not _budget_allows_more_tools(state):
+        _mark_budget_degraded(state, 'Graph subtree skipped: budget limit reached')
+        state['graph_subtree'] = {}
+        state['graph_refs'] = []
+        return state
+
+    depth = int(graph_cfg.get('depth', 2))
+    include_competitors = bool(graph_cfg.get('include_competitors', True))
+    graph_result = execute_tool(
+        'query_supply_chain_subtree',
+        {'ticker': req.get('ticker', ''), 'depth': depth, 'include_competitors': include_competitors},
+        query_supply_chain_subtree,
+    )
+    state['tool_traces'].append(graph_result['trace'])
+    if graph_result['ok']:
+        output = dict(graph_result['output'])
+        state['graph_subtree'] = output
+        refs: list[str] = []
+        graph_id = str(output.get('graph_id', '')).strip()
+        path_id = str(output.get('path_id', '')).strip()
+        if graph_id:
+            refs.append(graph_id)
+        if path_id and path_id not in refs:
+            refs.append(path_id)
+        state['graph_refs'] = refs
+    else:
+        state['graph_subtree'] = {}
+        state['graph_refs'] = []
+        state['data_quality'] = _merge_data_quality(
+            state['data_quality'],
+            {
+                'status': 'PARTIAL',
+                'missing_fields': ['graph.subtree'],
+                'notes': graph_result['output'].get('error', {}).get('message', 'graph subtree failed'),
+            },
+        )
+    _refresh_tool_stats(state)
+    return state
+
+
+def _impact_entities(state: dict, limit: int) -> list[str]:
+    if limit <= 0:
+        return []
+    ranked: list[tuple[int, float, str]] = []
+    seen: set[str] = set()
+    event_priority = {
+        'COMMODITY': 5,
+        'LOGISTICS': 4,
+        'POLICY': 4,
+        'GEOPOLITICS': 4,
+        'SUPPLY_DEMAND': 3,
+        'OTHER': 1,
+    }
+    for event in state.get('extracted_events', []):
+        if not isinstance(event, dict):
+            continue
+        priority = event_priority.get(str(event.get('type', 'OTHER')).upper(), 1)
+        confidence = float(event.get('confidence', 0.0))
+        for entity in event.get('entities', []):
+            normalized = str(entity or '').strip()
+            if not normalized:
+                continue
+            dedupe = normalized.lower()
+            if dedupe in seen:
+                continue
+            seen.add(dedupe)
+            ranked.append((priority, confidence, normalized))
+    ranked.sort(key=lambda item: (-item[0], -item[1], item[2]))
+    entities = [item[2] for item in ranked[:limit]]
+    if entities:
+        return entities
+
+    for node in state.get('graph_subtree', {}).get('nodes', []):
+        if not isinstance(node, dict):
+            continue
+        node_type = str(node.get('type', '')).upper()
+        if node_type not in {'COMMODITY', 'REGION', 'ROUTE', 'POLICYEVENT', 'INDUSTRY'}:
+            continue
+        label = str(node.get('label') or node.get('id') or '').strip()
+        if not label:
+            continue
+        dedupe = label.lower()
+        if dedupe in seen:
+            continue
+        seen.add(dedupe)
+        entities.append(label)
+        if len(entities) >= limit:
+            break
+    return entities
+
+
+def impact_paths_node(state: dict) -> dict:
+    req = state.get('request', {})
+    tier = str(req.get('tier', 'TIER0'))
+    graph_cfg = _graph_cfg(state)
+    if tier not in ('TIER1', 'TIER2') or not graph_cfg.get('enabled', False):
+        state['impact_paths'] = []
+        state['exposure_scores'] = []
+        return state
+
+    max_entities = int(graph_cfg.get('impact_top_entities', 3))
+    entities = _impact_entities(state, max_entities)
+    if not entities:
+        state['impact_paths'] = []
+        state['exposure_scores'] = []
+        return state
+
+    max_hops = int(graph_cfg.get('max_hops', 5))
+    impact_paths: list[dict[str, Any]] = []
+    exposure_scores: list[dict[str, Any]] = []
+    graph_refs: list[str] = list(state.get('graph_refs', []))
+    for entity in entities:
+        if not _budget_allows_more_tools(state):
+            _mark_budget_degraded(state, 'Impact paths skipped: budget limit reached')
+            break
+
+        path_result = execute_tool(
+            'find_impact_paths',
+            {'ticker': req.get('ticker', ''), 'entity': entity, 'max_hops': max_hops},
+            find_impact_paths,
+        )
+        state['tool_traces'].append(path_result['trace'])
+        if path_result['ok']:
+            payload = dict(path_result['output'])
+            payload['entity'] = entity
+            impact_paths.append(payload)
+            path_id = str(payload.get('path_id', '')).strip()
+            if path_id and path_id not in graph_refs:
+                graph_refs.append(path_id)
+        else:
+            state['data_quality'] = _merge_data_quality(
+                state['data_quality'],
+                {
+                    'status': 'PARTIAL',
+                    'missing_fields': [f'graph.paths.{entity}'],
+                    'notes': path_result['output'].get('error', {}).get('message', f'impact paths failed for {entity}'),
+                },
+            )
+
+        if not _budget_allows_more_tools(state):
+            _mark_budget_degraded(state, 'Exposure score skipped: budget limit reached')
+            continue
+
+        exposure_result = execute_tool(
+            'compute_exposure_score',
+            {'ticker': req.get('ticker', ''), 'entity': entity},
+            compute_exposure_score,
+        )
+        state['tool_traces'].append(exposure_result['trace'])
+        if exposure_result['ok']:
+            payload = dict(exposure_result['output'])
+            payload['entity'] = entity
+            exposure_scores.append(payload)
+            path_id = str(payload.get('path_id', '')).strip()
+            if path_id and path_id not in graph_refs:
+                graph_refs.append(path_id)
+        else:
+            state['data_quality'] = _merge_data_quality(
+                state['data_quality'],
+                {
+                    'status': 'PARTIAL',
+                    'missing_fields': [f'graph.exposure.{entity}'],
+                    'notes': exposure_result['output'].get('error', {}).get('message', f'exposure score failed for {entity}'),
+                },
+            )
+
+    state['impact_paths'] = impact_paths
+    state['exposure_scores'] = exposure_scores
+    state['graph_refs'] = graph_refs
+    _refresh_tool_stats(state)
+    return state
+
+
 def _coverage_details_for_refs(state: dict, evidence_refs: list[dict[str, Any]]) -> dict[str, Any]:
     coverage_cfg = dict(_tier_params(state).get('coverage', {}))
     min_total_refs = int(coverage_cfg.get('min_total_refs', 1))
@@ -539,6 +733,79 @@ def _append_doc_evidence_refs(evidence_refs: list[dict[str, Any]], docs: list[di
             }
         )
         existing_ids.add(evidence_id)
+
+
+def _append_graph_evidence_refs(state: dict, evidence_refs: list[dict[str, Any]], now_iso: str) -> None:
+    existing_ids = {str(ref.get('evidence_id', '')) for ref in evidence_refs}
+    graph_refs: list[str] = []
+    for ref_id in state.get('graph_refs', []):
+        normalized = str(ref_id or '').strip()
+        if normalized and normalized not in graph_refs:
+            graph_refs.append(normalized)
+
+    graph_subtree = state.get('graph_subtree', {})
+    if isinstance(graph_subtree, dict):
+        for key in ('graph_id', 'path_id'):
+            normalized = str(graph_subtree.get(key, '')).strip()
+            if normalized and normalized not in graph_refs:
+                graph_refs.append(normalized)
+
+    for path_item in state.get('impact_paths', []):
+        if not isinstance(path_item, dict):
+            continue
+        path_id = str(path_item.get('path_id', '')).strip()
+        if path_id and path_id not in graph_refs:
+            graph_refs.append(path_id)
+
+    for score_item in state.get('exposure_scores', []):
+        if not isinstance(score_item, dict):
+            continue
+        path_id = str(score_item.get('path_id', '')).strip()
+        if path_id and path_id not in graph_refs:
+            graph_refs.append(path_id)
+
+    path_map: dict[str, dict[str, Any]] = {}
+    for path_item in state.get('impact_paths', []):
+        if not isinstance(path_item, dict):
+            continue
+        path_id = str(path_item.get('path_id', '')).strip()
+        if path_id:
+            path_map[path_id] = path_item
+
+    for ref_id in graph_refs:
+        safe_ref = ref_id.replace(':', '_').replace('/', '_')
+        if len(safe_ref) > 80:
+            safe_ref = safe_ref[:80]
+        evidence_id = f'ev_graph_{safe_ref}'
+        if evidence_id in existing_ids:
+            continue
+        source = 'graph.query_supply_chain_subtree'
+        snippet = f'graph_ref={ref_id}'
+        title = f'graph evidence {ref_id}'
+        path_item = path_map.get(ref_id)
+        if path_item:
+            source = 'graph.find_impact_paths'
+            entity = str(path_item.get('entity', '')).strip()
+            top_path = (path_item.get('paths') or [{}])[0]
+            direction = str(top_path.get('impact_direction', 'UNCERTAIN'))
+            confidence = float(top_path.get('confidence', 0.0))
+            snippet = f"entity={entity}; direction={direction}; confidence={confidence:.2f}"
+            title = f'impact path {entity or ref_id}'
+        evidence_refs.append(
+            {
+                'evidence_id': evidence_id,
+                'type': 'GRAPH_QUERY',
+                'title': title[:140],
+                'source': source,
+                'captured_at': now_iso,
+                'uri': None,
+                'snippet': snippet[:240],
+                'checksum': ref_id,
+            }
+        )
+        existing_ids.add(evidence_id)
+
+    state['graph_refs'] = graph_refs
 
 
 def _attempt_tier1_coverage_repair(state: dict, evidence_refs: list[dict[str, Any]], now_iso: str) -> None:
@@ -639,6 +906,8 @@ def build_context(state: dict) -> dict:
             }
         )
 
+    _append_graph_evidence_refs(state, evidence_refs, now_iso)
+
     if not evidence_refs:
         evidence_refs = [
             {
@@ -671,6 +940,10 @@ def build_context(state: dict) -> dict:
         'event_docs': state.get('event_docs', []),
         'ranked_doc_ids': state.get('ranked_doc_ids', []),
         'extracted_events': state.get('extracted_events', []),
+        'graph_subtree': state.get('graph_subtree', {}),
+        'impact_paths': state.get('impact_paths', []),
+        'exposure_scores': state.get('exposure_scores', []),
+        'graph_refs': state.get('graph_refs', []),
         'evidence_refs': evidence_refs,
         'evidence_coverage': state.get('evidence_coverage', {}),
         'data_quality': state['data_quality'],
@@ -678,7 +951,7 @@ def build_context(state: dict) -> dict:
         'weights_hash': state['weights_hash'],
         'tool_call_stats': state['tool_call_stats'],
         'budget': state.get('budget', {}),
-        'router_policy': state.get('config', {}).get('router_policy_version', 'router_m4_v1'),
+        'router_policy': state.get('config', {}).get('router_policy_version', 'router_m5_v1'),
     }
     return state
 
@@ -695,6 +968,91 @@ def risk_gate_node(state: dict) -> dict:
     state['risk_gate_hard_blocks'] = gate['output'].get('hard_blocks', [])
     state['report_draft'] = gate['output']['report']
     _refresh_tool_stats(state)
+    return state
+
+
+def reviewer_node(state: dict) -> dict:
+    report = dict(state.get('report_draft', {}))
+    if not report:
+        state['reviewer_notes'] = ['empty report payload']
+        return state
+
+    req = state.get('request', {})
+    tier = str(req.get('tier', report.get('tier', 'TIER0')))
+    decision = report.get('decision', {})
+    dq_status = str(report.get('data_quality', {}).get('status', 'OK'))
+    notes: list[str] = []
+
+    driver_graph_refs: list[str] = []
+    for driver in report.get('key_drivers_to_watch', []):
+        if not isinstance(driver, dict):
+            continue
+        for ref_id in driver.get('graph_refs', []):
+            normalized = str(ref_id).strip()
+            if normalized:
+                driver_graph_refs.append(normalized)
+    graph_refs = [
+        str(ref_id).strip()
+        for ref_id in list(state.get('graph_refs', [])) + driver_graph_refs
+        if str(ref_id).strip()
+    ]
+    graph_refs = list(dict.fromkeys(graph_refs))
+    graph_evidence = [
+        ref
+        for ref in report.get('evidence_refs', [])
+        if isinstance(ref, dict) and str(ref.get('type', '')).upper() == 'GRAPH_QUERY'
+    ]
+
+    if tier == 'TIER2' and not graph_refs:
+        notes.append('missing graph_refs for tier2 report')
+    if tier == 'TIER2' and not graph_evidence:
+        notes.append('missing graph evidence for tier2 report')
+    if decision.get('action') == 'BUY' and tier != 'TIER2':
+        notes.append('BUY action outside tier2 should receive manual confirmation')
+    if dq_status != 'OK':
+        notes.append(f'data_quality={dq_status} requires conservative interpretation')
+    if any(isinstance(item, dict) and str(item.get('severity', '')).upper() == 'HIGH' for item in report.get('risk_flags', [])):
+        notes.append('high severity risk flag present')
+    if state.get('risk_gate_hard_blocks'):
+        notes.append(f"risk gate hard blocks: {','.join(state.get('risk_gate_hard_blocks', []))}")
+    if not state.get('evidence_coverage', {}).get('ok', True):
+        notes.append('evidence coverage not satisfied')
+    if not notes:
+        notes.append('no blocking findings')
+
+    report.setdefault('memory_update', {})
+    followups = [str(item) for item in report['memory_update'].get('followups', []) if str(item).strip()]
+    for note in notes:
+        tagged = f'reviewer: {note}'
+        if tagged not in followups:
+            followups.append(tagged)
+    report['memory_update']['followups'] = followups[:20]
+
+    report.setdefault('provenance', {})
+    report['provenance'].setdefault('model', {})
+    report['provenance']['model']['reviewer'] = 'rule-reviewer-v1'
+
+    critical_flags = (
+        'missing graph_refs for tier2 report',
+        'missing graph evidence for tier2 report',
+        'high severity risk flag present',
+        'evidence coverage not satisfied',
+    )
+    is_critical = any(flag in notes for flag in critical_flags) or dq_status != 'OK'
+    if is_critical:
+        normalized_dq = _normalize_report_data_quality(report)
+        if normalized_dq['status'] == 'OK':
+            normalized_dq['status'] = 'PARTIAL'
+        if 'reviewer.findings' not in normalized_dq['missing_fields']:
+            normalized_dq['missing_fields'].append('reviewer.findings')
+        normalized_dq['notes'] = f"{normalized_dq['notes']} | reviewer={' ; '.join(notes)}".strip(' |')
+        report['data_quality'] = normalized_dq
+        if report.get('decision', {}).get('action') == 'BUY':
+            report['decision']['action'] = 'WATCH'
+        report['decision']['confidence'] = min(float(report.get('decision', {}).get('confidence', 0.5)), 0.55)
+
+    state['reviewer_notes'] = notes
+    state['report_draft'] = report
     return state
 
 
@@ -832,7 +1190,7 @@ def persist_node(state: dict) -> dict:
     state['tool_traces'].append(write_memory['trace'])
     _refresh_tool_stats(state)
     report['provenance']['tool_call_stats'] = state['tool_call_stats']
-    report['provenance']['router_policy'] = state.get('config', {}).get('router_policy_version', 'router_m4_v1')
+    report['provenance']['router_policy'] = state.get('config', {}).get('router_policy_version', 'router_m5_v1')
     persist_refs = persist_workflow_state(state, thread_id=state['thread_id'])
     persist_refs['memory_note_id'] = write_memory['output'].get('note_id', persist_refs.get('memory_note_id', ''))
     state['persist_refs'] = persist_refs

@@ -127,16 +127,16 @@
 
 | ID | Task | Owner | Priority | Status | Est | Depends On | Acceptance |
 |---|---|---|---|---|---|---|---|
-| M5-01 | TIER2 预算与路由规则冻结（graph depth/review policy） | Product + BE | P0 | TODO | 0.5d | M4 | 配置可版本化且落库 |
-| M5-02 | Neo4j schema 初始化（节点/关系/索引） | Data Eng | P0 | TODO | 1d | M5-01 | 可建图并完成基本查询 |
-| M5-03 | 图谱导入任务（公司/行业/商品/地区最小数据） | Data Eng | P0 | TODO | 1.5d | M5-02 | 导入后可命中至少 1 条影响路径 |
-| M5-04 | 实装 `query_supply_chain_subtree` | BE | P0 | TODO | 1d | M5-02 | 返回 `graph_id/path_id` 与节点关系 |
-| M5-05 | 实装 `find_impact_paths`（事件/商品 -> 标的） | BE | P0 | TODO | 1d | M5-03,M5-04 | 返回可解释路径与权重 |
-| M5-06 | 实装 `compute_exposure_score`（确定性） | BE + Data | P0 | TODO | 1d | M5-05 | 同输入输出稳定，分数可解释 |
-| M5-07 | reviewer 节点接入（TIER2 强制 + BUY 条件复核） | BE + ML Eng | P0 | TODO | 1d | M5-01,M5-05 | 复核意见进入报告或修复链路 |
-| M5-08 | graph evidence 绑定（`graph_refs` + `evidence_refs`） | BE | P0 | TODO | 0.5d | M5-04,M5-07 | 图谱证据 ID 在报告中可追溯 |
-| M5-09 | TIER2 E2E 测试（graph + review + repair） | QA + BE | P0 | TODO | 1d | M5-08 | TIER2 全链路回放成功 |
-| M5-10 | 性能与预算校准（TIER2 tool_calls/cost/latency） | SRE + BE | P1 | TODO | 0.5d | M5-09 | 不超预算阈值并有告警线 |
+| M5-01 | TIER2 预算与路由规则冻结（graph depth/review policy） | Product + BE | P0 | DONE | 0.5d | M4 | 配置可版本化且落库 |
+| M5-02 | Neo4j schema 初始化（节点/关系/索引） | Data Eng | P0 | DONE | 1d | M5-01 | 可建图并完成基本查询 |
+| M5-03 | 图谱导入任务（公司/行业/商品/地区最小数据） | Data Eng | P0 | DONE | 1.5d | M5-02 | 导入后可命中至少 1 条影响路径 |
+| M5-04 | 实装 `query_supply_chain_subtree` | BE | P0 | DONE | 1d | M5-02 | 返回 `graph_id/path_id` 与节点关系 |
+| M5-05 | 实装 `find_impact_paths`（事件/商品 -> 标的） | BE | P0 | DONE | 1d | M5-03,M5-04 | 返回可解释路径与权重 |
+| M5-06 | 实装 `compute_exposure_score`（确定性） | BE + Data | P0 | DONE | 1d | M5-05 | 同输入输出稳定，分数可解释 |
+| M5-07 | reviewer 节点接入（TIER2 强制 + BUY 条件复核） | BE + ML Eng | P0 | DONE | 1d | M5-01,M5-05 | 复核意见进入报告或修复链路 |
+| M5-08 | graph evidence 绑定（`graph_refs` + `evidence_refs`） | BE | P0 | DONE | 0.5d | M5-04,M5-07 | 图谱证据 ID 在报告中可追溯 |
+| M5-09 | TIER2 E2E 测试（graph + review + repair） | QA + BE | P0 | DONE | 1d | M5-08 | TIER2 全链路回放成功 |
+| M5-10 | 性能与预算校准（TIER2 tool_calls/cost/latency） | SRE + BE | P1 | IN_PROGRESS | 0.5d | M5-09 | 不超预算阈值并有告警线 |
 
 ### M5 验收门
 
