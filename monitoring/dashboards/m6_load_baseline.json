@@ -1,0 +1,328 @@
+{
+  "capacity_recommendation": {
+    "notes": "Increase concurrency only when failure_rate remains <=0.03 and latency_p95_ms <= 12000 under the same workload.",
+    "recommended_concurrency": 6
+  },
+  "config": {
+    "actual_count": 30,
+    "concurrency": 6,
+    "requested_count": 30,
+    "wall_time_seconds": 0.983637
+  },
+  "generated_at": "2026-02-11T14:35:49.914697+00:00",
+  "samples": [
+    {
+      "cost_usd": 0.0,
+      "data_quality_status": "DEGRADED",
+      "latency_ms": 228,
+      "ok": true,
+      "report_id": "b7c1d15b-d384-41cc-9907-3ac70206d44d",
+      "retry_count": 0,
+      "thread_id": "thread_m6_load_1_195480fb",
+      "tool_calls": 16
+    },
+    {
+      "cost_usd": 0.0,
+      "data_quality_status": "DEGRADED",
+      "latency_ms": 230,
+      "ok": true,
+      "report_id": "f454407b-e6b4-4de6-8f88-9b50c23dd2ef",
+      "retry_count": 0,
+      "thread_id": "thread_m6_load_0_c1f13b8b",
+      "tool_calls": 16
+    },
+    {
+      "cost_usd": 0.0,
+      "data_quality_status": "DEGRADED",
+      "latency_ms": 232,
+      "ok": true,
+      "report_id": "7902db3f-383d-46cf-8d98-817949ad64c7",
+      "retry_count": 0,
+      "thread_id": "thread_m6_load_2_4c116166",
+      "tool_calls": 16
+    },
+    {
+      "cost_usd": 0.0,
+      "data_quality_status": "DEGRADED",
+      "latency_ms": 234,
+      "ok": true,
+      "report_id": "ab1907cf-c33e-4ef3-97bf-06a072ae29a6",
+      "retry_count": 0,
+      "thread_id": "thread_m6_load_5_0054bfde",
+      "tool_calls": 16
+    },
+    {
+      "cost_usd": 0.0,
+      "data_quality_status": "DEGRADED",
+      "latency_ms": 237,
+      "ok": true,
+      "report_id": "5948debe-a100-44e0-b348-bd46152b9235",
+      "retry_count": 0,
+      "thread_id": "thread_m6_load_3_6b94161f",
+      "tool_calls": 16
+    },
+    {
+      "cost_usd": 0.0,
+      "data_quality_status": "DEGRADED",
+      "latency_ms": 237,
+      "ok": true,
+      "report_id": "4b2bc708-21f8-4ee2-9553-ec2bf3266199",
+      "retry_count": 0,
+      "thread_id": "thread_m6_load_4_4e5efd2e",
+      "tool_calls": 16
+    },
+    {
+      "cost_usd": 0.0,
+      "data_quality_status": "DEGRADED",
+      "latency_ms": 185,
+      "ok": true,
+      "report_id": "da54646e-4cdd-47be-88a7-9b16ed358c5c",
+      "retry_count": 0,
+      "thread_id": "thread_m6_load_6_29202310",
+      "tool_calls": 16
+    },
+    {
+      "cost_usd": 0.0,
+      "data_quality_status": "DEGRADED",
+      "latency_ms": 189,
+      "ok": true,
+      "report_id": "7b4820ce-52f0-450c-8bdc-ade12b42a6dc",
+      "retry_count": 0,
+      "thread_id": "thread_m6_load_7_af250daf",
+      "tool_calls": 16
+    },
+    {
+      "cost_usd": 0.0,
+      "data_quality_status": "DEGRADED",
+      "latency_ms": 189,
+      "ok": true,
+      "report_id": "19a67875-9325-42fe-ab4d-9e7cedba1063",
+      "retry_count": 0,
+      "thread_id": "thread_m6_load_8_f010fb9d",
+      "tool_calls": 16
+    },
+    {
+      "cost_usd": 0.0,
+      "data_quality_status": "DEGRADED",
+      "latency_ms": 187,
+      "ok": true,
+      "report_id": "d7c28f9a-0634-435c-911c-bdc3e98c1cdc",
+      "retry_count": 0,
+      "thread_id": "thread_m6_load_9_a14dc99c",
+      "tool_calls": 16
+    },
+    {
+      "cost_usd": 0.0,
+      "data_quality_status": "DEGRADED",
+      "latency_ms": 188,
+      "ok": true,
+      "report_id": "9c28b838-7a7a-47f0-b607-e1c1e36188e6",
+      "retry_count": 0,
+      "thread_id": "thread_m6_load_10_41174d9a",
+      "tool_calls": 16
+    },
+    {
+      "cost_usd": 0.0,
+      "data_quality_status": "DEGRADED",
+      "latency_ms": 188,
+      "ok": true,
+      "report_id": "efe047e5-025b-4fd9-9cd4-3690f7a03f5a",
+      "retry_count": 0,
+      "thread_id": "thread_m6_load_11_aff600d2",
+      "tool_calls": 16
+    },
+    {
+      "cost_usd": 0.0,
+      "data_quality_status": "DEGRADED",
+      "latency_ms": 179,
+      "ok": true,
+      "report_id": "9e006a4b-37e4-4795-afb9-2f4a19a99c7d",
+      "retry_count": 0,
+      "thread_id": "thread_m6_load_12_552181c8",
+      "tool_calls": 16
+    },
+    {
+      "cost_usd": 0.0,
+      "data_quality_status": "DEGRADED",
+      "latency_ms": 180,
+      "ok": true,
+      "report_id": "4635c498-3d3f-40fa-ad4a-09b4b91c6b98",
+      "retry_count": 0,
+      "thread_id": "thread_m6_load_13_b3dca7ec",
+      "tool_calls": 16
+    },
+    {
+      "cost_usd": 0.0,
+      "data_quality_status": "DEGRADED",
+      "latency_ms": 182,
+      "ok": true,
+      "report_id": "86f184e0-5778-4dd7-ab1c-0296bb7b81d9",
+      "retry_count": 0,
+      "thread_id": "thread_m6_load_14_6dacd88b",
+      "tool_calls": 16
+    },
+    {
+      "cost_usd": 0.0,
+      "data_quality_status": "DEGRADED",
+      "latency_ms": 181,
+      "ok": true,
+      "report_id": "1cdeea44-2565-4f8a-adbe-6524ac2ad56c",
+      "retry_count": 0,
+      "thread_id": "thread_m6_load_15_9e56c2e2",
+      "tool_calls": 16
+    },
+    {
+      "cost_usd": 0.0,
+      "data_quality_status": "DEGRADED",
+      "latency_ms": 179,
+      "ok": true,
+      "report_id": "6866de52-db6e-413f-bce1-4b4a8a589a13",
+      "retry_count": 0,
+      "thread_id": "thread_m6_load_16_04a78f70",
+      "tool_calls": 16
+    },
+    {
+      "cost_usd": 0.0,
+      "data_quality_status": "DEGRADED",
+      "latency_ms": 190,
+      "ok": true,
+      "report_id": "ba7764ae-bd75-4ef7-9bb4-6b8cd36de4f0",
+      "retry_count": 0,
+      "thread_id": "thread_m6_load_17_67950466",
+      "tool_calls": 16
+    },
+    {
+      "cost_usd": 0.0,
+      "data_quality_status": "DEGRADED",
+      "latency_ms": 188,
+      "ok": true,
+      "report_id": "665b9e2e-6089-46a7-98c3-7cca886278ba",
+      "retry_count": 0,
+      "thread_id": "thread_m6_load_18_50025989",
+      "tool_calls": 16
+    },
+    {
+      "cost_usd": 0.0,
+      "data_quality_status": "DEGRADED",
+      "latency_ms": 188,
+      "ok": true,
+      "report_id": "c1758b1a-0250-4270-9e76-fc4fb66aa0e4",
+      "retry_count": 0,
+      "thread_id": "thread_m6_load_19_94ad36ac",
+      "tool_calls": 16
+    },
+    {
+      "cost_usd": 0.0,
+      "data_quality_status": "DEGRADED",
+      "latency_ms": 197,
+      "ok": true,
+      "report_id": "a13daebb-22f9-46f7-996d-41e08ecbae1c",
+      "retry_count": 0,
+      "thread_id": "thread_m6_load_20_04f540f5",
+      "tool_calls": 16
+    },
+    {
+      "cost_usd": 0.0,
+      "data_quality_status": "DEGRADED",
+      "latency_ms": 202,
+      "ok": true,
+      "report_id": "943a35c6-94b6-4d8d-8efe-bc5d0c034d63",
+      "retry_count": 0,
+      "thread_id": "thread_m6_load_21_548fffdd",
+      "tool_calls": 16
+    },
+    {
+      "cost_usd": 0.0,
+      "data_quality_status": "DEGRADED",
+      "latency_ms": 202,
+      "ok": true,
+      "report_id": "8e187298-a6a6-4b76-b3e1-e3ece2d1cdbc",
+      "retry_count": 0,
+      "thread_id": "thread_m6_load_22_21540281",
+      "tool_calls": 16
+    },
+    {
+      "cost_usd": 0.0,
+      "data_quality_status": "DEGRADED",
+      "latency_ms": 218,
+      "ok": true,
+      "report_id": "1f824fed-2816-42b3-87fb-b04c1516e024",
+      "retry_count": 0,
+      "thread_id": "thread_m6_load_23_7315b37b",
+      "tool_calls": 16
+    },
+    {
+      "cost_usd": 0.0,
+      "data_quality_status": "DEGRADED",
+      "latency_ms": 180,
+      "ok": true,
+      "report_id": "3820518d-15a9-4990-b0b6-b187b99588c2",
+      "retry_count": 0,
+      "thread_id": "thread_m6_load_24_34f44f43",
+      "tool_calls": 16
+    },
+    {
+      "cost_usd": 0.0,
+      "data_quality_status": "DEGRADED",
+      "latency_ms": 181,
+      "ok": true,
+      "report_id": "c76d919c-d921-4d0a-acae-1696a7112fa8",
+      "retry_count": 0,
+      "thread_id": "thread_m6_load_25_b2b479dd",
+      "tool_calls": 16
+    },
+    {
+      "cost_usd": 0.0,
+      "data_quality_status": "DEGRADED",
+      "latency_ms": 165,
+      "ok": true,
+      "report_id": "20f1102a-90d2-4dbf-8aba-11d3544fc74c",
+      "retry_count": 0,
+      "thread_id": "thread_m6_load_27_c54f66c5",
+      "tool_calls": 16
+    },
+    {
+      "cost_usd": 0.0,
+      "data_quality_status": "DEGRADED",
+      "latency_ms": 164,
+      "ok": true,
+      "report_id": "521e22ed-225f-4ed1-b22a-098f1ca83054",
+      "retry_count": 0,
+      "thread_id": "thread_m6_load_28_b3a0eb42",
+      "tool_calls": 16
+    },
+    {
+      "cost_usd": 0.0,
+      "data_quality_status": "DEGRADED",
+      "latency_ms": 137,
+      "ok": true,
+      "report_id": "811eb966-8758-433a-ad96-48bce1ff9e9c",
+      "retry_count": 0,
+      "thread_id": "thread_m6_load_29_b7bf0ddd",
+      "tool_calls": 16
+    },
+    {
+      "cost_usd": 0.0,
+      "data_quality_status": "DEGRADED",
+      "latency_ms": 180,
+      "ok": true,
+      "report_id": "f7335880-547a-4a98-ba3e-ae4f3beb998a",
+      "retry_count": 0,
+      "thread_id": "thread_m6_load_26_59c0edb2",
+      "tool_calls": 16
+    }
+  ],
+  "summary": {
+    "cost_avg_usd": 0.0,
+    "cost_p95_usd": 0.0,
+    "degraded_report_rate": 1.0,
+    "failed_count": 0,
+    "failure_rate": 0.0,
+    "latency_avg_ms": 193.9,
+    "latency_p95_ms": 235.65,
+    "latency_p99_ms": 237.0,
+    "success_count": 30,
+    "success_rate": 1.0,
+    "throughput_rps": 30.499072
+  }
+}

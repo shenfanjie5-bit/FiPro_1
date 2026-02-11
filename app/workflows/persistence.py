@@ -38,6 +38,14 @@ def _uuid_or_namespace(value: str) -> uuid.UUID:
         return uuid.uuid5(uuid.NAMESPACE_URL, str(value))
 
 
+def _ensure_sqlite_column(conn: sqlite3.Connection, table: str, column: str, ddl: str) -> None:
+    rows = conn.execute(f'pragma table_info({table})').fetchall()
+    existing = {str(row[1]) for row in rows}
+    if column in existing:
+        return
+    conn.execute(f'alter table {table} add column {column} {ddl}')
+
+
 def _sqlite_conn() -> sqlite3.Connection:
     conn = sqlite3.connect(_runtime_db_path(), timeout=30)
     conn.execute(
@@ -81,6 +89,12 @@ def _sqlite_conn() -> sqlite3.Connection:
         'cost_usd real not null, '
         'error_code text, '
         'ok integer not null, '
+        'degraded integer not null default 0, '
+        'attempts integer not null default 1, '
+        'retry_count integer not null default 0, '
+        'retry_wait_ms integer not null default 0, '
+        'rate_limited_wait_ms integer not null default 0, '
+        'policy_version text not null default \'tool_wrapper_m6_v1\', '
         'created_at text not null'
         ')'
     )
@@ -126,6 +140,12 @@ def _sqlite_conn() -> sqlite3.Connection:
         ')'
     )
     conn.execute('create index if not exists idx_event_docs_query_published on event_docs(query, published_at desc)')
+    _ensure_sqlite_column(conn, 'tool_traces', 'degraded', 'integer not null default 0')
+    _ensure_sqlite_column(conn, 'tool_traces', 'attempts', 'integer not null default 1')
+    _ensure_sqlite_column(conn, 'tool_traces', 'retry_count', 'integer not null default 0')
+    _ensure_sqlite_column(conn, 'tool_traces', 'retry_wait_ms', 'integer not null default 0')
+    _ensure_sqlite_column(conn, 'tool_traces', 'rate_limited_wait_ms', 'integer not null default 0')
+    _ensure_sqlite_column(conn, 'tool_traces', 'policy_version', "text not null default 'tool_wrapper_m6_v1'")
     return conn
 
 
@@ -232,8 +252,8 @@ def _persist_sqlite_workflow_state(state: dict[str, Any], thread_id: str) -> dic
             trace_id = trace.get('trace_id') or str(uuid.uuid4())
             conn.execute(
                 'insert into tool_traces('
-                'id, report_id, tool_name, input_digest, latency_ms, cost_usd, error_code, ok, created_at'
-                ') values (?, ?, ?, ?, ?, ?, ?, ?, ?) '
+                'id, report_id, tool_name, input_digest, latency_ms, cost_usd, error_code, ok, degraded, attempts, retry_count, retry_wait_ms, rate_limited_wait_ms, policy_version, created_at'
+                ') values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) '
                 'on conflict(id) do update set '
                 'report_id=excluded.report_id, '
                 'tool_name=excluded.tool_name, '
@@ -242,6 +262,12 @@ def _persist_sqlite_workflow_state(state: dict[str, Any], thread_id: str) -> dic
                 'cost_usd=excluded.cost_usd, '
                 'error_code=excluded.error_code, '
                 'ok=excluded.ok, '
+                'degraded=excluded.degraded, '
+                'attempts=excluded.attempts, '
+                'retry_count=excluded.retry_count, '
+                'retry_wait_ms=excluded.retry_wait_ms, '
+                'rate_limited_wait_ms=excluded.rate_limited_wait_ms, '
+                'policy_version=excluded.policy_version, '
                 'created_at=excluded.created_at',
                 (
                     trace_id,
@@ -252,6 +278,12 @@ def _persist_sqlite_workflow_state(state: dict[str, Any], thread_id: str) -> dic
                     float(trace.get('cost_est', 0)),
                     trace.get('error_code'),
                     int(trace.get('error_code') is None),
+                    int(bool(trace.get('degraded', False))),
+                    int(trace.get('attempts', 1)),
+                    int(trace.get('retry_count', 0)),
+                    int(trace.get('retry_wait_ms', 0)),
+                    int(trace.get('rate_limited_wait_ms', 0)),
+                    str(trace.get('policy_version', 'tool_wrapper_m6_v1')),
                     now,
                 ),
             )
@@ -421,6 +453,12 @@ def _persist_postgres_workflow_state(state: dict[str, Any], thread_id: str) -> d
                     cost_usd=float(trace.get('cost_est', 0)),
                     error_code=trace.get('error_code') or '',
                     ok=trace.get('error_code') is None,
+                    degraded=bool(trace.get('degraded', False)),
+                    attempts=int(trace.get('attempts', 1)),
+                    retry_count=int(trace.get('retry_count', 0)),
+                    retry_wait_ms=int(trace.get('retry_wait_ms', 0)),
+                    rate_limited_wait_ms=int(trace.get('rate_limited_wait_ms', 0)),
+                    policy_version=str(trace.get('policy_version', 'tool_wrapper_m6_v1')),
                 )
             )
 

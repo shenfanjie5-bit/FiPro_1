@@ -102,5 +102,11 @@ create table if not exists tool_traces (
   cost_usd numeric(10,6) not null default 0,
   error_code text not null default '',
   ok boolean not null,
+  degraded boolean not null default false,
+  attempts int not null default 1,
+  retry_count int not null default 0,
+  retry_wait_ms int not null default 0,
+  rate_limited_wait_ms int not null default 0,
+  policy_version text not null default 'tool_wrapper_m6_v1',
   created_at timestamptz not null default now()
 );

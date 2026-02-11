@@ -13,3 +13,10 @@ Suggested dashboards:
 - M5 Tier2 calibration artifacts:
   - `m5_tier2_calibration.json`
   - `m5_tier2_calibration.md`
+- M6 reliability and rollout artifacts:
+  - `m6_reliability_panel.json`
+  - `m6_reliability_panel.md`
+  - `m6_load_baseline.json`
+  - `m6_load_baseline.md`
+  - `m6_rollout_drill.json`
+  - `m6_rollout_drill.md`

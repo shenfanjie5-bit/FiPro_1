@@ -148,7 +148,7 @@ def test_tier1_workflow_runs_rag_chain_and_router_policy() -> None:
     tool_names = {trace.get('tool_name') for trace in checkpoint_state.get('tool_traces', [])}
     assert {'search_event_docs', 'rerank_docs', 'extract_events_from_docs'}.issubset(tool_names)
 
-    assert final_report['provenance']['router_policy'] == 'router_m5_v1'
+    assert final_report['provenance']['router_policy'] == 'router_m6_v1'
     assert any(ref.get('source', '').startswith('event_docs.') for ref in final_report['evidence_refs'])
 
 

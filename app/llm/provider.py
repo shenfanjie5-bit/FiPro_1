@@ -1,5 +1,8 @@
 from datetime import datetime, timezone
+import os
 import uuid
+
+from app.tools.wrapper import ToolExecutionError
 
 
 class LLMProvider:
@@ -15,6 +18,29 @@ class LLMProvider:
         self.reviewer_model = reviewer_model
 
     def generate_report_draft(self, context: dict) -> dict:
+        failure_mode = str(os.getenv('LLM_FORCE_FAILURE', '')).strip().lower()
+        if failure_mode in {'timeout', 'upstream_timeout'}:
+            raise ToolExecutionError(
+                code='UPSTREAM_TIMEOUT',
+                message='forced llm timeout for drill',
+                retryable=True,
+                details={'provider': self.primary_model},
+            )
+        if failure_mode in {'rate_limit', '429'}:
+            raise ToolExecutionError(
+                code='RATE_LIMITED',
+                message='forced llm rate limit for drill',
+                retryable=True,
+                details={'provider': self.primary_model},
+            )
+        if failure_mode in {'error', 'internal_error'}:
+            raise ToolExecutionError(
+                code='UPSTREAM_ERROR',
+                message='forced llm upstream error for drill',
+                retryable=True,
+                details={'provider': self.primary_model},
+            )
+
         ticker = context['request']['ticker']
         market = context['request'].get('market', 'OTHER')
         asof = context['request']['asof']

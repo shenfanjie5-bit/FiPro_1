@@ -51,3 +51,14 @@ def test_watchlist_has_status() -> None:
     sql = _sql_text()
     block = _table_block(sql, 'watchlist')
     assert 'status text not null' in block
+
+
+def test_tool_traces_has_m6_retry_and_audit_fields() -> None:
+    sql = _sql_text()
+    block = _table_block(sql, 'tool_traces')
+    assert 'degraded boolean not null' in block
+    assert 'attempts int not null' in block
+    assert 'retry_count int not null' in block
+    assert 'retry_wait_ms int not null' in block
+    assert 'rate_limited_wait_ms int not null' in block
+    assert 'policy_version text not null' in block

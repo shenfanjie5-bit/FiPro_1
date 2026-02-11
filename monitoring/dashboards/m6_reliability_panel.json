@@ -1,0 +1,103 @@
+{
+  "alert_lines": {
+    "cost_p95_usd": {
+      "critical": 2.5,
+      "warn": 2.125
+    },
+    "failure_rate": {
+      "critical": 0.03,
+      "warn": 0.024
+    },
+    "latency_p95_ms": {
+      "critical": 12000,
+      "warn": 10200.0
+    },
+    "schema_pass_rate": {
+      "critical": 0.97,
+      "warn": 0.98
+    }
+  },
+  "daily_trend": [
+    {
+      "cost_p95_usd": 0.0,
+      "date": "2026-02-11",
+      "failure_rate": 0.0,
+      "latency_p95_ms": 160.0,
+      "sample_size": 54,
+      "schema_pass_rate": 1.0,
+      "success_rate": 1.0
+    }
+  ],
+  "effective_sample_size": 54,
+  "generated_at": "2026-02-11T14:35:41.430476+00:00",
+  "overall_status": "PASS",
+  "raw_sample_size": 333,
+  "summary": {
+    "avg_cost_usd": 0.0,
+    "avg_latency_ms": 42.0,
+    "cost_p95_usd": 0.0,
+    "degraded_report_rate": 1.0,
+    "failure_rate": 0.0,
+    "latency_p95_ms": 160.0,
+    "retry_report_rate": 0.055556,
+    "sample_size": 54,
+    "schema_pass_rate": 1.0,
+    "success_rate": 1.0
+  },
+  "threshold_checks": [
+    {
+      "actual": 54.0,
+      "metric": "sample_size",
+      "operator": ">=",
+      "pass": true,
+      "threshold": 10.0
+    },
+    {
+      "actual": 1.0,
+      "metric": "success_rate",
+      "operator": ">=",
+      "pass": true,
+      "threshold": 0.97
+    },
+    {
+      "actual": 0.0,
+      "metric": "failure_rate",
+      "operator": "<=",
+      "pass": true,
+      "threshold": 0.03
+    },
+    {
+      "actual": 1.0,
+      "metric": "schema_pass_rate",
+      "operator": ">=",
+      "pass": true,
+      "threshold": 0.99
+    },
+    {
+      "actual": 160.0,
+      "metric": "latency_p95_ms",
+      "operator": "<=",
+      "pass": true,
+      "threshold": 12000.0
+    },
+    {
+      "actual": 0.0,
+      "metric": "cost_p95_usd",
+      "operator": "<=",
+      "pass": true,
+      "threshold": 2.5
+    }
+  ],
+  "thresholds": {
+    "cost_p95_usd_max": 2.5,
+    "failure_rate_max": 0.03,
+    "latency_p95_ms_max": 12000,
+    "min_sample_size": 10,
+    "schema_pass_rate_min": 0.99,
+    "success_rate_min": 0.97
+  },
+  "window": {
+    "dedupe_latest": true,
+    "lookback_days": 7
+  }
+}

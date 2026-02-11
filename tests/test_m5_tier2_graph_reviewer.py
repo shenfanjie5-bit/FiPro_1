@@ -49,7 +49,7 @@ def test_tier2_workflow_runs_graph_and_reviewer(monkeypatch) -> None:
     assert ok, errors
     assert check_consistency(report) == []
 
-    assert report['provenance']['router_policy'] == 'router_m5_v1'
+    assert report['provenance']['router_policy'] == 'router_m6_v1'
     assert report['provenance']['model']['reviewer'] == 'rule-reviewer-v1'
     assert any(str(ref.get('type', '')).upper() == 'GRAPH_QUERY' for ref in report['evidence_refs'])
     graph_checksums = {

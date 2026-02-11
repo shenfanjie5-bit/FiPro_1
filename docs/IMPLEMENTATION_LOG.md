@@ -654,3 +654,58 @@
 ### Artifacts
 - `monitoring/dashboards/m5_tier2_calibration.json`
 - `monitoring/dashboards/m5_tier2_calibration.md`
+
+## 2026-02-11 - Batch 23 (M6 Stability & Risk Control Closure)
+
+### Completed Operations
+- Closed M6-01 budget guardrail:
+  - Added stage-level budget guard checks in workflow nodes for facts/RAG/graph/LLM paths.
+  - Added structured budget degradation reasons (`degrade_reason` + `degrade_reasons`) and automatic data-quality propagation.
+- Closed M6-02 retry/ratelimit policy:
+  - Upgraded `app/tools/wrapper.py` with bounded retries, exponential backoff, and local sliding-window rate limiting.
+  - Added trace fields: `attempts`, `retry_count`, `retry_wait_ms`, `rate_limited_wait_ms`, `policy_version`, `degraded`.
+- Closed M6-03 degradation matrix:
+  - Added dependency-level degradation matrix (`budget/data_source/rag/graph/llm`) and sync to data_quality.
+  - Implemented conservative fallback report path when LLM fails or budget blocks draft generation.
+- Closed M6-04 trace & audit persistence:
+  - Expanded `tool_traces` persistence schema (sqlite/postgres) with retry/degraded audit fields.
+  - Updated ORM model and added Alembic migration: `20260211_0003_m6_trace_audit_fields.py`.
+- Closed M6-05 dashboard/panel:
+  - Added reliability panel module/script:
+    - `app/eval/m6_reliability.py`
+    - `scripts/m6_reliability_panel.py`
+  - Generated artifacts:
+    - `monitoring/dashboards/m6_reliability_panel.json`
+    - `monitoring/dashboards/m6_reliability_panel.md`
+- Closed M6-06 alert rules:
+  - Extended `monitoring/alerts.yml` with M6 warning/critical alerts for failure rate, schema pass, cost p95, retry storm.
+- Closed M6-07 runbook:
+  - Rewrote `docs/RUNBOOK.md` to production-ready incident playbook with clear fault handling and rollback flow.
+- Closed M6-08 load/soak & capacity baseline:
+  - Added load baseline module/script:
+    - `app/eval/m6_load.py`
+    - `scripts/m6_load_soak.py`
+  - Generated artifacts:
+    - `monitoring/dashboards/m6_load_baseline.json`
+    - `monitoring/dashboards/m6_load_baseline.md`
+- Closed M6-09 risk gate regression:
+  - Added regression tests for risk-gate priority and resilience:
+    - `tests/test_m6_risk_and_resilience.py`
+    - `tests/test_tool_wrapper.py` (retry/ratelimit coverage)
+- Closed M6-10 rollout drill:
+  - Added rollout drill module/script:
+    - `app/eval/m6_rollout.py`
+    - `scripts/m6_rollout_drill.py`
+  - Generated artifacts:
+    - `monitoring/dashboards/m6_rollout_drill.json`
+    - `monitoring/dashboards/m6_rollout_drill.md`
+- Updated milestone docs:
+  - Marked `M6-01` ~ `M6-10` as `DONE` in `docs/BACKLOG.md`.
+  - Added M6 sections/commands to `docs/EVAL_PLAN.md`, `Makefile`, and dashboard README.
+
+### Validation Evidence
+- `.venv/bin/python -m compileall app tests scripts` passed.
+- `.venv/bin/python -m pytest -q` passed.
+- `.venv/bin/python scripts/m6_reliability_panel.py --lookback-days 7` passed (`overall_status=PASS`).
+- `.venv/bin/python scripts/m6_load_soak.py --requests 30 --concurrency 6 --tier TIER1` passed (`success_rate=1.0`).
+- `.venv/bin/python scripts/m6_rollout_drill.py --tier TIER1` passed (`overall_status=PASS`).

@@ -88,6 +88,12 @@ class ToolTrace(Base):
     cost_usd: Mapped[float] = mapped_column(Numeric(10, 6, asdecimal=False), default=0)
     error_code: Mapped[str] = mapped_column(String, default='')
     ok: Mapped[bool] = mapped_column(default=True)
+    degraded: Mapped[bool] = mapped_column(default=False)
+    attempts: Mapped[int] = mapped_column(Integer, default=1)
+    retry_count: Mapped[int] = mapped_column(Integer, default=0)
+    retry_wait_ms: Mapped[int] = mapped_column(Integer, default=0)
+    rate_limited_wait_ms: Mapped[int] = mapped_column(Integer, default=0)
+    policy_version: Mapped[str] = mapped_column(String, default='tool_wrapper_m6_v1')
 
 
 class DecisionLog(Base):

@@ -49,3 +49,10 @@ curl -X POST http://localhost:8000/reports/generate \
     "run_mode":"LIVE"
   }'
 ```
+
+## 8) M6 stability checks
+```bash
+make eval-m6
+make load-m6
+make drill-m6
+```

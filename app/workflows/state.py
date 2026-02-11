@@ -42,4 +42,5 @@ class ResearchState(TypedDict, total=False):
     risk_gate_hard_blocks: list[str]
     weights_hash: str
     tool_call_stats: dict[str, Any]
+    degradation_matrix: dict[str, Any]
     persist_refs: dict[str, str]

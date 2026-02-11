@@ -21,6 +21,7 @@ from app.workflows.persistence import persist_workflow_state
 
 
 STATUS_RANK = {'OK': 0, 'PARTIAL': 1, 'DEGRADED': 2}
+DEGRADATION_DEPENDENCIES = ('budget', 'data_source', 'rag', 'graph', 'llm')
 
 
 def _merge_status(a: str, b: str) -> str:
@@ -75,14 +76,66 @@ def _default_tier_policy() -> dict[str, dict[str, Any]]:
 
 
 def _refresh_tool_stats(state: dict) -> None:
+    traces = list(state.get('tool_traces', []))
     state['tool_call_stats'] = {
-        'tool_calls': len(state.get('tool_traces', [])),
-        'latency_ms': sum(trace.get('latency_ms', 0) for trace in state.get('tool_traces', [])),
-        'cost_usd_est': round(sum(float(trace.get('cost_est', 0.0)) for trace in state.get('tool_traces', [])), 6),
+        'tool_calls': len(traces),
+        'latency_ms': sum(int(trace.get('latency_ms', 0)) for trace in traces),
+        'cost_usd_est': round(sum(float(trace.get('cost_est', 0.0)) for trace in traces), 6),
+        'tool_failures': sum(1 for trace in traces if str(trace.get('error_code', '')).strip()),
+        'retry_count': sum(int(trace.get('retry_count', 0)) for trace in traces),
+        'retry_wait_ms': sum(int(trace.get('retry_wait_ms', 0)) for trace in traces),
     }
     if 'budget' in state:
         state['budget']['used_tool_calls'] = state['tool_call_stats']['tool_calls']
         state['budget']['used_cost_usd'] = state['tool_call_stats']['cost_usd_est']
+
+
+def _default_degradation_matrix() -> dict[str, dict[str, Any]]:
+    return {
+        key: {'status': 'OK', 'mode': 'PRIMARY', 'reasons': []}
+        for key in DEGRADATION_DEPENDENCIES
+    }
+
+
+def _note_degradation(state: dict, dependency: str, *, status: str, reason: str, mode: str = 'DEGRADED') -> None:
+    matrix = state.setdefault('degradation_matrix', _default_degradation_matrix())
+    entry = matrix.setdefault(dependency, {'status': 'OK', 'mode': 'PRIMARY', 'reasons': []})
+    entry['status'] = _merge_status(str(entry.get('status', 'OK')), str(status))
+    if str(mode).strip():
+        entry['mode'] = str(mode)
+    reasons = [str(item) for item in entry.get('reasons', []) if str(item).strip()]
+    normalized_reason = str(reason).strip()
+    if normalized_reason and normalized_reason not in reasons:
+        reasons.append(normalized_reason)
+    entry['reasons'] = reasons[:8]
+
+
+def _sync_data_quality_from_matrix(state: dict) -> None:
+    matrix = state.get('degradation_matrix', {})
+    worst_status = 'OK'
+    missing_fields: list[str] = []
+    notes: list[str] = []
+    for dependency, entry in matrix.items():
+        if not isinstance(entry, dict):
+            continue
+        dep_status = str(entry.get('status', 'OK'))
+        worst_status = _merge_status(worst_status, dep_status)
+        if dep_status != 'OK':
+            missing_fields.append(f'dependency.{dependency}')
+            for reason in entry.get('reasons', []):
+                normalized_reason = str(reason).strip()
+                if normalized_reason:
+                    notes.append(f'{dependency}:{normalized_reason}')
+    if worst_status == 'OK':
+        return
+    state['data_quality'] = _merge_data_quality(
+        state.get('data_quality', {'status': 'OK', 'missing_fields': [], 'notes': ''}),
+        {
+            'status': worst_status,
+            'missing_fields': missing_fields,
+            'notes': ' | '.join(notes[:6]),
+        },
+    )
 
 
 def _tier_params(state: dict) -> dict[str, Any]:
@@ -105,6 +158,11 @@ def _mark_budget_degraded(state: dict, reason: str) -> None:
     state.setdefault('budget', {})
     state['budget']['degraded'] = True
     state['budget']['degrade_reason'] = reason
+    degrade_reasons = [str(item) for item in state['budget'].get('degrade_reasons', []) if str(item).strip()]
+    if reason and reason not in degrade_reasons:
+        degrade_reasons.append(reason)
+    state['budget']['degrade_reasons'] = degrade_reasons[:8]
+    _note_degradation(state, 'budget', status='DEGRADED', reason=reason, mode='GUARDRAIL')
     state['data_quality'] = _merge_data_quality(
         state['data_quality'],
         {
@@ -113,6 +171,34 @@ def _mark_budget_degraded(state: dict, reason: str) -> None:
             'notes': reason,
         },
     )
+
+
+def _budget_guardrail(
+    state: dict,
+    *,
+    stage: str,
+    reserve_tool_calls: int = 1,
+    reserve_cost_usd: float = 0.0,
+) -> bool:
+    _refresh_tool_stats(state)
+    budget = state.get('budget', {})
+    max_calls = int(budget.get('max_tool_calls', 0))
+    max_cost = float(budget.get('max_cost_usd', 0.0))
+    used_calls = int(budget.get('used_tool_calls', 0))
+    used_cost = float(budget.get('used_cost_usd', 0.0))
+    remaining_calls = max_calls - used_calls
+    remaining_cost = max_cost - used_cost
+    if remaining_calls < reserve_tool_calls or remaining_cost < reserve_cost_usd:
+        _mark_budget_degraded(
+            state,
+            (
+                f'budget guardrail at {stage}: '
+                f'remaining_calls={remaining_calls}, remaining_cost_usd={remaining_cost:.4f}, '
+                f'required_calls={reserve_tool_calls}, required_cost_usd={reserve_cost_usd:.4f}'
+            ),
+        )
+        return False
+    return True
 
 
 def load_strategy_config(state: dict) -> dict:
@@ -129,7 +215,7 @@ def load_strategy_config(state: dict) -> dict:
             'event_impact': 0.10,
         },
         'risk_profile': 'LOW',
-        'router_policy_version': 'router_m5_v1',
+        'router_policy_version': 'router_m6_v1',
         'tier_policy': tier_policy,
     }
     state['weights_hash'] = 'w_mock_hash_v1'
@@ -140,6 +226,7 @@ def load_strategy_config(state: dict) -> dict:
         'used_cost_usd': 0.0,
         'degraded': False,
         'degrade_reason': '',
+        'degrade_reasons': [],
     }
     return state
 
@@ -147,7 +234,7 @@ def load_strategy_config(state: dict) -> dict:
 def init_data_quality(state: dict) -> dict:
     state['data_quality'] = {'status': 'OK', 'missing_fields': [], 'notes': ''}
     state['tool_traces'] = []
-    state['tool_call_stats'] = {'tool_calls': 0, 'latency_ms': 0, 'cost_usd_est': 0}
+    state['tool_call_stats'] = {'tool_calls': 0, 'latency_ms': 0, 'cost_usd_est': 0, 'tool_failures': 0, 'retry_count': 0, 'retry_wait_ms': 0}
     state['doc_queries'] = []
     state['doc_candidates'] = []
     state['ranked_docs'] = []
@@ -167,6 +254,7 @@ def init_data_quality(state: dict) -> dict:
     state['graph_refs'] = []
     state['reviewer_notes'] = []
     state['persist_refs'] = {}
+    state['degradation_matrix'] = _default_degradation_matrix()
     return state
 
 
@@ -183,6 +271,8 @@ def build_facts(state: dict) -> dict:
         ('get_fundamentals_snapshot', {'ticker': ticker, 'asof': asof}, get_fundamentals_snapshot),
         ('get_flow_sentiment_snapshot', {'ticker': ticker, 'asof': asof}, get_flow_sentiment_snapshot),
     ]:
+        if not _budget_guardrail(state, stage=f'facts.{tool_name}', reserve_tool_calls=1):
+            break
         result = execute_tool(tool_name, payload, fn)
         state['tool_traces'].append(result['trace'])
         if result['ok']:
@@ -195,17 +285,48 @@ def build_facts(state: dict) -> dict:
                 result['output'].get('data_quality'),
                 prefix=tool_name,
             )
+            source_name = str(result['output'].get('source', 'PRIMARY')).upper()
+            if source_name.startswith('SYNTHETIC') or source_name.endswith('_CACHE'):
+                _note_degradation(
+                    state,
+                    'data_source',
+                    status='PARTIAL',
+                    reason=f'{tool_name} uses {source_name}',
+                    mode='FALLBACK',
+                )
+            if result['trace'].get('degraded'):
+                _note_degradation(
+                    state,
+                    'data_source',
+                    status='PARTIAL',
+                    reason=f'{tool_name} completed with upstream degradation',
+                    mode='FALLBACK',
+                )
         else:
+            err = result['output'].get('error', {})
             state['data_quality'] = _merge_data_quality(
                 state['data_quality'],
                 {
                     'status': 'DEGRADED',
                     'missing_fields': [f'{tool_name}.__upstream__'],
-                    'notes': f'{tool_name} failed: {result["output"].get("error", {}).get("message", "unknown error")}',
+                    'notes': f'{tool_name} failed: {err.get("message", "unknown error")}',
                 },
+            )
+            _note_degradation(
+                state,
+                'data_source',
+                status='DEGRADED',
+                reason=f'{tool_name} failed ({err.get("code", "INTERNAL_ERROR")})',
+                mode='FALLBACK',
             )
 
     if req['tier'] in ('TIER1', 'TIER2'):
+        if not _budget_guardrail(state, stage='facts.get_macro_commodity_logistics_snapshot', reserve_tool_calls=1):
+            _sync_data_quality_from_matrix(state)
+            state['snapshots'] = snapshots
+            state['snapshot_ids'] = snapshot_ids
+            _refresh_tool_stats(state)
+            return state
         macro = execute_tool(
             'get_macro_commodity_logistics_snapshot',
             {'ticker': ticker, 'asof': asof},
@@ -222,6 +343,23 @@ def build_facts(state: dict) -> dict:
                 macro['output'].get('data_quality'),
                 prefix='get_macro_commodity_logistics_snapshot',
             )
+            source_name = str(macro['output'].get('source', 'PRIMARY')).upper()
+            if source_name.startswith('SYNTHETIC') or source_name.endswith('_CACHE'):
+                _note_degradation(
+                    state,
+                    'data_source',
+                    status='PARTIAL',
+                    reason=f'get_macro_commodity_logistics_snapshot uses {source_name}',
+                    mode='FALLBACK',
+                )
+            if macro['trace'].get('degraded'):
+                _note_degradation(
+                    state,
+                    'data_source',
+                    status='PARTIAL',
+                    reason='macro snapshot completed with upstream degradation',
+                    mode='FALLBACK',
+                )
         else:
             state['data_quality'] = _merge_data_quality(
                 state['data_quality'],
@@ -231,9 +369,17 @@ def build_facts(state: dict) -> dict:
                     'notes': macro['output'].get('error', {}).get('message', 'macro snapshot failed'),
                 },
             )
+            _note_degradation(
+                state,
+                'data_source',
+                status='DEGRADED',
+                reason=f"get_macro_commodity_logistics_snapshot failed ({macro['output'].get('error', {}).get('code', 'INTERNAL_ERROR')})",
+                mode='FALLBACK',
+            )
 
     state['snapshots'] = snapshots
     state['snapshot_ids'] = snapshot_ids
+    _sync_data_quality_from_matrix(state)
     _refresh_tool_stats(state)
     return state
 
@@ -302,6 +448,10 @@ def retrieve_memory_node(state: dict) -> dict:
     memory_cfg = dict(tier_params.get('memory', {}))
     memory_top_k = int(memory_cfg.get('top_k', 5))
     memory_window_days = int(memory_cfg.get('time_range_days', 180))
+    if not _budget_guardrail(state, stage='memory.retrieve', reserve_tool_calls=1):
+        state['memory_notes'] = []
+        _sync_data_quality_from_matrix(state)
+        return state
     res = execute_tool(
         'retrieve_memory_notes',
         {
@@ -325,11 +475,17 @@ def retrieve_memory_node(state: dict) -> dict:
                 'notes': 'Memory retrieval failed',
             },
         )
+        _note_degradation(state, 'data_source', status='PARTIAL', reason='memory retrieval failed', mode='FALLBACK')
     _refresh_tool_stats(state)
     rag_cfg = dict(_tier_params(state).get('rag', {}))
     req_tier = str(req.get('tier', 'TIER0'))
-    if req_tier in ('TIER1', 'TIER2') and rag_cfg.get('enabled', False) and not _budget_allows_more_tools(state):
+    if req_tier in ('TIER1', 'TIER2') and rag_cfg.get('enabled', False) and not _budget_guardrail(
+        state,
+        stage='memory->rag',
+        reserve_tool_calls=1,
+    ):
         _mark_budget_degraded(state, 'RAG disabled: remaining budget is insufficient after memory retrieval')
+    _sync_data_quality_from_matrix(state)
     return state
 
 
@@ -358,10 +514,11 @@ def search_docs_node(state: dict) -> dict:
         state['doc_queries'] = []
         state['doc_candidates'] = []
         return state
-    if not _budget_allows_more_tools(state):
+    if not _budget_guardrail(state, stage='rag.search', reserve_tool_calls=1):
         _mark_budget_degraded(state, 'RAG search skipped: budget limit reached')
         state['doc_queries'] = []
         state['doc_candidates'] = []
+        _sync_data_quality_from_matrix(state)
         return state
 
     asof = datetime.fromisoformat(str(req['asof']).replace('Z', '+00:00'))
@@ -385,6 +542,8 @@ def search_docs_node(state: dict) -> dict:
     state['tool_traces'].append(docs_result['trace'])
     if docs_result['ok']:
         state['doc_candidates'] = docs_result['output'].get('docs', [])
+        if docs_result['trace'].get('degraded'):
+            _note_degradation(state, 'rag', status='PARTIAL', reason='event docs search degraded', mode='FALLBACK')
     else:
         state['doc_candidates'] = []
         state['data_quality'] = _merge_data_quality(
@@ -395,6 +554,14 @@ def search_docs_node(state: dict) -> dict:
                 'notes': docs_result['output'].get('error', {}).get('message', 'event docs search failed'),
             },
         )
+        _note_degradation(
+            state,
+            'rag',
+            status='DEGRADED',
+            reason=f"search_event_docs failed ({docs_result['output'].get('error', {}).get('code', 'INTERNAL_ERROR')})",
+            mode='FALLBACK',
+        )
+    _sync_data_quality_from_matrix(state)
     _refresh_tool_stats(state)
     return state
 
@@ -405,10 +572,11 @@ def rerank_docs_node(state: dict) -> dict:
         state['ranked_docs'] = []
         state['ranked_doc_ids'] = []
         return state
-    if not _budget_allows_more_tools(state):
+    if not _budget_guardrail(state, stage='rag.rerank', reserve_tool_calls=1):
         _mark_budget_degraded(state, 'Doc rerank skipped: budget limit reached')
         state['ranked_docs'] = candidates
         state['ranked_doc_ids'] = [doc.get('doc_id') for doc in candidates if doc.get('doc_id')]
+        _sync_data_quality_from_matrix(state)
         return state
 
     rerank_top_k = int(_tier_params(state).get('rag', {}).get('rerank_top_k', 8))
@@ -422,6 +590,8 @@ def rerank_docs_node(state: dict) -> dict:
     if rerank_result['ok']:
         state['ranked_docs'] = rerank_result['output'].get('docs', [])
         state['ranked_doc_ids'] = rerank_result['output'].get('ranked_doc_ids', [])
+        if rerank_result['trace'].get('degraded'):
+            _note_degradation(state, 'rag', status='PARTIAL', reason='doc rerank degraded', mode='FALLBACK')
     else:
         state['ranked_docs'] = candidates[:rerank_top_k]
         state['ranked_doc_ids'] = [doc.get('doc_id') for doc in state['ranked_docs'] if doc.get('doc_id')]
@@ -433,6 +603,14 @@ def rerank_docs_node(state: dict) -> dict:
                 'notes': rerank_result['output'].get('error', {}).get('message', 'doc rerank failed'),
             },
         )
+        _note_degradation(
+            state,
+            'rag',
+            status='PARTIAL',
+            reason=f"rerank_docs failed ({rerank_result['output'].get('error', {}).get('code', 'INTERNAL_ERROR')})",
+            mode='FALLBACK',
+        )
+    _sync_data_quality_from_matrix(state)
     _refresh_tool_stats(state)
     return state
 
@@ -443,16 +621,19 @@ def extract_events_node(state: dict) -> dict:
         state['extracted_events'] = []
         state['event_docs'] = []
         return state
-    if not _budget_allows_more_tools(state):
+    if not _budget_guardrail(state, stage='rag.extract_events', reserve_tool_calls=1):
         _mark_budget_degraded(state, 'Event extraction skipped: budget limit reached')
         state['extracted_events'] = []
         state['event_docs'] = ranked_docs
+        _sync_data_quality_from_matrix(state)
         return state
 
     extract_result = execute_tool('extract_events_from_docs', {'docs': ranked_docs}, extract_events_from_docs)
     state['tool_traces'].append(extract_result['trace'])
     if extract_result['ok']:
         state['extracted_events'] = extract_result['output'].get('events', [])
+        if extract_result['trace'].get('degraded'):
+            _note_degradation(state, 'rag', status='PARTIAL', reason='event extraction degraded', mode='FALLBACK')
     else:
         state['extracted_events'] = []
         state['data_quality'] = _merge_data_quality(
@@ -463,7 +644,15 @@ def extract_events_node(state: dict) -> dict:
                 'notes': extract_result['output'].get('error', {}).get('message', 'event extraction failed'),
             },
         )
+        _note_degradation(
+            state,
+            'rag',
+            status='PARTIAL',
+            reason=f"extract_events_from_docs failed ({extract_result['output'].get('error', {}).get('code', 'INTERNAL_ERROR')})",
+            mode='FALLBACK',
+        )
     state['event_docs'] = ranked_docs
+    _sync_data_quality_from_matrix(state)
     _refresh_tool_stats(state)
     return state
 
@@ -480,10 +669,12 @@ def graph_subtree_node(state: dict) -> dict:
         state['graph_subtree'] = {}
         state['graph_refs'] = []
         return state
-    if not _budget_allows_more_tools(state):
+    if not _budget_guardrail(state, stage='graph.subtree', reserve_tool_calls=1):
         _mark_budget_degraded(state, 'Graph subtree skipped: budget limit reached')
         state['graph_subtree'] = {}
         state['graph_refs'] = []
+        _note_degradation(state, 'graph', status='PARTIAL', reason='graph subtree skipped by budget', mode='DISABLED')
+        _sync_data_quality_from_matrix(state)
         return state
 
     depth = int(graph_cfg.get('depth', 2))
@@ -505,6 +696,8 @@ def graph_subtree_node(state: dict) -> dict:
         if path_id and path_id not in refs:
             refs.append(path_id)
         state['graph_refs'] = refs
+        if graph_result['trace'].get('degraded'):
+            _note_degradation(state, 'graph', status='PARTIAL', reason='graph subtree degraded', mode='FALLBACK')
     else:
         state['graph_subtree'] = {}
         state['graph_refs'] = []
@@ -516,6 +709,14 @@ def graph_subtree_node(state: dict) -> dict:
                 'notes': graph_result['output'].get('error', {}).get('message', 'graph subtree failed'),
             },
         )
+        _note_degradation(
+            state,
+            'graph',
+            status='DEGRADED',
+            reason=f"query_supply_chain_subtree failed ({graph_result['output'].get('error', {}).get('code', 'INTERNAL_ERROR')})",
+            mode='FALLBACK',
+        )
+    _sync_data_quality_from_matrix(state)
     _refresh_tool_stats(state)
     return state
 
@@ -592,7 +793,7 @@ def impact_paths_node(state: dict) -> dict:
     exposure_scores: list[dict[str, Any]] = []
     graph_refs: list[str] = list(state.get('graph_refs', []))
     for entity in entities:
-        if not _budget_allows_more_tools(state):
+        if not _budget_guardrail(state, stage='graph.impact_paths', reserve_tool_calls=1):
             _mark_budget_degraded(state, 'Impact paths skipped: budget limit reached')
             break
 
@@ -618,8 +819,15 @@ def impact_paths_node(state: dict) -> dict:
                     'notes': path_result['output'].get('error', {}).get('message', f'impact paths failed for {entity}'),
                 },
             )
+            _note_degradation(
+                state,
+                'graph',
+                status='PARTIAL',
+                reason=f"find_impact_paths failed for {entity}",
+                mode='FALLBACK',
+            )
 
-        if not _budget_allows_more_tools(state):
+        if not _budget_guardrail(state, stage='graph.exposure', reserve_tool_calls=1):
             _mark_budget_degraded(state, 'Exposure score skipped: budget limit reached')
             continue
 
@@ -645,10 +853,18 @@ def impact_paths_node(state: dict) -> dict:
                     'notes': exposure_result['output'].get('error', {}).get('message', f'exposure score failed for {entity}'),
                 },
             )
+            _note_degradation(
+                state,
+                'graph',
+                status='PARTIAL',
+                reason=f"compute_exposure_score failed for {entity}",
+                mode='FALLBACK',
+            )
 
     state['impact_paths'] = impact_paths
     state['exposure_scores'] = exposure_scores
     state['graph_refs'] = graph_refs
+    _sync_data_quality_from_matrix(state)
     _refresh_tool_stats(state)
     return state
 
@@ -818,8 +1034,9 @@ def _attempt_tier1_coverage_repair(state: dict, evidence_refs: list[dict[str, An
     need_news_doc = any(rule == 'missing_type=NEWS_DOC' for rule in missing_rules)
     if not need_news_doc:
         return
-    if not _budget_allows_more_tools(state):
+    if not _budget_guardrail(state, stage='rag.coverage_repair', reserve_tool_calls=1):
         _mark_budget_degraded(state, 'Tier1 coverage repair skipped: budget limit reached')
+        _note_degradation(state, 'rag', status='PARTIAL', reason='coverage repair skipped by budget', mode='DISABLED')
         return
 
     asof = datetime.fromisoformat(str(req['asof']).replace('Z', '+00:00'))
@@ -846,6 +1063,8 @@ def _attempt_tier1_coverage_repair(state: dict, evidence_refs: list[dict[str, An
         if fallback_docs:
             state['event_docs'] = _dedupe_docs(list(state.get('event_docs', [])) + fallback_docs)
             _append_doc_evidence_refs(evidence_refs, fallback_docs, now_iso)
+            if fallback_result['trace'].get('degraded'):
+                _note_degradation(state, 'rag', status='PARTIAL', reason='coverage repair search degraded', mode='FALLBACK')
         else:
             state['data_quality'] = _merge_data_quality(
                 state['data_quality'],
@@ -855,6 +1074,7 @@ def _attempt_tier1_coverage_repair(state: dict, evidence_refs: list[dict[str, An
                     'notes': 'coverage repair search returned no documents',
                 },
             )
+            _note_degradation(state, 'rag', status='PARTIAL', reason='coverage repair returned no docs', mode='FALLBACK')
     else:
         state['data_quality'] = _merge_data_quality(
             state['data_quality'],
@@ -864,6 +1084,14 @@ def _attempt_tier1_coverage_repair(state: dict, evidence_refs: list[dict[str, An
                 'notes': fallback_result['output'].get('error', {}).get('message', 'coverage repair search failed'),
             },
         )
+        _note_degradation(
+            state,
+            'rag',
+            status='PARTIAL',
+            reason=f"coverage repair search failed ({fallback_result['output'].get('error', {}).get('code', 'INTERNAL_ERROR')})",
+            mode='FALLBACK',
+        )
+    _sync_data_quality_from_matrix(state)
     _refresh_tool_stats(state)
 
 
@@ -922,10 +1150,12 @@ def build_context(state: dict) -> dict:
             }
         ]
 
+    _sync_data_quality_from_matrix(state)
     coverage = _enforce_evidence_coverage(state, evidence_refs)
     if not coverage.get('ok', False):
         _attempt_tier1_coverage_repair(state, evidence_refs, now_iso)
         _enforce_evidence_coverage(state, evidence_refs)
+    _sync_data_quality_from_matrix(state)
     _refresh_tool_stats(state)
     req = state['request']
     state['context'] = {
@@ -951,22 +1181,172 @@ def build_context(state: dict) -> dict:
         'weights_hash': state['weights_hash'],
         'tool_call_stats': state['tool_call_stats'],
         'budget': state.get('budget', {}),
-        'router_policy': state.get('config', {}).get('router_policy_version', 'router_m5_v1'),
+        'router_policy': state.get('config', {}).get('router_policy_version', 'router_m6_v1'),
+        'degradation_matrix': state.get('degradation_matrix', {}),
     }
     return state
 
 
+def _fallback_report_from_context(state: dict, reason: str) -> dict[str, Any]:
+    now_iso = datetime.now(timezone.utc).isoformat()
+    req = dict(state.get('request', {}))
+    context = dict(state.get('context', {}))
+    evidence_refs = [dict(item) for item in context.get('evidence_refs', []) if isinstance(item, dict)]
+    if not evidence_refs:
+        evidence_refs = [
+            {
+                'evidence_id': 'ev_fallback_001',
+                'type': 'MANUAL_NOTE',
+                'title': 'fallback evidence',
+                'source': 'fallback',
+                'captured_at': now_iso,
+                'uri': None,
+                'snippet': 'fallback generated by guardrail',
+                'checksum': 'fallback',
+            }
+        ]
+    primary_evidence_id = str(evidence_refs[0].get('evidence_id', 'ev_fallback_001'))
+    raw_score = int(context.get('score', {}).get('overall_score', 45))
+    data_quality = dict(context.get('data_quality', state.get('data_quality', {'status': 'DEGRADED', 'missing_fields': [], 'notes': ''})))
+    data_quality = _merge_data_quality(
+        data_quality,
+        {
+            'status': 'DEGRADED',
+            'missing_fields': ['llm.generate_report'],
+            'notes': reason,
+        },
+    )
+    confidence_cap = 0.45 if data_quality.get('status') == 'DEGRADED' else 0.5
+    report = {
+        'schema_version': '0.1',
+        'report_id': str(uuid.uuid4()),
+        'generated_at': now_iso,
+        'ticker': req.get('ticker', ''),
+        'market': req.get('market', 'OTHER'),
+        'asof': req.get('asof', now_iso),
+        'strategy_version_id': req.get('strategy_version_id', 'stg_unknown'),
+        'tier': req.get('tier', 'TIER0'),
+        'decision': {
+            'action': 'AVOID' if data_quality.get('status') == 'DEGRADED' else 'WATCH',
+            'overall_score': max(0, min(100, raw_score)),
+            'confidence': min(float(context.get('score', {}).get('confidence', 0.5)), confidence_cap),
+            'time_horizon': 'SWING',
+            'summary': f'Conservative fallback output: {reason}',
+        },
+        'price_bands': list(context.get('price_bands', [])) or [
+            {
+                'band_id': 'B1',
+                'range': {'currency': 'CNY', 'min': 0.0, 'max': 0.0},
+                'score': max(0, min(100, raw_score)),
+                'confidence': 0.4,
+                'rationale': 'Fallback band due to degraded dependency.',
+                'entry_conditions': [{'type': 'RISK', 'description': 'Wait for dependency recovery', 'priority': 'HIGH'}],
+                'exit_conditions': [{'type': 'RISK', 'description': 'Abort if risk escalates', 'priority': 'HIGH'}],
+            }
+        ],
+        'key_drivers_to_watch': [
+            {
+                'driver_id': 'drv_fallback_001',
+                'type': 'RISK',
+                'what': 'Dependency degraded, maintain conservative stance',
+                'direction': 'NEG',
+                'urgency': 'HIGH',
+                'impact_hypothesis': 'Missing or degraded inputs reduce decision confidence.',
+                'monitor': {
+                    'signals': [{'name': 'degradation_matrix', 'source': 'workflow'}],
+                    'triggers': [{'description': 'dependency recovered and schema valid', 'severity': 'MEDIUM'}],
+                },
+                'evidence_ids': [primary_evidence_id],
+                'graph_refs': [str(item).strip() for item in context.get('graph_refs', []) if str(item).strip()][:6],
+            }
+        ],
+        'thesis': {
+            'base_case': 'Use conservative action until upstream dependencies recover.',
+            'bull_case': 'After dependency recovery, rerun full workflow for refreshed thesis.',
+            'bear_case': 'Extended dependency outage can increase model risk and uncertainty.',
+            'next_steps': ['Retry generation after dependency recovery', 'Review degraded components in runbook'],
+        },
+        'risk_flags': [
+            {
+                'risk_id': 'risk_fallback_001',
+                'severity': 'HIGH',
+                'description': 'LLM or upstream dependency unavailable/degraded.',
+                'evidence_ids': [primary_evidence_id],
+            }
+        ],
+        'invalidations': [
+            {
+                'invalidation_id': 'inv_fallback_001',
+                'description': 'Fallback should be replaced once dependencies recover and validation passes.',
+                'priority': 'HIGH',
+                'evidence_ids': [primary_evidence_id],
+            }
+        ],
+        'evidence_refs': evidence_refs,
+        'data_quality': data_quality,
+        'provenance': {
+            'model': {'primary': 'rule-fallback-v1', 'reviewer': 'NONE'},
+            'router_policy': state.get('config', {}).get('router_policy_version', 'router_m6_v1'),
+            'snapshot_ids': list(context.get('snapshot_ids', [])),
+            'weights_hash': context.get('weights_hash', state.get('weights_hash', 'w_mock_hash_v1')),
+            'run_mode': req.get('run_mode', 'LIVE'),
+            'tool_call_stats': dict(state.get('tool_call_stats', {})),
+        },
+        'memory_update': {
+            'summary': 'Fallback report generated due to dependency degradation.',
+            'tags': [str(req.get('ticker', '')), 'fallback', 'm6'],
+            'importance': 75,
+            'followups': [reason],
+        },
+    }
+    return report
+
+
 def draft_report_node(state: dict) -> dict:
     provider = LLMProvider(primary_model='mock-primary-v1', reviewer_model='NONE')
-    state['report_draft'] = provider.generate_report_draft(state['context'])
+    if not _budget_guardrail(state, stage='llm.draft', reserve_tool_calls=1):
+        reason = 'LLM draft skipped by budget guardrail'
+        _note_degradation(state, 'llm', status='DEGRADED', reason=reason, mode='DISABLED')
+        state['report_draft'] = _fallback_report_from_context(state, reason)
+        _sync_data_quality_from_matrix(state)
+        return state
+
+    draft_result = execute_tool('llm_generate_report_draft', {'context': state['context']}, provider.generate_report_draft)
+    state['tool_traces'].append(draft_result['trace'])
+    if draft_result['ok']:
+        state['report_draft'] = draft_result['output']
+        if draft_result['trace'].get('degraded'):
+            _note_degradation(state, 'llm', status='PARTIAL', reason='llm draft degraded', mode='FALLBACK')
+    else:
+        err = draft_result['output'].get('error', {})
+        reason = f"LLM draft failed ({err.get('code', 'INTERNAL_ERROR')}): {err.get('message', 'unknown error')}"
+        _note_degradation(state, 'llm', status='DEGRADED', reason=reason, mode='FALLBACK')
+        state['report_draft'] = _fallback_report_from_context(state, reason)
+    _sync_data_quality_from_matrix(state)
+    _refresh_tool_stats(state)
     return state
 
 
 def risk_gate_node(state: dict) -> dict:
-    gate = execute_tool('risk_gate', {'report': state['report_draft'], 'risk_profile': state['config']['risk_profile']}, risk_gate)
+    _sync_data_quality_from_matrix(state)
+    report_payload = dict(state.get('report_draft', {}))
+    report_payload['data_quality'] = _merge_data_quality(
+        _normalize_report_data_quality(report_payload),
+        state.get('data_quality', {'status': 'OK', 'missing_fields': [], 'notes': ''}),
+    )
+    gate = execute_tool('risk_gate', {'report': report_payload, 'risk_profile': state['config']['risk_profile']}, risk_gate)
     state['tool_traces'].append(gate['trace'])
-    state['risk_gate_hard_blocks'] = gate['output'].get('hard_blocks', [])
-    state['report_draft'] = gate['output']['report']
+    if gate['ok']:
+        state['risk_gate_hard_blocks'] = gate['output'].get('hard_blocks', [])
+        state['report_draft'] = gate['output']['report']
+    else:
+        err = gate['output'].get('error', {})
+        reason = f"risk gate failed ({err.get('code', 'INTERNAL_ERROR')}): {err.get('message', 'unknown error')}"
+        state['risk_gate_hard_blocks'] = ['RISK_GATE_FAILED']
+        _note_degradation(state, 'llm', status='DEGRADED', reason=reason, mode='FALLBACK')
+        state['report_draft'] = _fallback_report_from_context(state, reason)
+    state['report_draft'].setdefault('provenance', {})
+    state['report_draft']['provenance']['degradation_matrix'] = state.get('degradation_matrix', {})
     _refresh_tool_stats(state)
     return state
 
@@ -975,6 +1355,22 @@ def reviewer_node(state: dict) -> dict:
     report = dict(state.get('report_draft', {}))
     if not report:
         state['reviewer_notes'] = ['empty report payload']
+        return state
+
+    if bool(state.get('budget', {}).get('degraded', False)):
+        skip_reason = 'review skipped due to budget guardrail'
+        report.setdefault('provenance', {})
+        report['provenance'].setdefault('model', {})
+        report['provenance']['model']['reviewer'] = 'SKIPPED_BUDGET'
+        report.setdefault('memory_update', {})
+        followups = [str(item) for item in report['memory_update'].get('followups', []) if str(item).strip()]
+        if skip_reason not in followups:
+            followups.append(skip_reason)
+        report['memory_update']['followups'] = followups[:20]
+        state['reviewer_notes'] = [skip_reason]
+        state['report_draft'] = report
+        _note_degradation(state, 'budget', status='DEGRADED', reason=skip_reason, mode='GUARDRAIL')
+        _sync_data_quality_from_matrix(state)
         return state
 
     req = state.get('request', {})
@@ -1161,8 +1557,7 @@ def repair_report_node(state: dict) -> dict:
 
 def mark_invalid_node(state: dict) -> dict:
     # After max repairs, emit a conservative but schema-valid fallback report.
-    provider = LLMProvider(primary_model='mock-primary-v1', reviewer_model='NONE')
-    fallback = provider.generate_report_draft(state['context'])
+    fallback = _fallback_report_from_context(state, 'validation failed after max repairs')
     fallback['decision']['action'] = 'AVOID'
     fallback['decision']['confidence'] = min(float(fallback['decision']['confidence']), 0.45)
     fallback['decision']['summary'] = 'Fallback output: validation failed after max repairs.'
@@ -1188,9 +1583,23 @@ def persist_node(state: dict) -> dict:
     }
     write_memory = execute_tool('write_memory_note', {'note': memory_note}, write_memory_note)
     state['tool_traces'].append(write_memory['trace'])
+    if not write_memory['ok']:
+        err = write_memory['output'].get('error', {})
+        _note_degradation(
+            state,
+            'data_source',
+            status='PARTIAL',
+            reason=f"write_memory_note failed ({err.get('code', 'INTERNAL_ERROR')})",
+            mode='FALLBACK',
+        )
     _refresh_tool_stats(state)
+    _sync_data_quality_from_matrix(state)
+    report['data_quality'] = _merge_data_quality(_normalize_report_data_quality(report), state.get('data_quality', {}))
+    report.setdefault('provenance', {})
     report['provenance']['tool_call_stats'] = state['tool_call_stats']
-    report['provenance']['router_policy'] = state.get('config', {}).get('router_policy_version', 'router_m5_v1')
+    report['provenance']['router_policy'] = state.get('config', {}).get('router_policy_version', 'router_m6_v1')
+    report['provenance']['budget'] = state.get('budget', {})
+    report['provenance']['degradation_matrix'] = state.get('degradation_matrix', {})
     persist_refs = persist_workflow_state(state, thread_id=state['thread_id'])
     persist_refs['memory_note_id'] = write_memory['output'].get('note_id', persist_refs.get('memory_note_id', ''))
     state['persist_refs'] = persist_refs

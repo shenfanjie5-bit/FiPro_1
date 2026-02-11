@@ -72,3 +72,59 @@ groups:
           severity: warning
         annotations:
           summary: "Schema validation failure rate is high"
+
+      - alert: M6ReportFailureRateWarning
+        expr: report_failure_rate_15m > 0.024
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "M6 report failure rate exceeds warning line"
+
+      - alert: M6ReportFailureRateCritical
+        expr: report_failure_rate_15m > 0.03
+        for: 5m
+        labels:
+          severity: page
+        annotations:
+          summary: "M6 report failure rate exceeds critical line"
+
+      - alert: M6SchemaPassRateWarning
+        expr: report_schema_pass_rate_15m < 0.99
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "M6 schema pass rate is below warning threshold"
+
+      - alert: M6SchemaPassRateCritical
+        expr: report_schema_pass_rate_15m < 0.98
+        for: 5m
+        labels:
+          severity: page
+        annotations:
+          summary: "M6 schema pass rate is below critical threshold"
+
+      - alert: M6CostP95Warning
+        expr: report_cost_p95_usd_30m > 2.125
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "M6 report cost p95 exceeds warning line"
+
+      - alert: M6CostP95Critical
+        expr: report_cost_p95_usd_30m > 2.5
+        for: 5m
+        labels:
+          severity: page
+        annotations:
+          summary: "M6 report cost p95 exceeds critical line"
+
+      - alert: M6RetryStorm
+        expr: tool_retry_rate_5m > 0.20
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "M6 tool retry rate indicates possible upstream instability"

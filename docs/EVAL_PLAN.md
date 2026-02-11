@@ -62,6 +62,25 @@
   - `monitoring/dashboards/m5_tier2_calibration.json`
   - `monitoring/dashboards/m5_tier2_calibration.md`
 
+### 1.4 M6 稳定性面板与上线预演
+- 目标：补齐生产化稳定性指标与上线演练闭环（成功率/失败率/延迟/成本/schema pass + 压测 + 故障预演）。
+- 稳定性面板脚本：
+  - `python scripts/m6_reliability_panel.py --lookback-days 7 --enforce-thresholds`
+  - 或 `make eval-m6`
+- 压测/容量脚本：
+  - `python scripts/m6_load_soak.py --requests 60 --concurrency 6 --tier TIER1`
+  - 或 `make load-m6`
+- 上线预演脚本（故障+回放）：
+  - `python scripts/m6_rollout_drill.py --tier TIER1 --enforce-checks`
+  - 或 `make drill-m6`
+- 产物：
+  - `monitoring/dashboards/m6_reliability_panel.json`
+  - `monitoring/dashboards/m6_reliability_panel.md`
+  - `monitoring/dashboards/m6_load_baseline.json`
+  - `monitoring/dashboards/m6_load_baseline.md`
+  - `monitoring/dashboards/m6_rollout_drill.json`
+  - `monitoring/dashboards/m6_rollout_drill.md`
+
 ## 2. 在线评估（Online）
 - 指标：用户有用率、报告生成成功率、SLA 命中率。
 - 策略：小流量灰度 + 阈值守门。
