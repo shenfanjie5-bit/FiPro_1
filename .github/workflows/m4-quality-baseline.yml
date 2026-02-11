@@ -32,13 +32,13 @@ jobs:
     runs-on: ubuntu-latest
     env:
       APP_ENV: ci
-      DATABASE_URL: sqlite+pysqlite:///:memory:
-      REDIS_URL: redis://localhost:6379/0
-      NEO4J_URI: bolt://localhost:7687
+      DATABASE_URL: "sqlite+pysqlite:///:memory:"
+      REDIS_URL: "redis://localhost:6379/0"
+      NEO4J_URI: "bolt://localhost:7687"
       NEO4J_USER: neo4j
       NEO4J_PASSWORD: neo4j
-      WORKFLOW_RUNTIME_DB: ${{ runner.temp }}/m4-baseline-runtime.db
-      WORKFLOW_CHECKPOINT_DB: ${{ runner.temp }}/m4-baseline-runtime.db
+      WORKFLOW_RUNTIME_DB: "/tmp/m4-baseline-runtime.db"
+      WORKFLOW_CHECKPOINT_DB: "/tmp/m4-baseline-runtime.db"
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
