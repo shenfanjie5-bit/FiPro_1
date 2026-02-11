@@ -1,4 +1,4 @@
-.PHONY: up down run test migrate db-init ci lint-openapi eval-m4 seed-m4 replay-m4-lowcov
+.PHONY: up down run test migrate db-init ci lint-openapi eval-m4 eval-m5 seed-m4 replay-m4-lowcov
 
 PYTHON ?= .venv/bin/python
 
@@ -29,6 +29,9 @@ lint-openapi:
 
 eval-m4:
 	$(PYTHON) scripts/m4_quality_baseline.py --lookback-days 14 --auto-topup-samples --enforce-thresholds
+
+eval-m5:
+	$(PYTHON) scripts/m5_tier2_calibration.py --lookback-days 14 --auto-topup-samples --enforce-thresholds
 
 seed-m4:
 	$(PYTHON) scripts/seed_m4_baseline_samples.py --count 12 --tier-pattern "TIER0,TIER1" --vary-asof

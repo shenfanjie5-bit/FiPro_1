@@ -17,6 +17,54 @@ groups:
         annotations:
           summary: "Report generation latency p95 is above threshold"
 
+      - alert: Tier2ToolCallsP95High
+        expr: tier2_tool_calls_p95_30m > 76.5
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "TIER2 tool calls p95 is above warning line"
+
+      - alert: Tier2ToolCallsP95Critical
+        expr: tier2_tool_calls_p95_30m > 90
+        for: 5m
+        labels:
+          severity: page
+        annotations:
+          summary: "TIER2 tool calls p95 exceeds budget line"
+
+      - alert: Tier2CostP95High
+        expr: tier2_cost_p95_usd_30m > 2.125
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "TIER2 cost p95 is above warning line"
+
+      - alert: Tier2CostP95Critical
+        expr: tier2_cost_p95_usd_30m > 2.5
+        for: 5m
+        labels:
+          severity: page
+        annotations:
+          summary: "TIER2 cost p95 exceeds budget line"
+
+      - alert: Tier2LatencyP95High
+        expr: tier2_latency_p95_ms_30m > 10200
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "TIER2 latency p95 is above warning line"
+
+      - alert: Tier2LatencyP95Critical
+        expr: tier2_latency_p95_ms_30m > 12000
+        for: 5m
+        labels:
+          severity: page
+        annotations:
+          summary: "TIER2 latency p95 exceeds budget line"
+
       - alert: SchemaValidationFailures
         expr: report_schema_fail_rate_15m > 0.01
         for: 5m

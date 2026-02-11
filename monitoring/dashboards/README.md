@@ -10,3 +10,6 @@ Suggested dashboards:
 - M4 quality baseline artifacts:
   - `m4_quality_baseline.json`
   - `m4_quality_baseline.md`
+- M5 Tier2 calibration artifacts:
+  - `m5_tier2_calibration.json`
+  - `m5_tier2_calibration.md`

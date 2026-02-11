@@ -136,7 +136,7 @@
 | M5-07 | reviewer 节点接入（TIER2 强制 + BUY 条件复核） | BE + ML Eng | P0 | DONE | 1d | M5-01,M5-05 | 复核意见进入报告或修复链路 |
 | M5-08 | graph evidence 绑定（`graph_refs` + `evidence_refs`） | BE | P0 | DONE | 0.5d | M5-04,M5-07 | 图谱证据 ID 在报告中可追溯 |
 | M5-09 | TIER2 E2E 测试（graph + review + repair） | QA + BE | P0 | DONE | 1d | M5-08 | TIER2 全链路回放成功 |
-| M5-10 | 性能与预算校准（TIER2 tool_calls/cost/latency） | SRE + BE | P1 | IN_PROGRESS | 0.5d | M5-09 | 不超预算阈值并有告警线 |
+| M5-10 | 性能与预算校准（TIER2 tool_calls/cost/latency） | SRE + BE | P1 | DONE | 0.5d | M5-09 | 不超预算阈值并有告警线 |
 
 ### M5 验收门
 
