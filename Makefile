@@ -1,4 +1,6 @@
-.PHONY: up down run test migrate db-init ci eval-m4 seed-m4 replay-m4-lowcov
+.PHONY: up down run test migrate db-init ci lint-openapi eval-m4 seed-m4 replay-m4-lowcov
+
+PYTHON ?= .venv/bin/python
 
 up:
 	docker compose up -d
@@ -22,11 +24,14 @@ test:
 ci:
 	pytest
 
+lint-openapi:
+	$(PYTHON) scripts/lint_openapi.py docs/OPENAPI.yaml
+
 eval-m4:
-	python scripts/m4_quality_baseline.py --lookback-days 14
+	$(PYTHON) scripts/m4_quality_baseline.py --lookback-days 14 --auto-topup-samples --enforce-thresholds
 
 seed-m4:
-	python scripts/seed_m4_baseline_samples.py --count 12 --tier-pattern "TIER0,TIER1" --vary-asof
+	$(PYTHON) scripts/seed_m4_baseline_samples.py --count 12 --tier-pattern "TIER0,TIER1" --vary-asof
 
 replay-m4-lowcov:
-	python scripts/replay_tier1_low_coverage.py --lookback-days 14 --batch-size 20 --max-rounds 3 --run-mode-strategy same --update-baseline-artifacts
+	$(PYTHON) scripts/replay_tier1_low_coverage.py --lookback-days 14 --batch-size 20 --max-rounds 3 --run-mode-strategy same --update-baseline-artifacts

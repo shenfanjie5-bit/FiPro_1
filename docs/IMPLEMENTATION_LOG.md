@@ -546,3 +546,38 @@
 
 ### Observed Runtime Note
 - In the current local historical dataset, replay successfully re-ran low-coverage source report IDs, but final gate remained `FAIL` because the remaining blocker is `sample_size` (not coverage). This is now explicitly surfaced in replay artifacts.
+
+## 2026-02-11 - Batch 20 (OpenAPI Lint CI + Baseline Sample-Size Governance)
+
+### Completed Operations
+- Added OpenAPI lint script:
+  - `scripts/lint_openapi.py` (uses `openapi-spec-validator` to validate `docs/OPENAPI.yaml`).
+- Integrated OpenAPI lint into CI:
+  - `.github/workflows/ci.yml` now executes `python scripts/lint_openapi.py docs/OPENAPI.yaml` before tests.
+- Added dependency for lint execution:
+  - `pyproject.toml` includes `openapi-spec-validator>=0.7.1`.
+- Introduced reusable baseline seed utility:
+  - `app/eval/sample_seed.py` (`seed_m4_baseline_samples`, `resolve_tier_pattern`).
+  - Refactored `scripts/seed_m4_baseline_samples.py` to call the shared module.
+- Added baseline sample-size governance:
+  - `scripts/m4_quality_baseline.py` now supports:
+    - `--auto-topup-samples`
+    - `--min-sample-size`
+    - `--topup-max-rounds`
+    - `--seed-batch-size`
+    - `--seed-tier-pattern`
+    - `--seed-run-mode`
+  - When enabled, it auto-seeds missing samples and recomputes baseline until threshold or round limit.
+  - Governance result is written into report field `governance.sample_topup`.
+- Updated local run entrypoint:
+  - `Makefile` target `eval-m4` now runs
+    - `python scripts/m4_quality_baseline.py --lookback-days 14 --auto-topup-samples --enforce-thresholds`
+  - Added `lint-openapi` target.
+- Synced evaluation docs:
+  - `docs/EVAL_PLAN.md` updated with auto-topup and CI OpenAPI lint details.
+
+### Validation Evidence
+- `.venv/bin/ruff check app tests scripts .github/workflows` passed.
+- `.venv/bin/python -m pytest -q` passed.
+- `.venv/bin/python scripts/lint_openapi.py docs/OPENAPI.yaml` passed.
+- `.venv/bin/python scripts/m4_quality_baseline.py --lookback-days 14 --auto-topup-samples --enforce-thresholds` passed with `overall_status=PASS`.
