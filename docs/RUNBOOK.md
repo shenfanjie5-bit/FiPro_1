@@ -98,3 +98,20 @@ SLO/SLA 参考（与 M6 面板一致）：
 - 临时缓解动作
 - 永久修复动作
 - 是否需要更新阈值/runbook/测试
+
+## 8. M7 评估与模型切换值班动作
+- 离线评估：
+  - `python scripts/m7_offline_eval.py --lookback-days 30 --enforce-thresholds`
+- Shadow 对比：
+  - `python scripts/m7_shadow_compare.py --lookback-days 30 --enforce-thresholds`
+- 漂移监控：
+  - `python scripts/m7_drift_monitor.py --baseline-lookback-days 30 --current-lookback-days 7`
+- 模型准入门禁：
+  - `python scripts/m7_model_gate.py --enforce-block`
+- 月度复盘：
+  - `python scripts/m7_monthly_review.py`
+
+处理原则：
+- 若模型门禁为 `BLOCK`，禁止主模型切换，保持当前版本。
+- 若漂移状态为 `FAIL`，先触发数据/行为漂移调查，再评估是否回滚策略。
+- 反馈中 `FALSE_POSITIVE` 持续上升时，优先修复风控规则与证据覆盖策略。

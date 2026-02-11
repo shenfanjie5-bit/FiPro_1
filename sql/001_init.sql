@@ -110,3 +110,12 @@ create table if not exists tool_traces (
   policy_version text not null default 'tool_wrapper_m6_v1',
   created_at timestamptz not null default now()
 );
+
+create table if not exists report_feedback (
+  id uuid primary key default gen_random_uuid(),
+  report_id text not null,
+  feedback_label text not null check (feedback_label in ('USEFUL','USELESS','FALSE_POSITIVE')),
+  comment text not null default '',
+  created_at timestamptz not null default now()
+);
+create index if not exists idx_report_feedback_report_created on report_feedback(report_id, created_at desc);

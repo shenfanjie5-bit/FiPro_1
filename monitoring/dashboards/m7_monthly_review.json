@@ -1,0 +1,42 @@
+{
+  "backlog": [],
+  "findings": [
+    {
+      "details": {
+        "false_positive": 0,
+        "negative_feedback_rate": 0.0,
+        "useful": 3,
+        "useless": 0
+      },
+      "title": "Feedback summary"
+    },
+    {
+      "details": {
+        "alerts": 0,
+        "overall_status": "PASS"
+      },
+      "title": "Drift monitor"
+    },
+    {
+      "details": {
+        "challenger_quality_win_rate": 1.0,
+        "decision_change_rate": 0.0,
+        "paired_sample_size": 1
+      },
+      "title": "Shadow compare"
+    }
+  ],
+  "generated_at": "2026-02-11T15:12:49.945958+00:00",
+  "month": "2026-02",
+  "overall_status": "STABLE",
+  "summary": {
+    "bad_report_ids": [],
+    "feedback_counts": {
+      "FALSE_POSITIVE": 0,
+      "USEFUL": 3,
+      "USELESS": 0
+    },
+    "feedback_total": 3,
+    "negative_feedback_rate": 0.0
+  }
+}

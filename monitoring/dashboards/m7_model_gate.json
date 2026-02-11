@@ -1,0 +1,75 @@
+{
+  "candidate_model": "challenger",
+  "checks": [
+    {
+      "actual": 1.0,
+      "metric": "shadow_pairs",
+      "operator": ">=",
+      "pass": false,
+      "threshold": 20
+    },
+    {
+      "actual": 1.0,
+      "metric": "challenger_schema_pass_rate",
+      "operator": ">=",
+      "pass": true,
+      "threshold": 0.99
+    },
+    {
+      "actual": 1.0,
+      "metric": "challenger_coverage_pass_rate",
+      "operator": ">=",
+      "pass": true,
+      "threshold": 0.9
+    },
+    {
+      "actual": 1.0,
+      "metric": "challenger_quality_win_rate",
+      "operator": ">=",
+      "pass": true,
+      "threshold": 0.5
+    },
+    {
+      "actual": 0.0,
+      "metric": "abs_avg_cost_delta_usd",
+      "operator": "<=",
+      "pass": true,
+      "threshold": 0.1
+    },
+    {
+      "actual": 23.0,
+      "metric": "abs_avg_latency_delta_ms",
+      "operator": "<=",
+      "pass": true,
+      "threshold": 800.0
+    },
+    {
+      "actual": 0.0,
+      "metric": "critical_drift_dimensions",
+      "operator": "<=",
+      "pass": true,
+      "threshold": 0.0
+    }
+  ],
+  "current_model": "primary",
+  "decision": "BLOCK",
+  "failed_checks": [
+    "shadow_pairs"
+  ],
+  "generated_at": "2026-02-11T15:12:49.857317+00:00",
+  "rollout_strategy": {
+    "rollback_model": "primary",
+    "step_1": "Start with 5% traffic shadow-only verification window for 24h.",
+    "step_2": "Promote to 10% live canary with automatic rollback.",
+    "step_3": "Rollback immediately when failure_rate or schema_pass_rate crosses M6 thresholds."
+  },
+  "thresholds": {
+    "abs_avg_cost_delta_usd_max": 0.1,
+    "abs_avg_latency_delta_ms_max": 800.0,
+    "challenger_coverage_pass_rate_min": 0.9,
+    "challenger_schema_pass_rate_min": 0.99,
+    "challenger_win_rate_min": 0.5,
+    "max_critical_drift_dimensions": 0.0,
+    "min_shadow_pairs": 20
+  }
+}

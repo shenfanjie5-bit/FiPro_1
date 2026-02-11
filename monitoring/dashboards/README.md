@@ -20,3 +20,16 @@ Suggested dashboards:
   - `m6_load_baseline.md`
   - `m6_rollout_drill.json`
   - `m6_rollout_drill.md`
+- M7 evaluation/shadow artifacts:
+  - `m7_offline_dataset.json`
+  - `m7_offline_dataset.md`
+  - `m7_offline_eval.json`
+  - `m7_offline_eval.md`
+  - `m7_shadow_compare.json`
+  - `m7_shadow_compare.md`
+  - `m7_drift_monitor.json`
+  - `m7_drift_monitor.md`
+  - `m7_model_gate.json`
+  - `m7_model_gate.md`
+  - `m7_monthly_review.json`
+  - `m7_monthly_review.md`

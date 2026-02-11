@@ -175,14 +175,14 @@
 
 | ID | Task | Owner | Priority | Status | Est | Depends On | Acceptance |
 |---|---|---|---|---|---|---|---|
-| M7-01 | 离线回放数据集构建（按行业/行情阶段分层） | Data + QA | P0 | TODO | 1d | M6 | 数据集可重复生成并版本化 |
-| M7-02 | 离线评估管道（schema/一致性/证据覆盖/成本） | QA + BE | P0 | TODO | 1d | M7-01 | 一键评估并输出指标报告 |
-| M7-03 | Shadow 路由接入（challenger 不影响线上结果） | BE + ML Eng | P0 | TODO | 1d | M6-04 | 同输入双路跑通并落库对比 |
-| M7-04 | Shadow 对比报表（质量/延迟/成本） | Data + QA | P1 | TODO | 1d | M7-03 | 可按模型版本查看差异 |
-| M7-05 | 在线反馈回流（有用/无用/误报标签） | Product + BE | P1 | TODO | 0.5d | M7-02 | 用户反馈可关联 report_id |
-| M7-06 | 漂移监控（数据漂移/行为漂移） | Data + SRE | P1 | TODO | 1d | M7-01,M7-02 | 超阈值触发告警与调查流程 |
-| M7-07 | 模型切换准入规则（升版门槛与回滚策略） | ML Eng + Product | P0 | TODO | 0.5d | M7-04 | 满足门槛才允许主模型切换 |
-| M7-08 | 月度评审机制（坏报告复盘 + 规则更新） | Product + QA + BE | P2 | TODO | 0.5d | M7-05,M7-06 | 形成可执行改进 backlog |
+| M7-01 | 离线回放数据集构建（按行业/行情阶段分层） | Data + QA | P0 | DONE | 1d | M6 | 数据集可重复生成并版本化 |
+| M7-02 | 离线评估管道（schema/一致性/证据覆盖/成本） | QA + BE | P0 | DONE | 1d | M7-01 | 一键评估并输出指标报告 |
+| M7-03 | Shadow 路由接入（challenger 不影响线上结果） | BE + ML Eng | P0 | DONE | 1d | M6-04 | 同输入双路跑通并落库对比 |
+| M7-04 | Shadow 对比报表（质量/延迟/成本） | Data + QA | P1 | DONE | 1d | M7-03 | 可按模型版本查看差异 |
+| M7-05 | 在线反馈回流（有用/无用/误报标签） | Product + BE | P1 | DONE | 0.5d | M7-02 | 用户反馈可关联 report_id |
+| M7-06 | 漂移监控（数据漂移/行为漂移） | Data + SRE | P1 | DONE | 1d | M7-01,M7-02 | 超阈值触发告警与调查流程 |
+| M7-07 | 模型切换准入规则（升版门槛与回滚策略） | ML Eng + Product | P0 | DONE | 0.5d | M7-04 | 满足门槛才允许主模型切换 |
+| M7-08 | 月度评审机制（坏报告复盘 + 规则更新） | Product + QA + BE | P2 | DONE | 0.5d | M7-05,M7-06 | 形成可执行改进 backlog |
 
 ### M7 验收门
 

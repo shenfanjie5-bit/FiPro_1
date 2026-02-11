@@ -1,0 +1,84 @@
+{
+  "by_model": [
+    {
+      "avg_cost_delta_usd": 0.0,
+      "avg_latency_delta_ms": -23.0,
+      "challenger_quality_win_rate": 1.0,
+      "decision_change_rate": 0.0,
+      "model": "mock-challenger-v1",
+      "paired_sample_size": 1
+    }
+  ],
+  "generated_at": "2026-02-11T15:12:49.541866+00:00",
+  "overall_status": "FAIL",
+  "summary": {
+    "avg_cost_delta_usd": 0.0,
+    "avg_latency_delta_ms": -23.0,
+    "challenger_quality_win_rate": 1.0,
+    "decision_change_rate": 0.0,
+    "paired_sample_size": 1
+  },
+  "threshold_checks": [
+    {
+      "actual": 1.0,
+      "metric": "paired_sample_size",
+      "operator": ">=",
+      "pass": false,
+      "threshold": 10
+    },
+    {
+      "actual": 0.0,
+      "metric": "decision_change_rate",
+      "operator": "<=",
+      "pass": true,
+      "threshold": 0.4
+    },
+    {
+      "actual": 0.0,
+      "metric": "abs_avg_cost_delta_usd",
+      "operator": "<=",
+      "pass": true,
+      "threshold": 0.15
+    },
+    {
+      "actual": 23.0,
+      "metric": "abs_avg_latency_delta_ms",
+      "operator": "<=",
+      "pass": true,
+      "threshold": 1200.0
+    },
+    {
+      "actual": 1.0,
+      "metric": "challenger_quality_win_rate",
+      "operator": ">=",
+      "pass": true,
+      "threshold": 0.45
+    }
+  ],
+  "thresholds": {
+    "avg_cost_delta_usd_max": 0.15,
+    "avg_latency_delta_ms_max": 1200.0,
+    "challenger_quality_win_rate_min": 0.45,
+    "decision_change_rate_max": 0.4,
+    "min_paired_sample_size": 10
+  },
+  "top_differences": [
+    {
+      "action_changed": false,
+      "challenger_action": "WATCH",
+      "challenger_model": "mock-challenger-v1",
+      "challenger_quality_score": 4,
+      "challenger_report_id": "46db4cdf-ab90-4b1c-8278-123e85233f4a",
+      "cost_delta_usd": 0.0,
+      "latency_delta_ms": -23,
+      "primary_action": "WATCH",
+      "primary_model": "mock-primary-v1",
+      "primary_quality_score": 4,
+      "primary_report_id": "019efc44-0cf3-448b-aab3-4f21d7efde7b",
+      "scenario_key": "600519.SH|2026-02-10T09:30:00+08:00|stg_v1|TIER1"
+    }
+  ],
+  "window": {
+    "lookback_days": 30
+  }
+}

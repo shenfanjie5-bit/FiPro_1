@@ -126,3 +126,13 @@ class EventDoc(Base):
     snippet: Mapped[str] = mapped_column(Text, nullable=False)
     checksum: Mapped[str] = mapped_column(Text, nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_utcnow)
+
+
+class ReportFeedback(Base):
+    __tablename__ = 'report_feedback'
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True)
+    report_id: Mapped[str] = mapped_column(String, nullable=False)
+    feedback_label: Mapped[str] = mapped_column(String, nullable=False)
+    comment: Mapped[str] = mapped_column(Text, default='')
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_utcnow)

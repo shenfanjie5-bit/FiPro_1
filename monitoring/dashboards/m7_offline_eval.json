@@ -1,0 +1,146 @@
+{
+  "generated_at": "2026-02-11T15:12:49.360460+00:00",
+  "overall_status": "FAIL",
+  "pair_summary": {
+    "avg_cost_delta_usd": 0.0,
+    "avg_latency_delta_ms": -23.0,
+    "challenger_win_rate": 1.0,
+    "decision_change_rate": 0.0,
+    "paired_sample_size": 1,
+    "top_differences": [
+      {
+        "challenger_action": "WATCH",
+        "challenger_quality_score": 4,
+        "challenger_report_id": "46db4cdf-ab90-4b1c-8278-123e85233f4a",
+        "cost_delta_usd": 0.0,
+        "latency_delta_ms": -23,
+        "primary_action": "WATCH",
+        "primary_quality_score": 4,
+        "primary_report_id": "019efc44-0cf3-448b-aab3-4f21d7efde7b",
+        "scenario_key": "600519.SH|2026-02-10T09:30:00+08:00|stg_v1|TIER1"
+      }
+    ]
+  },
+  "threshold_checks": [
+    {
+      "actual": 405.0,
+      "metric": "PRIMARY.sample_size",
+      "operator": ">=",
+      "pass": true,
+      "threshold": 10
+    },
+    {
+      "actual": 0.958025,
+      "metric": "PRIMARY.schema_pass_rate",
+      "operator": ">=",
+      "pass": false,
+      "threshold": 0.99
+    },
+    {
+      "actual": 0.958025,
+      "metric": "PRIMARY.consistency_pass_rate",
+      "operator": ">=",
+      "pass": false,
+      "threshold": 0.97
+    },
+    {
+      "actual": 1.0,
+      "metric": "PRIMARY.citation_consistency_rate",
+      "operator": ">=",
+      "pass": true,
+      "threshold": 0.98
+    },
+    {
+      "actual": 0.893827,
+      "metric": "PRIMARY.evidence_coverage_pass_rate",
+      "operator": ">=",
+      "pass": false,
+      "threshold": 0.9
+    },
+    {
+      "actual": 3.0,
+      "metric": "CHALLENGER.sample_size",
+      "operator": ">=",
+      "pass": false,
+      "threshold": 10
+    },
+    {
+      "actual": 1.0,
+      "metric": "CHALLENGER.schema_pass_rate",
+      "operator": ">=",
+      "pass": true,
+      "threshold": 0.99
+    },
+    {
+      "actual": 1.0,
+      "metric": "CHALLENGER.consistency_pass_rate",
+      "operator": ">=",
+      "pass": true,
+      "threshold": 0.97
+    },
+    {
+      "actual": 1.0,
+      "metric": "CHALLENGER.citation_consistency_rate",
+      "operator": ">=",
+      "pass": true,
+      "threshold": 0.98
+    },
+    {
+      "actual": 1.0,
+      "metric": "CHALLENGER.evidence_coverage_pass_rate",
+      "operator": ">=",
+      "pass": true,
+      "threshold": 0.9
+    },
+    {
+      "actual": 1.0,
+      "metric": "PAIR.paired_sample_size",
+      "operator": ">=",
+      "pass": false,
+      "threshold": 8
+    },
+    {
+      "actual": 1.0,
+      "metric": "PAIR.challenger_win_rate",
+      "operator": ">=",
+      "pass": true,
+      "threshold": 0.45
+    }
+  ],
+  "thresholds": {
+    "challenger_win_rate_min": 0.45,
+    "citation_consistency_rate_min": 0.98,
+    "consistency_pass_rate_min": 0.97,
+    "evidence_coverage_pass_rate_min": 0.9,
+    "min_paired_sample_size": 8,
+    "min_sample_size": 10,
+    "schema_pass_rate_min": 0.99
+  },
+  "tracks": {
+    "CHALLENGER": {
+      "avg_cost_usd": 0.0,
+      "avg_latency_ms": 6.0,
+      "avg_tool_calls": 16.0,
+      "citation_consistency_rate": 1.0,
+      "consistency_pass_rate": 1.0,
+      "evidence_coverage_pass_rate": 1.0,
+      "sample_size": 3,
+      "schema_pass_rate": 1.0,
+      "track": "CHALLENGER"
+    },
+    "PRIMARY": {
+      "avg_cost_usd": 0.0,
+      "avg_latency_ms": 27.081481,
+      "avg_tool_calls": 12.034568,
+      "citation_consistency_rate": 1.0,
+      "consistency_pass_rate": 0.958025,
+      "evidence_coverage_pass_rate": 0.893827,
+      "sample_size": 405,
+      "schema_pass_rate": 0.958025,
+      "track": "PRIMARY"
+    }
+  },
+  "window": {
+    "lookback_days": 30
+  }
+}

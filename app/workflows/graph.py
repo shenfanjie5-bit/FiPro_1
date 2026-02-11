@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 from typing import Literal
 
 from langgraph.graph import END, START, StateGraph
@@ -162,7 +163,11 @@ def recover_research_state(thread_id: str) -> dict | None:
     return get_latest_checkpoint(thread_id)
 
 
-def run_research_workflow(request_data: dict, thread_id: str) -> dict:
+def _shadow_enabled() -> bool:
+    return os.getenv('M7_SHADOW_ENABLED', '').strip().lower() in {'1', 'true', 'yes', 'on'}
+
+
+def _run_single_workflow(request_data: dict, thread_id: str) -> dict:
     state = RESEARCH_GRAPH.invoke(
         {'thread_id': thread_id, 'request': request_data},
         config={'configurable': {'thread_id': thread_id}},
@@ -170,4 +175,27 @@ def run_research_workflow(request_data: dict, thread_id: str) -> dict:
     return {
         'final_report': state['final_report'],
         'persist_refs': state.get('persist_refs', {}),
+    }
+
+
+def run_research_workflow(request_data: dict, thread_id: str) -> dict:
+    primary_result = _run_single_workflow(request_data=request_data, thread_id=thread_id)
+    run_mode = str(request_data.get('run_mode', 'LIVE')).strip().upper() or 'LIVE'
+    if run_mode != 'LIVE' or not _shadow_enabled():
+        return primary_result
+
+    shadow_request = dict(request_data)
+    shadow_request['run_mode'] = 'SHADOW'
+    shadow_thread_id = f'{thread_id}__shadow'
+    try:
+        shadow_result = _run_single_workflow(request_data=shadow_request, thread_id=shadow_thread_id)
+    except Exception:  # noqa: BLE001
+        return primary_result
+
+    persist_refs = dict(primary_result.get('persist_refs', {}))
+    persist_refs['shadow_thread_id'] = shadow_thread_id
+    persist_refs['shadow_report_id'] = str(shadow_result.get('final_report', {}).get('report_id', ''))
+    return {
+        'final_report': primary_result['final_report'],
+        'persist_refs': persist_refs,
     }

@@ -1,0 +1,80 @@
+{
+  "alerts": [],
+  "baseline_label": "baseline",
+  "baseline_sample_size": 55,
+  "current_label": "current",
+  "current_sample_size": 55,
+  "dimensions": [
+    {
+      "baseline_distribution": {
+        "CONSUMER": 0.109091,
+        "FINANCE": 0.109091,
+        "HEALTHCARE": 0.672727,
+        "INDUSTRIAL": 0.109091
+      },
+      "current_distribution": {
+        "CONSUMER": 0.109091,
+        "FINANCE": 0.109091,
+        "HEALTHCARE": 0.672727,
+        "INDUSTRIAL": 0.109091
+      },
+      "dimension": "data.industry",
+      "psi": 0.0,
+      "status": "OK"
+    },
+    {
+      "baseline_distribution": {
+        "STRESSED": 1.0
+      },
+      "current_distribution": {
+        "STRESSED": 1.0
+      },
+      "dimension": "data.market_regime",
+      "psi": 0.0,
+      "status": "OK"
+    },
+    {
+      "baseline_distribution": {
+        "HIGH": 0.872727,
+        "LOW": 0.127273
+      },
+      "current_distribution": {
+        "HIGH": 0.872727,
+        "LOW": 0.127273
+      },
+      "dimension": "data.event_density",
+      "psi": 0.0,
+      "status": "OK"
+    },
+    {
+      "baseline_distribution": {
+        "AVOID": 0.090909,
+        "WATCH": 0.909091
+      },
+      "current_distribution": {
+        "AVOID": 0.090909,
+        "WATCH": 0.909091
+      },
+      "dimension": "behavior.action",
+      "psi": 0.0,
+      "status": "OK"
+    },
+    {
+      "baseline_distribution": {
+        "[0.4,0.6)": 1.0
+      },
+      "current_distribution": {
+        "[0.4,0.6)": 1.0
+      },
+      "dimension": "behavior.confidence_bucket",
+      "psi": 0.0,
+      "status": "OK"
+    }
+  ],
+  "generated_at": "2026-02-11T15:12:49.776644+00:00",
+  "overall_status": "PASS",
+  "thresholds": {
+    "psi_critical": 0.3,
+    "psi_warning": 0.2
+  }
+}

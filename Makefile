@@ -1,4 +1,4 @@
-.PHONY: up down run test migrate db-init ci lint-openapi eval-m4 eval-m5 eval-m6 seed-m4 replay-m4-lowcov load-m6 drill-m6
+.PHONY: up down run test migrate db-init ci lint-openapi eval-m4 eval-m5 eval-m6 eval-m7 eval-m7-dataset eval-m7-offline eval-m7-shadow eval-m7-drift eval-m7-gate eval-m7-review eval-m7-offline-gate eval-m7-shadow-gate eval-m7-gate-strict seed-m4 replay-m4-lowcov load-m6 drill-m6
 
 PYTHON ?= .venv/bin/python
 
@@ -47,3 +47,32 @@ load-m6:
 
 drill-m6:
 	$(PYTHON) scripts/m6_rollout_drill.py --tier TIER1 --enforce-checks
+
+eval-m7-dataset:
+	$(PYTHON) scripts/m7_build_dataset.py --lookback-days 30
+
+eval-m7-offline:
+	$(PYTHON) scripts/m7_offline_eval.py --lookback-days 30
+
+eval-m7-shadow:
+	$(PYTHON) scripts/m7_shadow_compare.py --lookback-days 30
+
+eval-m7-drift:
+	$(PYTHON) scripts/m7_drift_monitor.py --baseline-lookback-days 30 --current-lookback-days 7
+
+eval-m7-gate:
+	$(PYTHON) scripts/m7_model_gate.py
+
+eval-m7-review:
+	$(PYTHON) scripts/m7_monthly_review.py
+
+eval-m7-offline-gate:
+	$(PYTHON) scripts/m7_offline_eval.py --lookback-days 30 --enforce-thresholds
+
+eval-m7-shadow-gate:
+	$(PYTHON) scripts/m7_shadow_compare.py --lookback-days 30 --enforce-thresholds
+
+eval-m7-gate-strict:
+	$(PYTHON) scripts/m7_model_gate.py --enforce-block
+
+eval-m7: eval-m7-dataset eval-m7-offline eval-m7-shadow eval-m7-drift eval-m7-gate eval-m7-review

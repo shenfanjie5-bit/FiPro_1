@@ -65,6 +65,24 @@ curl -X POST http://localhost:8000/reports/generate \
 - JSON schema validation + consistency checks
 - SQLite checkpoint for replay seed (thread-level)
 - M1 contract tests for OpenAPI + SQL baseline
+- M7 offline eval/shadow/drift/gate/monthly review pipeline artifacts
+
+## M7 Evaluation Commands
+
+```bash
+make eval-m7
+```
+
+Or run stages separately:
+
+```bash
+make eval-m7-dataset
+make eval-m7-offline
+make eval-m7-shadow
+make eval-m7-drift
+make eval-m7-gate
+make eval-m7-review
+```
 
 ## TODO
 

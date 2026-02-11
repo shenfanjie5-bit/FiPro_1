@@ -8,7 +8,11 @@ from app.tools.facts import get_market_snapshot
 from app.tools.graph import compute_exposure_score, find_impact_paths, query_supply_chain_subtree
 from app.tools.memory import retrieve_memory_notes, write_memory_note
 from app.workflows.graph import run_research_workflow
-from app.workflows.persistence import get_report as get_persisted_report
+from app.workflows.persistence import (
+    get_report as get_persisted_report,
+    list_report_feedback,
+    save_report_feedback,
+)
 
 router = APIRouter()
 
@@ -33,6 +37,11 @@ class MemoryWriteRequest(BaseModel):
     ticker: str
     content: str
     tags: list[str] = Field(default_factory=list)
+
+
+class ReportFeedbackRequest(BaseModel):
+    feedback_label: str = Field(pattern='^(USEFUL|USELESS|FALSE_POSITIVE)$')
+    comment: str = ''
 
 
 @router.get('/health')
@@ -67,6 +76,27 @@ def get_report(report_id: str) -> dict:
     if report is None:
         raise HTTPException(status_code=404, detail='report not found')
     return {'report_id': report_id, 'final_report': report}
+
+
+@router.post('/reports/{report_id}/feedback', status_code=201)
+def submit_report_feedback(report_id: str, payload: ReportFeedbackRequest) -> dict:
+    report = REPORT_STORE.get(report_id)
+    if report is None:
+        report = get_persisted_report(report_id)
+    if report is None:
+        raise HTTPException(status_code=404, detail='report not found')
+    saved = save_report_feedback(
+        report_id=report_id,
+        feedback_label=payload.feedback_label,
+        comment=payload.comment,
+    )
+    return {'report_id': report_id, **saved}
+
+
+@router.get('/reports/{report_id}/feedback')
+def get_report_feedback(report_id: str, limit: int = 50) -> dict:
+    rows = list_report_feedback(report_id=report_id, limit=max(1, min(500, int(limit))))
+    return {'report_id': report_id, 'items': rows}
 
 
 @router.post('/strategies', status_code=201)

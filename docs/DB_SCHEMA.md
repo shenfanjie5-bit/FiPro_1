@@ -16,6 +16,7 @@
 - `memory_notes`
 - `memory_embeddings`
 - `tool_traces`
+- `report_feedback`
 
 ## Index Baseline
 - `daily_snapshots(ticker, asof desc)`
@@ -23,6 +24,7 @@
 - `decision_logs(ticker, created_at desc)`
 - `watchlist(tier, updated_at desc)`
 - `memory_embeddings using ivfflat (embedding vector_cosine_ops)`
+- `report_feedback(report_id, created_at desc)`
 
 ## Integrity Rules
 - `strategy_versions` immutable after publish

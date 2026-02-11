@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from datetime import datetime, timedelta, timezone
+import os
 import uuid
 from typing import Any
 
@@ -1303,7 +1304,14 @@ def _fallback_report_from_context(state: dict, reason: str) -> dict[str, Any]:
 
 
 def draft_report_node(state: dict) -> dict:
-    provider = LLMProvider(primary_model='mock-primary-v1', reviewer_model='NONE')
+    run_mode = str(state.get('request', {}).get('run_mode', 'LIVE')).strip().upper() or 'LIVE'
+    if run_mode == 'SHADOW':
+        primary_model = os.getenv('LLM_SHADOW_MODEL', 'mock-challenger-v1').strip() or 'mock-challenger-v1'
+        reviewer_model = os.getenv('LLM_SHADOW_REVIEWER_MODEL', 'NONE').strip() or 'NONE'
+    else:
+        primary_model = os.getenv('LLM_PRIMARY_MODEL', 'mock-primary-v1').strip() or 'mock-primary-v1'
+        reviewer_model = os.getenv('LLM_REVIEWER_MODEL', 'NONE').strip() or 'NONE'
+    provider = LLMProvider(primary_model=primary_model, reviewer_model=reviewer_model)
     if not _budget_guardrail(state, stage='llm.draft', reserve_tool_calls=1):
         reason = 'LLM draft skipped by budget guardrail'
         _note_degradation(state, 'llm', status='DEGRADED', reason=reason, mode='DISABLED')

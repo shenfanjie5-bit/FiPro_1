@@ -17,3 +17,9 @@ def test_m6_trace_audit_migration_exists() -> None:
     versions_dir = Path('app/db/migrations/versions')
     revisions = list(versions_dir.glob('*_m6_trace_audit_fields.py'))
     assert revisions, 'Missing M6 trace audit migration revision file'
+
+
+def test_m7_feedback_migration_exists() -> None:
+    versions_dir = Path('app/db/migrations/versions')
+    revisions = list(versions_dir.glob('*_m7_feedback_table.py'))
+    assert revisions, 'Missing M7 feedback migration revision file'

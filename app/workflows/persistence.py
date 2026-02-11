@@ -140,6 +140,16 @@ def _sqlite_conn() -> sqlite3.Connection:
         ')'
     )
     conn.execute('create index if not exists idx_event_docs_query_published on event_docs(query, published_at desc)')
+    conn.execute(
+        'create table if not exists report_feedback ('
+        'id text primary key, '
+        'report_id text not null, '
+        'feedback_label text not null, '
+        'comment text not null default \'\', '
+        'created_at text not null'
+        ')'
+    )
+    conn.execute('create index if not exists idx_report_feedback_report_created on report_feedback(report_id, created_at desc)')
     _ensure_sqlite_column(conn, 'tool_traces', 'degraded', 'integer not null default 0')
     _ensure_sqlite_column(conn, 'tool_traces', 'attempts', 'integer not null default 1')
     _ensure_sqlite_column(conn, 'tool_traces', 'retry_count', 'integer not null default 0')
@@ -671,3 +681,129 @@ def get_latest_snapshot(ticker: str, snapshot_type: str | None = None) -> dict[s
     if _use_postgres_primary():
         return _get_latest_snapshot_postgres(ticker, snapshot_type)
     return _get_latest_snapshot_sqlite(ticker, snapshot_type)
+
+
+def _normalize_feedback_label(feedback_label: str) -> str:
+    normalized = str(feedback_label or '').strip().upper()
+    if normalized not in {'USEFUL', 'USELESS', 'FALSE_POSITIVE'}:
+        raise ValueError('feedback_label must be one of USEFUL/USELESS/FALSE_POSITIVE')
+    return normalized
+
+
+def _save_report_feedback_sqlite(report_id: str, feedback_label: str, comment: str) -> dict[str, Any]:
+    now_iso = datetime.now(timezone.utc).isoformat()
+    feedback_id = str(uuid.uuid4())
+    conn = _sqlite_conn()
+    try:
+        conn.execute(
+            'insert into report_feedback(id, report_id, feedback_label, comment, created_at) '
+            'values (?, ?, ?, ?, ?)',
+            (feedback_id, str(report_id), str(feedback_label), str(comment), now_iso),
+        )
+        conn.commit()
+    finally:
+        conn.close()
+    return {
+        'feedback_id': feedback_id,
+        'report_id': str(report_id),
+        'feedback_label': str(feedback_label),
+        'comment': str(comment),
+        'created_at': now_iso,
+    }
+
+
+def _save_report_feedback_postgres(report_id: str, feedback_label: str, comment: str) -> dict[str, Any]:
+    from app.db.models import ReportFeedback
+    from app.db.session import SessionLocal
+
+    now_dt = datetime.now(timezone.utc)
+    feedback_id = uuid.uuid4()
+    session = SessionLocal()
+    try:
+        session.add(
+            ReportFeedback(
+                id=feedback_id,
+                report_id=str(report_id),
+                feedback_label=str(feedback_label),
+                comment=str(comment),
+                created_at=now_dt,
+            )
+        )
+        session.commit()
+    finally:
+        session.close()
+    return {
+        'feedback_id': str(feedback_id),
+        'report_id': str(report_id),
+        'feedback_label': str(feedback_label),
+        'comment': str(comment),
+        'created_at': now_dt.isoformat(),
+    }
+
+
+def save_report_feedback(report_id: str, feedback_label: str, comment: str = '') -> dict[str, Any]:
+    normalized_label = _normalize_feedback_label(feedback_label)
+    if _use_postgres_primary():
+        return _save_report_feedback_postgres(str(report_id), normalized_label, str(comment or ''))
+    return _save_report_feedback_sqlite(str(report_id), normalized_label, str(comment or ''))
+
+
+def _list_report_feedback_sqlite(report_id: str | None, limit: int) -> list[dict[str, Any]]:
+    conn = _sqlite_conn()
+    try:
+        if report_id:
+            rows = conn.execute(
+                'select id, report_id, feedback_label, comment, created_at '
+                'from report_feedback where report_id = ? order by created_at desc limit ?',
+                (str(report_id), int(limit)),
+            ).fetchall()
+        else:
+            rows = conn.execute(
+                'select id, report_id, feedback_label, comment, created_at '
+                'from report_feedback order by created_at desc limit ?',
+                (int(limit),),
+            ).fetchall()
+    finally:
+        conn.close()
+    return [
+        {
+            'feedback_id': str(row[0]),
+            'report_id': str(row[1]),
+            'feedback_label': str(row[2]),
+            'comment': str(row[3] or ''),
+            'created_at': str(row[4]),
+        }
+        for row in rows
+    ]
+
+
+def _list_report_feedback_postgres(report_id: str | None, limit: int) -> list[dict[str, Any]]:
+    from sqlalchemy import desc, select
+    from app.db.models import ReportFeedback
+    from app.db.session import SessionLocal
+
+    session = SessionLocal()
+    try:
+        stmt = select(ReportFeedback).order_by(desc(ReportFeedback.created_at)).limit(int(limit))
+        if report_id:
+            stmt = stmt.where(ReportFeedback.report_id == str(report_id))
+        rows = session.execute(stmt).scalars().all()
+    finally:
+        session.close()
+    return [
+        {
+            'feedback_id': str(row.id),
+            'report_id': str(row.report_id),
+            'feedback_label': str(row.feedback_label),
+            'comment': str(row.comment or ''),
+            'created_at': row.created_at.isoformat() if row.created_at else '',
+        }
+        for row in rows
+    ]
+
+
+def list_report_feedback(report_id: str | None = None, limit: int = 100) -> list[dict[str, Any]]:
+    safe_limit = max(1, min(1000, int(limit)))
+    if _use_postgres_primary():
+        return _list_report_feedback_postgres(report_id, safe_limit)
+    return _list_report_feedback_sqlite(report_id, safe_limit)

@@ -1,0 +1,43 @@
+#!/usr/bin/env python3
+from __future__ import annotations
+
+import argparse
+import json
+from pathlib import Path
+import sys
+
+from app.eval.m7_shadow_compare import load_and_build_m7_shadow_compare, render_m7_shadow_compare_markdown
+
+
+def _write_text(path: Path, content: str) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(content, encoding='utf-8')
+
+
+def main() -> None:
+    parser = argparse.ArgumentParser(description='Generate M7 shadow comparison artifact.')
+    parser.add_argument('--lookback-days', type=int, default=30)
+    parser.add_argument('--output-json', default='monitoring/dashboards/m7_shadow_compare.json')
+    parser.add_argument('--output-md', default='monitoring/dashboards/m7_shadow_compare.md')
+    parser.add_argument('--enforce-thresholds', action='store_true', help='Exit non-zero when status is FAIL.')
+    args = parser.parse_args()
+
+    report = load_and_build_m7_shadow_compare(lookback_days=max(1, int(args.lookback_days)))
+    markdown = render_m7_shadow_compare_markdown(report)
+
+    output_json_path = Path(args.output_json)
+    output_md_path = Path(args.output_md)
+    _write_text(output_json_path, json.dumps(report, ensure_ascii=True, indent=2, sort_keys=True))
+    _write_text(output_md_path, markdown)
+
+    print(f'generated_json={output_json_path}')
+    print(f'generated_markdown={output_md_path}')
+    print(f"overall_status={report.get('overall_status', 'UNKNOWN')}")
+    print(f"paired_sample_size={report.get('summary', {}).get('paired_sample_size', 0)}")
+    if args.enforce_thresholds and report.get('overall_status') == 'FAIL':
+        print('threshold_gate=FAILED')
+        sys.exit(1)
+
+
+if __name__ == '__main__':
+    main()

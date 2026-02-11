@@ -43,5 +43,11 @@
 - `GET /memory/search?ticker=...&q=...`
 - `POST /memory/write`
 
+### 2.6 M7 在线反馈
+- `POST /reports/{report_id}/feedback`
+  - `feedback_label`: `USEFUL` | `USELESS` | `FALSE_POSITIVE`
+  - `comment`: 可选文本
+- `GET /reports/{report_id}/feedback?limit=...`
+
 ## 3. 对齐声明
 - 若本文件与 `docs/OPENAPI.yaml` 冲突，以 `docs/OPENAPI.yaml` 为准。

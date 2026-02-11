@@ -709,3 +709,63 @@
 - `.venv/bin/python scripts/m6_reliability_panel.py --lookback-days 7` passed (`overall_status=PASS`).
 - `.venv/bin/python scripts/m6_load_soak.py --requests 30 --concurrency 6 --tier TIER1` passed (`success_rate=1.0`).
 - `.venv/bin/python scripts/m6_rollout_drill.py --tier TIER1` passed (`overall_status=PASS`).
+
+## 2026-02-11 - Batch 24 (M7 Evaluation & Shadow Closure)
+
+### Completed Operations
+- Closed M7-01 offline replay dataset build:
+  - Added dataset module: `app/eval/m7_dataset.py`
+  - Added dataset script: `scripts/m7_build_dataset.py`
+  - Stratification dimensions: `industry`, `market_regime`, `event_density`
+  - Deterministic dataset versioning and markdown summary output.
+- Closed M7-02 offline evaluation pipeline:
+  - Added eval module: `app/eval/m7_offline_eval.py`
+  - Added script: `scripts/m7_offline_eval.py`
+  - Metrics include schema/consistency/citation/evidence coverage/cost/latency with threshold checks.
+- Closed M7-03 shadow routing integration:
+  - Added optional dual-run live+shadow orchestration in `app/workflows/graph.py` (`M7_SHADOW_ENABLED`).
+  - Live result remains primary response; shadow runs on a sibling thread and does not affect live output.
+  - Added model selection split in `app/workflows/nodes.py` (`LLM_PRIMARY_MODEL` vs `LLM_SHADOW_MODEL`).
+- Closed M7-04 shadow comparison report:
+  - Added compare module: `app/eval/m7_shadow_compare.py`
+  - Added script: `scripts/m7_shadow_compare.py`
+  - Supports action drift, quality win-rate, cost/latency deltas, and challenger model breakdown.
+- Closed M7-05 online feedback loop:
+  - Added feedback persistence table/model:
+    - SQL baseline: `sql/001_init.sql` (`report_feedback`)
+    - ORM: `app/db/models.py` (`ReportFeedback`)
+    - Alembic migration: `app/db/migrations/versions/20260211_0004_m7_feedback_table.py`
+  - Added persistence APIs: `save_report_feedback`, `list_report_feedback` in `app/workflows/persistence.py`.
+  - Added runtime endpoints:
+    - `POST /reports/{report_id}/feedback`
+    - `GET /reports/{report_id}/feedback`
+- Closed M7-06 drift monitoring:
+  - Added drift module: `app/eval/m7_drift.py`
+  - Added script: `scripts/m7_drift_monitor.py`
+  - Drift method: PSI on data + behavior dimensions with warning/critical thresholds.
+- Closed M7-07 model switch admission gate:
+  - Added gate module: `app/eval/m7_model_gate.py`
+  - Added script: `scripts/m7_model_gate.py`
+  - Gate evaluates shadow pairs, challenger quality, cost/latency deltas, and critical drift count.
+- Closed M7-08 monthly review mechanism:
+  - Added monthly review module: `app/eval/m7_monthly_review.py`
+  - Added script: `scripts/m7_monthly_review.py`
+  - Produces actionable backlog items from feedback + drift + shadow signals.
+- Added make targets:
+  - `eval-m7`, `eval-m7-dataset`, `eval-m7-offline`, `eval-m7-shadow`, `eval-m7-drift`, `eval-m7-gate`, `eval-m7-review`.
+- Updated docs:
+  - `docs/EVAL_PLAN.md` M7 section and commands.
+  - `monitoring/dashboards/README.md` M7 artifact list.
+  - `docs/BACKLOG.md` marks `M7-01` ~ `M7-08` as `DONE`.
+
+### Validation Evidence
+- `.venv/bin/python -m compileall app tests scripts` passed.
+- `.venv/bin/python -m pytest -q` passed.
+- New M7 test coverage added:
+  - `tests/test_m7_dataset.py`
+  - `tests/test_m7_offline_eval.py`
+  - `tests/test_m7_shadow_compare.py`
+  - `tests/test_m7_drift_and_gate.py`
+  - `tests/test_m7_monthly_review.py`
+  - `tests/test_m7_feedback_api.py`
+  - `tests/test_m7_shadow_routing.py`

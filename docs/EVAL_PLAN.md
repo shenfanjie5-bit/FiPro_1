@@ -81,6 +81,45 @@
   - `monitoring/dashboards/m6_rollout_drill.json`
   - `monitoring/dashboards/m6_rollout_drill.md`
 
+### 1.5 M7 评估与 Shadow 闭环
+- 目标：建立可复用离线数据集、Shadow 对比、漂移监控、准入门禁与月度复盘闭环。
+- 数据集构建（行业/行情阶段/事件密度分层）：
+  - `python scripts/m7_build_dataset.py --lookback-days 30`
+  - 或 `make eval-m7-dataset`
+- 离线评估（schema/一致性/证据覆盖/成本/延迟）：
+  - `python scripts/m7_offline_eval.py --lookback-days 30 --enforce-thresholds`
+  - 或 `make eval-m7-offline`
+  - 严格门禁目标：`make eval-m7-offline-gate`
+- Shadow 对比（质量/延迟/成本）：
+  - `python scripts/m7_shadow_compare.py --lookback-days 30 --enforce-thresholds`
+  - 或 `make eval-m7-shadow`
+  - 严格门禁目标：`make eval-m7-shadow-gate`
+- 漂移监控（数据漂移+行为漂移，PSI）：
+  - `python scripts/m7_drift_monitor.py --baseline-lookback-days 30 --current-lookback-days 7`
+  - 或 `make eval-m7-drift`
+- 模型切换准入门禁：
+  - `python scripts/m7_model_gate.py --enforce-block`
+  - 或 `make eval-m7-gate`
+  - 严格门禁目标：`make eval-m7-gate-strict`
+- 月度评审与 backlog 输出：
+  - `python scripts/m7_monthly_review.py`
+  - 或 `make eval-m7-review`
+- 全链路一键执行：
+  - `make eval-m7`
+- 产物：
+  - `monitoring/dashboards/m7_offline_dataset.json`
+  - `monitoring/dashboards/m7_offline_dataset.md`
+  - `monitoring/dashboards/m7_offline_eval.json`
+  - `monitoring/dashboards/m7_offline_eval.md`
+  - `monitoring/dashboards/m7_shadow_compare.json`
+  - `monitoring/dashboards/m7_shadow_compare.md`
+  - `monitoring/dashboards/m7_drift_monitor.json`
+  - `monitoring/dashboards/m7_drift_monitor.md`
+  - `monitoring/dashboards/m7_model_gate.json`
+  - `monitoring/dashboards/m7_model_gate.md`
+  - `monitoring/dashboards/m7_monthly_review.json`
+  - `monitoring/dashboards/m7_monthly_review.md`
+
 ## 2. 在线评估（Online）
 - 指标：用户有用率、报告生成成功率、SLA 命中率。
 - 策略：小流量灰度 + 阈值守门。
