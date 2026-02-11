@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 import uuid
 
 from app.llm.provider import LLMProvider
@@ -13,8 +13,34 @@ from app.tools.facts import (
 )
 from app.tools.memory import retrieve_memory_notes, write_memory_note
 from app.tools.qa import consistency_check, validate_report_schema_tool
+from app.tools.rag import search_event_docs
 from app.tools.wrapper import execute_tool
 from app.workflows.persistence import persist_workflow_state
+
+
+STATUS_RANK = {'OK': 0, 'PARTIAL': 1, 'DEGRADED': 2}
+
+
+def _merge_status(a: str, b: str) -> str:
+    return a if STATUS_RANK.get(a, 0) >= STATUS_RANK.get(b, 0) else b
+
+
+def _merge_data_quality(base: dict, incoming: dict | None, prefix: str = '') -> dict:
+    if not incoming:
+        return base
+    merged = {
+        'status': _merge_status(str(base.get('status', 'OK')), str(incoming.get('status', 'OK'))),
+        'missing_fields': list(base.get('missing_fields', [])),
+        'notes': str(base.get('notes', '')),
+    }
+    for field in incoming.get('missing_fields', []):
+        normalized = f'{prefix}.{field}' if prefix else str(field)
+        if normalized not in merged['missing_fields']:
+            merged['missing_fields'].append(normalized)
+    incoming_notes = str(incoming.get('notes', '')).strip()
+    if incoming_notes:
+        merged['notes'] = f"{merged['notes']} | {incoming_notes}".strip(' |')
+    return merged
 
 
 def load_strategy_config(state: dict) -> dict:
@@ -37,6 +63,7 @@ def init_data_quality(state: dict) -> dict:
     state['data_quality'] = {'status': 'OK', 'missing_fields': [], 'notes': ''}
     state['tool_traces'] = []
     state['tool_call_stats'] = {'tool_calls': 0, 'latency_ms': 0, 'cost_usd_est': 0}
+    state['event_docs'] = []
     state['repair_attempts'] = 0
     state['max_repairs'] = 2
     state['workflow_invalid'] = False
@@ -64,10 +91,23 @@ def build_facts(state: dict) -> dict:
         state['tool_traces'].append(result['trace'])
         if result['ok']:
             snapshots[tool_name] = result['output']
-            snapshot_ids.append(result['output']['snapshot_id'])
+            snapshot_id = result['output'].get('snapshot_id')
+            if snapshot_id:
+                snapshot_ids.append(snapshot_id)
+            state['data_quality'] = _merge_data_quality(
+                state['data_quality'],
+                result['output'].get('data_quality'),
+                prefix=tool_name,
+            )
         else:
-            state['data_quality']['status'] = 'DEGRADED'
-            state['data_quality']['notes'] = 'One or more facts tools failed'
+            state['data_quality'] = _merge_data_quality(
+                state['data_quality'],
+                {
+                    'status': 'DEGRADED',
+                    'missing_fields': [f'{tool_name}.__upstream__'],
+                    'notes': f'{tool_name} failed: {result["output"].get("error", {}).get("message", "unknown error")}',
+                },
+            )
 
     if req['tier'] in ('TIER1', 'TIER2'):
         macro = execute_tool(
@@ -78,7 +118,23 @@ def build_facts(state: dict) -> dict:
         state['tool_traces'].append(macro['trace'])
         if macro['ok']:
             snapshots['get_macro_commodity_logistics_snapshot'] = macro['output']
-            snapshot_ids.append(macro['output']['snapshot_id'])
+            macro_id = macro['output'].get('snapshot_id')
+            if macro_id:
+                snapshot_ids.append(macro_id)
+            state['data_quality'] = _merge_data_quality(
+                state['data_quality'],
+                macro['output'].get('data_quality'),
+                prefix='get_macro_commodity_logistics_snapshot',
+            )
+        else:
+            state['data_quality'] = _merge_data_quality(
+                state['data_quality'],
+                {
+                    'status': 'DEGRADED',
+                    'missing_fields': ['get_macro_commodity_logistics_snapshot.__upstream__'],
+                    'notes': macro['output'].get('error', {}).get('message', 'macro snapshot failed'),
+                },
+            )
 
     state['snapshots'] = snapshots
     state['snapshot_ids'] = snapshot_ids
@@ -90,12 +146,33 @@ def build_features(state: dict) -> dict:
     funda = state['snapshots'].get('get_fundamentals_snapshot', {})
     flow = state['snapshots'].get('get_flow_sentiment_snapshot', {})
 
+    hotness = flow.get('hotness_score')
+    if hotness is None:
+        hotness = flow.get('hotness', {}).get('hot_score')
+    hotness = int(max(0, min(100, hotness if hotness is not None else 50)))
+
+    roe = funda.get('roe')
+    if roe is None:
+        roe = funda.get('quality', {}).get('roe')
+    fundamentals = int(max(0, min(100, (roe if roe is not None else 0.1) * 400)))
+
+    volatility_20d = market.get('volatility_20d')
+    if volatility_20d is None:
+        volatility_20d = market.get('volatility', {}).get('stdev_20')
+    volatility = int(max(0, min(100, (volatility_20d if volatility_20d is not None else 0.2) * 200)))
+
+    volume_ratio = market.get('volume_ratio')
+    if volume_ratio is None:
+        turnover = market.get('liquidity', {}).get('avg_turnover_20d')
+        volume_ratio = turnover if turnover is not None else 1.0
+    liquidity = int(max(0, min(100, float(volume_ratio) * 60)))
+
     state['features'] = {
         'feature_id': f"feat_{uuid.uuid4().hex[:12]}",
-        'hotness': flow.get('hotness_score', 50),
-        'fundamentals': int(min(100, funda.get('roe', 0.1) * 400)),
-        'volatility': int(min(100, market.get('volatility_20d', 0.2) * 200)),
-        'liquidity': int(min(100, market.get('volume_ratio', 1.0) * 60)),
+        'hotness': hotness,
+        'fundamentals': fundamentals,
+        'volatility': volatility,
+        'liquidity': liquidity,
     }
     state['feature_id'] = state['features']['feature_id']
     return state
@@ -111,7 +188,8 @@ def score_signal_node(state: dict) -> dict:
 
 
 def generate_price_bands_node(state: dict) -> dict:
-    base_price = state['snapshots'].get('get_market_snapshot', {}).get('close', 100.0)
+    market = state['snapshots'].get('get_market_snapshot', {})
+    base_price = market.get('close', market.get('last_price', 100.0))
     res = execute_tool('generate_price_bands', {'base_price': base_price, 'score': state['score']['overall_score']}, generate_price_bands)
     state['tool_traces'].append(res['trace'])
     state['price_band_set_id'] = res['output']['price_band_set_id']
@@ -131,8 +209,14 @@ def retrieve_memory_node(state: dict) -> dict:
         state['memory_notes'] = res['output'].get('notes', [])
     else:
         state['memory_notes'] = []
-        state['data_quality']['status'] = 'DEGRADED'
-        state['data_quality']['notes'] = 'Memory retrieval failed'
+        state['data_quality'] = _merge_data_quality(
+            state['data_quality'],
+            {
+                'status': 'DEGRADED',
+                'missing_fields': ['memory.notes'],
+                'notes': 'Memory retrieval failed',
+            },
+        )
     return state
 
 
@@ -149,9 +233,48 @@ def build_context(state: dict) -> dict:
                 'captured_at': snapshot.get('captured_at', datetime.now(timezone.utc).isoformat()),
                 'uri': None,
                 'snippet': f"snapshot_id={snapshot_id}",
-                'checksum': snapshot_id,
+                'checksum': snapshot.get('checksum', snapshot_id),
             }
         )
+
+    req = state['request']
+    if req['tier'] in ('TIER1', 'TIER2'):
+        asof = datetime.fromisoformat(str(req['asof']).replace('Z', '+00:00'))
+        if asof.tzinfo is None:
+            asof = asof.replace(tzinfo=timezone.utc)
+        time_window = {'start': (asof - timedelta(days=7)).isoformat(), 'end': asof.isoformat()}
+        query = f"{req['ticker']} latest events"
+        docs_result = execute_tool(
+            'search_event_docs',
+            {'query': query, 'asof_range': time_window, 'top_k': 8},
+            search_event_docs,
+        )
+        state['tool_traces'].append(docs_result['trace'])
+        if docs_result['ok']:
+            docs = docs_result['output'].get('docs', [])
+            state['event_docs'] = docs
+            for doc in docs[:5]:
+                evidence_refs.append(
+                    {
+                        'evidence_id': f"ev_{doc.get('doc_id', uuid.uuid4().hex[:8])}",
+                        'type': 'NEWS_DOC',
+                        'title': doc.get('title', 'event_doc'),
+                        'source': f"event_docs.{doc.get('source', 'UNKNOWN')}",
+                        'captured_at': doc.get('captured_at', datetime.now(timezone.utc).isoformat()),
+                        'uri': doc.get('uri'),
+                        'snippet': doc.get('snippet'),
+                        'checksum': doc.get('checksum'),
+                    }
+                )
+        else:
+            state['data_quality'] = _merge_data_quality(
+                state['data_quality'],
+                {
+                    'status': 'PARTIAL',
+                    'missing_fields': ['event_docs.query'],
+                    'notes': docs_result['output'].get('error', {}).get('message', 'event docs retrieval failed'),
+                },
+            )
 
     if not evidence_refs:
         evidence_refs = [
@@ -175,13 +298,14 @@ def build_context(state: dict) -> dict:
     state['tool_call_stats'] = tool_call_stats
 
     state['context'] = {
-        'request': state['request'],
+        'request': req,
         'features': state['features'],
         'score_id': state.get('score_id'),
         'score': state['score'],
         'price_band_set_id': state.get('price_band_set_id'),
         'price_bands': state['price_bands'],
         'memory_notes': state.get('memory_notes', []),
+        'event_docs': state.get('event_docs', []),
         'evidence_refs': evidence_refs,
         'data_quality': state['data_quality'],
         'snapshot_ids': state['snapshot_ids'],

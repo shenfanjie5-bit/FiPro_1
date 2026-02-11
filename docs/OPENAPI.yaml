@@ -62,7 +62,7 @@ components:
         report_id: { type: string }
         generated_at: { type: string, format: date-time }
         ticker: { type: string }
-        market: { type: string }
+        market: { type: string, enum: [CN_A, US, HK, CRYPTO, OTHER] }
         asof: { type: string, format: date-time }
         strategy_version_id: { type: string }
         tier: { type: string, enum: [TIER0, TIER1, TIER2] }
@@ -82,7 +82,18 @@ components:
           items: { type: object }
         evidence_refs:
           type: array
-          items: { type: object }
+          items:
+            type: object
+            required: [evidence_id, type, title, source, captured_at]
+            properties:
+              evidence_id: { type: string }
+              type: { type: string, enum: [SNAPSHOT_FIELD, NEWS_DOC, FILINGS, MACRO_SERIES, GRAPH_QUERY, MANUAL_NOTE] }
+              title: { type: string }
+              source: { type: string }
+              captured_at: { type: string, format: date-time }
+              uri: { type: string }
+              snippet: { type: string }
+              checksum: { type: string }
         data_quality: { type: object }
         provenance: { type: object }
         memory_update: { type: object }
