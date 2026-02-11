@@ -84,9 +84,15 @@ def risk_gate(report: dict, risk_profile: str = 'LOW') -> dict:
     if risk_profile == 'LOW' and decision.get('action') == 'BUY' and decision.get('confidence', 0) > 0.7:
         decision['confidence'] = 0.7
 
-    if dq != 'OK' and decision.get('action') == 'BUY':
-        decision['action'] = 'WATCH'
-        decision['confidence'] = min(decision.get('confidence', 0.5), 0.55)
+    if dq == 'PARTIAL':
+        decision['confidence'] = min(decision.get('confidence', 0.5), 0.5)
+        if decision.get('action') == 'BUY':
+            decision['action'] = 'WATCH'
+            hard_blocks.append('DATA_QUALITY_PARTIAL')
+    elif dq != 'OK':
+        decision['confidence'] = min(decision.get('confidence', 0.5), 0.45)
+        if decision.get('action') == 'BUY':
+            decision['action'] = 'WATCH'
         hard_blocks.append('DATA_QUALITY_NOT_OK')
 
     gated['decision'] = decision

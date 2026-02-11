@@ -15,9 +15,20 @@ if config.config_file_name is not None:
     fileConfig(config.config_file_name)
 
 # Prefer DATABASE_URL from environment for consistency with app runtime.
+def _normalize_database_url(database_url: str) -> str:
+    raw = (database_url or '').strip()
+    if raw.startswith('postgresql+'):
+        return raw
+    if raw.startswith('postgresql://'):
+        return raw.replace('postgresql://', 'postgresql+psycopg://', 1)
+    if raw.startswith('postgres://'):
+        return raw.replace('postgres://', 'postgresql+psycopg://', 1)
+    return raw
+
+
 database_url = os.getenv('DATABASE_URL')
 if database_url:
-    config.set_main_option('sqlalchemy.url', database_url)
+    config.set_main_option('sqlalchemy.url', _normalize_database_url(database_url))
 
 target_metadata = Base.metadata
 

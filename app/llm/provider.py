@@ -22,12 +22,13 @@ class LLMProvider:
         strategy_version_id = context['request']['strategy_version_id']
         score = context['score']['overall_score']
         confidence = context['score']['confidence']
+        proposed_action = context['score'].get('proposed_action', 'WATCH')
         price_bands = context['price_bands']
         evidence = context['evidence_refs']
 
         return {
             'schema_version': '0.1',
-            'report_id': f'rpt_{uuid.uuid4().hex[:12]}',
+            'report_id': str(uuid.uuid4()),
             'generated_at': datetime.now(timezone.utc).isoformat(),
             'ticker': ticker,
             'market': market,
@@ -35,7 +36,7 @@ class LLMProvider:
             'strategy_version_id': strategy_version_id,
             'tier': tier,
             'decision': {
-                'action': 'WATCH',
+                'action': proposed_action,
                 'overall_score': score,
                 'confidence': confidence,
                 'time_horizon': 'SWING',

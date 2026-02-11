@@ -21,6 +21,11 @@ class Settings(BaseSettings):
     llm_provider: str = Field(default='mock', alias='LLM_PROVIDER')
     llm_api_key: str = Field(default='', alias='LLM_API_KEY')
 
+    tushare_token: str = Field(default='', alias='TUSHARE_TOKEN')
+    news_data_api_key: str = Field(default='', alias='NEWS_DATA_API_KEY')
+    tushare_base_url: str = Field(default='https://api.tushare.pro', alias='TUSHARE_BASE_URL')
+    datasource_timeout_seconds: float = Field(default=6.0, alias='DATASOURCE_TIMEOUT_SECONDS')
+
 
 REQUIRED_SETTINGS: Final[tuple[str, ...]] = (
     'database_url',
