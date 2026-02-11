@@ -5,6 +5,7 @@ import hashlib
 import json
 import os
 from pathlib import Path
+import re
 import sqlite3
 from typing import Any
 
@@ -15,6 +16,12 @@ from app.tools.cache import TTLCache
 
 EVENT_DOCS_CACHE_TTL_SECONDS = 10 * 60
 _DOCS_CACHE: TTLCache[dict[str, Any]] = TTLCache()
+
+ALLOWED_DOC_SOURCES = {'NEWS', 'FILINGS', 'REPORT', 'SOCIAL'}
+EVENT_TYPES = {'COMMODITY', 'POLICY', 'GEOPOLITICS', 'LOGISTICS', 'EARNINGS', 'COMPETITION', 'OTHER'}
+
+POSITIVE_HINTS = ('增长', '上调', '利好', '改善', '恢复', '提升', 'increase', 'beat', 'upgrade')
+NEGATIVE_HINTS = ('下滑', '下调', '利空', '恶化', '收缩', '风险', 'decrease', 'miss', 'downgrade')
 
 
 def _now_utc() -> datetime:
@@ -38,6 +45,52 @@ def _runtime_db_path() -> Path:
 def _hash_digest(payload: Any, length: int = 16) -> str:
     raw = json.dumps(payload, sort_keys=True, ensure_ascii=True, default=str)
     return hashlib.sha256(raw.encode('utf-8')).hexdigest()[:length]
+
+
+def _tokenize_text(text: str) -> list[str]:
+    return [token.lower() for token in re.findall(r'[\w\u4e00-\u9fff]+', text or '') if token.strip()]
+
+
+def _normalize_queries(query: Any) -> list[str]:
+    if isinstance(query, str):
+        normalized = query.strip()
+        return [normalized] if normalized else []
+    if isinstance(query, (list, tuple, set)):
+        output: list[str] = []
+        for item in query:
+            normalized = str(item).strip()
+            if normalized and normalized not in output:
+                output.append(normalized)
+        return output[:6]
+    return []
+
+
+def _normalize_sources(sources: Any) -> list[str]:
+    if sources is None:
+        return sorted(ALLOWED_DOC_SOURCES)
+    if isinstance(sources, str):
+        candidates = [sources]
+    else:
+        candidates = list(sources) if isinstance(sources, (list, tuple, set)) else []
+    normalized: list[str] = []
+    for item in candidates:
+        value = str(item).upper().strip()
+        if value in ALLOWED_DOC_SOURCES and value not in normalized:
+            normalized.append(value)
+    return normalized or sorted(ALLOWED_DOC_SOURCES)
+
+
+def _normalize_source(raw: str) -> str:
+    value = str(raw or '').strip().upper()
+    if value in ALLOWED_DOC_SOURCES:
+        return value
+    if 'FILING' in value or '公告' in value:
+        return 'FILINGS'
+    if 'REPORT' in value or '研报' in value:
+        return 'REPORT'
+    if 'SOCIAL' in value or '微博' in value:
+        return 'SOCIAL'
+    return 'NEWS'
 
 
 def _classify_news_error(exc: Exception) -> str:
@@ -98,7 +151,7 @@ def _parse_asof_range(asof_range: Any) -> tuple[datetime, datetime]:
 def _normalize_doc(query: str, item: dict[str, Any]) -> dict[str, Any]:
     published_at = _parse_iso_to_utc(item.get('published_at', _now_utc().isoformat())).isoformat()
     title = str(item.get('title', '')).strip() or 'Untitled document'
-    source = str(item.get('source', '')).strip() or 'UNKNOWN'
+    source = _normalize_source(str(item.get('source', 'NEWS')))
     snippet = str(item.get('snippet', '')).strip() or title[:120]
     uri = item.get('uri')
     checksum = item.get('checksum') or _hash_digest(
@@ -219,7 +272,7 @@ def _fetch_newsapi_docs(query: str, start: datetime, end: datetime, top_k: int) 
         docs.append(
             {
                 'title': title,
-                'source': source_name,
+                'source': _normalize_source(source_name),
                 'published_at': published_at,
                 'captured_at': _now_utc().isoformat(),
                 'uri': article.get('url'),
@@ -240,7 +293,7 @@ def _synthetic_docs(query: str, start: datetime, end: datetime, top_k: int) -> l
         docs.append(
             {
                 'title': f'{query} event update {index + 1}',
-                'source': 'SYNTHETIC_FALLBACK',
+                'source': ['NEWS', 'FILINGS', 'REPORT', 'SOCIAL'][index % 4],
                 'published_at': published,
                 'captured_at': _now_utc().isoformat(),
                 'uri': None,
@@ -258,53 +311,76 @@ def _with_cache_meta(result: dict[str, Any], cache_key: str, cache_hit: bool) ->
     return output
 
 
-def search_event_docs(query: str, asof_range: Any, top_k: int = 8) -> dict:
-    start, end = _parse_asof_range(asof_range)
-    normalized_query = str(query).strip()
-    if not normalized_query:
-        return {'docs': [], 'meta': {'error': {'code': 'INVALID_ARGUMENT', 'message': 'query must not be blank'}}}
+def _doc_matches_sources(doc: dict[str, Any], sources: list[str]) -> bool:
+    return _normalize_source(str(doc.get('source', 'NEWS'))) in set(sources)
 
-    cache_key = f'docs:{normalized_query}:{start.isoformat()}:{end.isoformat()}:{top_k}'
+
+def search_event_docs(query: Any, asof_range: Any, top_k: int = 8, sources: list[str] | None = None) -> dict:
+    start, end = _parse_asof_range(asof_range)
+    normalized_queries = _normalize_queries(query)
+    if not normalized_queries:
+        return {'docs': [], 'meta': {'error': {'code': 'INVALID_ARGUMENT', 'message': 'query must not be blank'}}}
+    normalized_sources = _normalize_sources(sources)
+    safe_top_k = max(1, min(50, int(top_k)))
+
+    cache_key = (
+        f"docs:{'|'.join(normalized_queries)}:{'|'.join(normalized_sources)}:"
+        f'{start.isoformat()}:{end.isoformat()}:{safe_top_k}'
+    )
     cached = _DOCS_CACHE.get(cache_key)
     if cached is not None:
         return _with_cache_meta(cached.value, cache_key=cache_key, cache_hit=True)
 
-    db_docs = _query_docs_from_store(normalized_query, start, end, top_k)
-    docs = list(db_docs)
-    source_mode = 'STORE'
-    fallback_reason = ''
-    fallback_error: dict[str, Any] | None = None
+    per_query_store_limit = max(1, min(25, safe_top_k // len(normalized_queries) + 2))
+    docs: list[dict[str, Any]] = []
+    db_hits = 0
+    for q in normalized_queries:
+        stored = _query_docs_from_store(q, start, end, per_query_store_limit)
+        filtered = [doc for doc in stored if _doc_matches_sources(doc, normalized_sources)]
+        docs.extend(filtered)
+        db_hits += len(filtered)
 
-    if len(docs) < top_k:
-        fetched_docs: list[dict[str, Any]]
+    source_modes: list[str] = ['STORE'] if db_hits else []
+    fallback_reasons: list[str] = []
+    upstream_errors: list[dict[str, Any]] = []
+    for q in normalized_queries:
+        if len(docs) >= safe_top_k:
+            break
+        need = max(1, safe_top_k - len(docs))
         try:
-            fetched_docs = _fetch_newsapi_docs(normalized_query, start, end, top_k=top_k - len(docs))
-            source_mode = 'NEWS_API'
+            fetched_docs = _fetch_newsapi_docs(q, start, end, top_k=need)
+            source_modes.append('NEWS_API')
         except Exception as exc:  # noqa: BLE001
-            fallback_reason = str(exc)
             code = _classify_news_error(exc)
-            fallback_error = {'code': code, 'message': str(exc), 'retryable': code in {'UPSTREAM_TIMEOUT', 'RATE_LIMITED', 'UPSTREAM_ERROR'}}
-            fetched_docs = _synthetic_docs(normalized_query, start, end, top_k=top_k - len(docs))
-            source_mode = 'SYNTHETIC_FALLBACK'
+            upstream_errors.append(
+                {'code': code, 'message': str(exc), 'retryable': code in {'UPSTREAM_TIMEOUT', 'RATE_LIMITED', 'UPSTREAM_ERROR'}}
+            )
+            fallback_reasons.append(str(exc))
+            fetched_docs = _synthetic_docs(q, start, end, top_k=need)
+            source_modes.append('SYNTHETIC_FALLBACK')
 
-        normalized_fetched = [_normalize_doc(normalized_query, item) for item in fetched_docs]
-        _ingest_docs(normalized_query, normalized_fetched)
-        docs.extend(normalized_fetched)
+        normalized_fetched = [_normalize_doc(q, item) for item in fetched_docs]
+        filtered_fetched = [doc for doc in normalized_fetched if _doc_matches_sources(doc, normalized_sources)]
+        _ingest_docs(q, filtered_fetched)
+        docs.extend(filtered_fetched)
 
     dedup: dict[str, dict[str, Any]] = {}
     for doc in docs:
-        normalized = _normalize_doc(normalized_query, doc)
-        dedup[normalized['doc_id']] = normalized
-    merged_docs = sorted(dedup.values(), key=lambda item: item['published_at'], reverse=True)[:top_k]
+        normalized = _normalize_doc(str(doc.get('query', normalized_queries[0])), doc)
+        dedup_key = normalized.get('doc_id') or normalized.get('checksum')
+        dedup[dedup_key] = normalized
+    merged_docs = sorted(dedup.values(), key=lambda item: item['published_at'], reverse=True)[:safe_top_k]
 
     result = {
         'docs': merged_docs,
         'meta': {
-            'source_mode': source_mode,
-            'db_hits': len(db_docs),
-            'fallback_reason': fallback_reason,
+            'queries': normalized_queries,
+            'sources': normalized_sources,
+            'source_modes': sorted(set(source_modes or ['STORE'])),
+            'db_hits': db_hits,
+            'fallback_reason': ' | '.join(fallback_reasons),
             'window': {'start': start.isoformat(), 'end': end.isoformat()},
-            'upstream_error': fallback_error,
+            'upstream_error': upstream_errors[0] if upstream_errors else None,
         },
     }
     _DOCS_CACHE.set(cache_key, result, EVENT_DOCS_CACHE_TTL_SECONDS)
@@ -312,35 +388,128 @@ def search_event_docs(query: str, asof_range: Any, top_k: int = 8) -> dict:
 
 
 def rerank_docs(query: str, docs: list[dict], top_k: int = 5) -> dict:
-    query_tokens = {token for token in query.lower().split() if token}
+    if not isinstance(docs, list):
+        return {'error': {'code': 'INVALID_ARGUMENT', 'message': 'docs must be list', 'retryable': False, 'details': {}}}
+    query_tokens = set(_tokenize_text(query))
+    safe_top_k = max(1, min(20, int(top_k)))
     scored_docs: list[dict[str, Any]] = []
     for doc in docs:
-        text = f"{doc.get('title', '')} {doc.get('snippet', '')}".lower()
-        overlap = sum(1 for token in query_tokens if token in text)
-        score = round(min(1.0, 0.4 + overlap * 0.2), 4)
+        text = f"{doc.get('title', '')} {doc.get('snippet', '')}"
+        doc_tokens = set(_tokenize_text(text))
+        overlap = len(query_tokens.intersection(doc_tokens))
+        keyword_score = overlap / max(1, len(query_tokens))
+        contains_phrase = 1.0 if str(query).strip().lower() in text.lower() else 0.0
+        published_at = doc.get('published_at')
+        recency_score = 0.0
+        if published_at:
+            try:
+                published_dt = _parse_iso_to_utc(published_at)
+                age_hours = max(0.0, (_now_utc() - published_dt).total_seconds() / 3600.0)
+                recency_score = max(0.0, 1.0 - min(age_hours, 24.0 * 7.0) / (24.0 * 7.0))
+            except Exception:  # noqa: BLE001
+                recency_score = 0.0
+        source_prior = {
+            'FILINGS': 0.95,
+            'REPORT': 0.9,
+            'NEWS': 0.8,
+            'SOCIAL': 0.65,
+        }.get(_normalize_source(str(doc.get('source', 'NEWS'))), 0.75)
+        score = round(min(1.0, 0.5 * keyword_score + 0.2 * contains_phrase + 0.15 * recency_score + 0.15 * source_prior), 4)
+        reason = f'overlap={overlap}, phrase={int(contains_phrase)}, recency={recency_score:.2f}, source_prior={source_prior:.2f}'
         ranked = dict(doc)
         ranked['rank_score'] = score
+        ranked['rank_reason'] = reason
         scored_docs.append(ranked)
-    scored_docs.sort(key=lambda item: (item.get('rank_score', 0), item.get('published_at', '')), reverse=True)
-    return {'docs': scored_docs[:top_k]}
+    scored_docs.sort(
+        key=lambda item: (
+            float(item.get('rank_score', 0)),
+            str(item.get('published_at', '')),
+            str(item.get('doc_id', '')),
+        ),
+        reverse=True,
+    )
+    top_docs = scored_docs[:safe_top_k]
+    return {
+        'docs': top_docs,
+        'ranked_doc_ids': [str(item.get('doc_id', '')) for item in top_docs if str(item.get('doc_id', '')).strip()],
+        'scores': [float(item.get('rank_score', 0.0)) for item in top_docs],
+        'reasons': [str(item.get('rank_reason', '')) for item in top_docs],
+    }
 
 
 def extract_events_from_docs(docs: list[dict]) -> dict:
-    events = []
+    if not isinstance(docs, list):
+        return {'error': {'code': 'INVALID_ARGUMENT', 'message': 'docs must be list', 'retryable': False, 'details': {}}}
+
+    def classify_event_type(text: str, source: str) -> str:
+        lowered = text.lower()
+        if '政策' in text or 'regulation' in lowered or 'policy' in lowered:
+            return 'POLICY'
+        if any(x in text for x in ['运价', '物流', '港口']) or 'shipping' in lowered:
+            return 'LOGISTICS'
+        if any(x in text for x in ['油价', '煤炭', '铜', 'commodity']) or 'commodity' in lowered:
+            return 'COMMODITY'
+        if any(x in text for x in ['地缘', '制裁', '冲突']) or 'geopolitics' in lowered:
+            return 'GEOPOLITICS'
+        if '竞争' in text or 'competition' in lowered:
+            return 'COMPETITION'
+        if _normalize_source(source) in {'NEWS', 'REPORT'}:
+            return 'EARNINGS'
+        return 'OTHER'
+
+    def infer_direction(text: str) -> str:
+        lowered = text.lower()
+        pos_hits = sum(1 for hint in POSITIVE_HINTS if hint in lowered or hint in text)
+        neg_hits = sum(1 for hint in NEGATIVE_HINTS if hint in lowered or hint in text)
+        if pos_hits and not neg_hits:
+            return 'POS'
+        if neg_hits and not pos_hits:
+            return 'NEG'
+        if pos_hits and neg_hits:
+            return 'MIXED'
+        return 'UNCERTAIN'
+
+    def extract_entities(text: str, fallback: str) -> list[str]:
+        entities: list[str] = []
+        for token in re.findall(r'[0-9]{6}\.(?:SH|SZ)', text.upper()):
+            if token not in entities:
+                entities.append(token)
+        for token in re.findall(r'[\u4e00-\u9fff]{2,8}', text):
+            if token not in entities:
+                entities.append(token)
+            if len(entities) >= 4:
+                break
+        if not entities and fallback:
+            entities.append(fallback)
+        return entities[:5]
+
+    events: list[dict[str, Any]] = []
     for index, doc in enumerate(docs):
-        source = str(doc.get('source', '')).upper()
-        event_type = 'OTHER'
-        if 'POLICY' in source:
-            event_type = 'POLICY'
-        elif 'NEWS' in source or 'REPORT' in source:
-            event_type = 'EARNINGS'
+        doc_id = str(doc.get('doc_id', '')).strip()
+        if not doc_id:
+            continue
+        title = str(doc.get('title', '')).strip()
+        snippet = str(doc.get('snippet', '')).strip()
+        source = _normalize_source(str(doc.get('source', 'NEWS')))
+        text = f'{title} {snippet}'.strip()
+        event_type = classify_event_type(text, source)
+        if event_type not in EVENT_TYPES:
+            event_type = 'OTHER'
+        direction = infer_direction(text)
+        keyword_density = min(1.0, len(_tokenize_text(text)) / 40.0)
+        source_conf = {'FILINGS': 0.92, 'REPORT': 0.88, 'NEWS': 0.8, 'SOCIAL': 0.65}.get(source, 0.7)
+        confidence = round(max(0.2, min(0.97, 0.5 * source_conf + 0.5 * keyword_density)), 4)
+        summary_base = title or snippet or f'event from {doc_id}'
+        summary = summary_base[:160]
         events.append(
             {
-                'event_id': f"evt_{_hash_digest({'doc_id': doc.get('doc_id'), 'idx': index}, length=10)}",
-                'doc_id': doc.get('doc_id', ''),
+                'event_id': f"evt_{_hash_digest({'doc_id': doc_id, 'idx': index, 'type': event_type, 'direction': direction}, length=10)}",
                 'type': event_type,
-                'direction': 'MIXED',
-                'summary': f"Derived event from {doc.get('doc_id', 'unknown_doc')}",
+                'entities': extract_entities(text, fallback=source),
+                'direction': direction,
+                'confidence': confidence,
+                'summary': summary,
+                'evidence_doc_ids': [doc_id],
             }
         )
     return {'events': events}

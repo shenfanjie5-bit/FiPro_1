@@ -6,7 +6,7 @@ from pydantic import BaseModel, Field
 
 from app.tools.facts import get_market_snapshot
 from app.tools.graph import find_impact_paths
-from app.tools.memory import write_memory_note
+from app.tools.memory import retrieve_memory_notes, write_memory_note
 from app.workflows.graph import run_research_workflow
 from app.workflows.persistence import get_report as get_persisted_report
 
@@ -131,7 +131,8 @@ def graph_paths(entity: str, ticker: str) -> dict:
 
 @router.get('/memory/search')
 def memory_search(ticker: str, q: str) -> dict:
-    return {'ticker': ticker, 'query': q, 'items': []}
+    result = retrieve_memory_notes(ticker=ticker, query=q, top_k=8, time_range_days=180)
+    return {'ticker': ticker, 'query': q, 'items': result.get('notes', [])}
 
 
 @router.post('/memory/write', status_code=201)

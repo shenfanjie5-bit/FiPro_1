@@ -25,6 +25,7 @@ class LLMProvider:
         proposed_action = context['score'].get('proposed_action', 'WATCH')
         price_bands = context['price_bands']
         evidence = context['evidence_refs']
+        router_policy = context.get('router_policy', 'default-v1')
 
         return {
             'schema_version': '0.1',
@@ -85,7 +86,7 @@ class LLMProvider:
             'data_quality': context['data_quality'],
             'provenance': {
                 'model': {'primary': self.primary_model, 'reviewer': self.reviewer_model},
-                'router_policy': 'default-v1',
+                'router_policy': router_policy,
                 'snapshot_ids': context['snapshot_ids'],
                 'weights_hash': context['weights_hash'],
                 'run_mode': context['request'].get('run_mode', 'LIVE'),

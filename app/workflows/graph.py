@@ -17,9 +17,12 @@ from app.workflows.nodes import (
     persist_node,
     publish_node,
     repair_report_node,
+    rerank_docs_node,
     retrieve_memory_node,
+    search_docs_node,
     risk_gate_node,
     score_signal_node,
+    extract_events_node,
     validate_node,
 )
 from app.workflows.state import ResearchState
@@ -34,6 +37,23 @@ def _route_need_repair(state: ResearchState) -> Literal['persist', 'repair', 'in
     return 'repair'
 
 
+def _route_after_memory(state: ResearchState) -> Literal['direct_context', 'rag_chain']:
+    req = state.get('request', {})
+    tier = str(req.get('tier', 'TIER0'))
+    config = state.get('config', {})
+    policies = config.get('tier_policy', {})
+    tier_cfg = policies.get(tier, {})
+    rag_enabled = bool((tier_cfg.get('rag') or {}).get('enabled', False))
+    budget = state.get('budget', {})
+    budget_degraded = bool(budget.get('degraded', False))
+    max_calls = int(budget.get('max_tool_calls', 0))
+    used_calls = int(budget.get('used_tool_calls', 0))
+    budget_exhausted = max_calls > 0 and used_calls >= max_calls
+    if tier in ('TIER1', 'TIER2') and rag_enabled and not budget_degraded and not budget_exhausted:
+        return 'rag_chain'
+    return 'direct_context'
+
+
 def _build_graph():
     builder = StateGraph(ResearchState)
     builder.add_node('load_strategy_config', load_strategy_config)
@@ -43,6 +63,9 @@ def _build_graph():
     builder.add_node('score_signal_node', score_signal_node)
     builder.add_node('generate_price_bands_node', generate_price_bands_node)
     builder.add_node('retrieve_memory_node', retrieve_memory_node)
+    builder.add_node('search_docs_node', search_docs_node)
+    builder.add_node('rerank_docs_node', rerank_docs_node)
+    builder.add_node('extract_events_node', extract_events_node)
     builder.add_node('build_context', build_context)
     builder.add_node('draft_report_node', draft_report_node)
     builder.add_node('risk_gate_node', risk_gate_node)
@@ -59,7 +82,17 @@ def _build_graph():
     builder.add_edge('build_features', 'score_signal_node')
     builder.add_edge('score_signal_node', 'generate_price_bands_node')
     builder.add_edge('generate_price_bands_node', 'retrieve_memory_node')
-    builder.add_edge('retrieve_memory_node', 'build_context')
+    builder.add_conditional_edges(
+        'retrieve_memory_node',
+        _route_after_memory,
+        {
+            'direct_context': 'build_context',
+            'rag_chain': 'search_docs_node',
+        },
+    )
+    builder.add_edge('search_docs_node', 'rerank_docs_node')
+    builder.add_edge('rerank_docs_node', 'extract_events_node')
+    builder.add_edge('extract_events_node', 'build_context')
     builder.add_edge('build_context', 'draft_report_node')
     builder.add_edge('draft_report_node', 'risk_gate_node')
     builder.add_edge('risk_gate_node', 'validate_node')

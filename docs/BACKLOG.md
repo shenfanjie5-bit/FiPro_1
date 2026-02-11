@@ -103,16 +103,16 @@
 
 | ID | Task | Owner | Priority | Status | Est | Depends On | Acceptance |
 |---|---|---|---|---|---|---|---|
-| M4-01 | TIER1 路由参数冻结（top_k、depth、预算） | Product + BE | P0 | TODO | 0.5d | M3 | 参数写入 config，可版本化 |
-| M4-02 | `search_event_docs` 实装（多 query + 时间窗） | BE | P0 | TODO | 1d | M3-03 | 返回 doc_id/source/checksum，支持 top_k |
-| M4-03 | `rerank_docs` 实装（轻量模型/规则） | ML Eng | P1 | TODO | 1d | M4-02 | 重排结果可解释（score/reason） |
-| M4-04 | `extract_events_from_docs` 实装（结构化事件） | ML Eng | P0 | TODO | 1d | M4-02 | 产出标准事件结构并附 evidence 关联 |
-| M4-05 | 记忆检索 `retrieve_memory_notes`（pgvector + keyword） | BE | P0 | TODO | 1d | M3-06 | 能按 ticker/q/time_range 召回 |
-| M4-06 | 记忆写入 `write_memory_note` 与去重策略 | BE | P0 | TODO | 0.5d | M4-05 | 每次 report 可写入并避免重复爆炸 |
-| M4-07 | TIER1 context builder（融合 facts + docs + memory） | BE | P0 | TODO | 1d | M4-04,M4-05 | draft context 含可追溯 evidence_ids |
-| M4-08 | evidence coverage 规则（最小证据条数/类型覆盖） | BE + QA | P0 | TODO | 0.5d | M4-07 | 不达标则触发 repair 或降级 |
-| M4-09 | TIER1 E2E 测试（含缓存、预算、降级） | QA + BE | P0 | TODO | 1d | M4-08 | TIER1 全链路稳定通过并可回放 |
-| M4-10 | 质量评估基线（evidence 覆盖率、引用一致率、成本/延迟） | QA + Data | P1 | TODO | 0.5d | M4-09 | 出具首版指标报表并设阈值 |
+| M4-01 | TIER1 路由参数冻结（top_k、depth、预算） | Product + BE | P0 | DONE | 0.5d | M3 | 参数写入 config，可版本化 |
+| M4-02 | `search_event_docs` 实装（多 query + 时间窗） | BE | P0 | DONE | 1d | M3-03 | 返回 doc_id/source/checksum，支持 top_k |
+| M4-03 | `rerank_docs` 实装（轻量模型/规则） | ML Eng | P1 | DONE | 1d | M4-02 | 重排结果可解释（score/reason） |
+| M4-04 | `extract_events_from_docs` 实装（结构化事件） | ML Eng | P0 | DONE | 1d | M4-02 | 产出标准事件结构并附 evidence 关联 |
+| M4-05 | 记忆检索 `retrieve_memory_notes`（pgvector + keyword） | BE | P0 | DONE | 1d | M3-06 | 能按 ticker/q/time_range 召回 |
+| M4-06 | 记忆写入 `write_memory_note` 与去重策略 | BE | P0 | DONE | 0.5d | M4-05 | 每次 report 可写入并避免重复爆炸 |
+| M4-07 | TIER1 context builder（融合 facts + docs + memory） | BE | P0 | DONE | 1d | M4-04,M4-05 | draft context 含可追溯 evidence_ids |
+| M4-08 | evidence coverage 规则（最小证据条数/类型覆盖） | BE + QA | P0 | DONE | 0.5d | M4-07 | 不达标则触发 repair 或降级 |
+| M4-09 | TIER1 E2E 测试（含缓存、预算、降级） | QA + BE | P0 | DONE | 1d | M4-08 | TIER1 全链路稳定通过并可回放 |
+| M4-10 | 质量评估基线（evidence 覆盖率、引用一致率、成本/延迟） | QA + Data | P1 | DONE | 0.5d | M4-09 | 出具首版指标报表并设阈值 |
 
 ### M4 验收门
 

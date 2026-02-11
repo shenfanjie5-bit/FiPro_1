@@ -1,0 +1,85 @@
+name: m4-quality-baseline
+
+on:
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: Run baseline only, or run replay repair then baseline gate
+        required: false
+        default: 'baseline'
+        type: choice
+        options:
+          - baseline
+          - replay_repair
+      lookback_days:
+        description: Lookback days for baseline report window
+        required: false
+        default: '14'
+      seed_count:
+        description: Number of seeded reports for gating
+        required: false
+        default: '12'
+      enforce_thresholds:
+        description: Fail workflow when baseline thresholds are not met
+        required: false
+        type: boolean
+        default: true
+  schedule:
+    - cron: '0 2 * * *'
+
+jobs:
+  baseline-gate:
+    runs-on: ubuntu-latest
+    env:
+      APP_ENV: ci
+      DATABASE_URL: sqlite+pysqlite:///:memory:
+      REDIS_URL: redis://localhost:6379/0
+      NEO4J_URI: bolt://localhost:7687
+      NEO4J_USER: neo4j
+      NEO4J_PASSWORD: neo4j
+      WORKFLOW_RUNTIME_DB: ${{ runner.temp }}/m4-baseline-runtime.db
+      WORKFLOW_CHECKPOINT_DB: ${{ runner.temp }}/m4-baseline-runtime.db
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install dependencies
+        run: |
+          python -m pip install -U pip
+          python -m pip install -e .
+      - name: Seed baseline samples
+        if: ${{ github.event.inputs.mode != 'replay_repair' }}
+        run: |
+          python scripts/seed_m4_baseline_samples.py \
+            --count "${{ github.event.inputs.seed_count || '12' }}" \
+            --tier-pattern "TIER0,TIER1" \
+            --vary-asof \
+            --run-mode "LIVE"
+      - name: Replay low coverage reports
+        if: ${{ github.event.inputs.mode == 'replay_repair' }}
+        run: |
+          python scripts/replay_tier1_low_coverage.py \
+            --lookback-days "${{ github.event.inputs.lookback_days || '14' }}" \
+            --batch-size 30 \
+            --max-rounds 3 \
+            --run-mode-strategy same \
+            --update-baseline-artifacts
+      - name: Run baseline gate
+        run: |
+          if [ "${{ github.event.inputs.enforce_thresholds || 'true' }}" = "true" ]; then
+            python scripts/m4_quality_baseline.py \
+              --lookback-days "${{ github.event.inputs.lookback_days || '14' }}" \
+              --enforce-thresholds
+          else
+            python scripts/m4_quality_baseline.py \
+              --lookback-days "${{ github.event.inputs.lookback_days || '14' }}"
+          fi
+      - name: Upload baseline artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: m4-quality-baseline
+          path: |
+            monitoring/dashboards/m4_quality_baseline.json
+            monitoring/dashboards/m4_quality_baseline.md

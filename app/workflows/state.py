@@ -7,6 +7,7 @@ class ResearchState(TypedDict, total=False):
     thread_id: str
     request: dict[str, Any]
     config: dict[str, Any]
+    budget: dict[str, Any]
     data_quality: dict[str, Any]
     snapshots: dict[str, Any]
     snapshot_ids: list[str]
@@ -17,7 +18,13 @@ class ResearchState(TypedDict, total=False):
     price_band_set_id: str
     price_bands: list[dict[str, Any]]
     memory_notes: list[dict[str, Any]]
+    doc_queries: list[str]
+    doc_candidates: list[dict[str, Any]]
+    ranked_docs: list[dict[str, Any]]
+    ranked_doc_ids: list[str]
+    extracted_events: list[dict[str, Any]]
     event_docs: list[dict[str, Any]]
+    evidence_coverage: dict[str, Any]
     context: dict[str, Any]
     report_draft: dict[str, Any]
     final_report: dict[str, Any]
