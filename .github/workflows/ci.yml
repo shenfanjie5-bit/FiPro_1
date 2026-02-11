@@ -19,5 +19,7 @@ jobs:
           python -m pip install ruff
       - name: Lint
         run: ruff check --select F,E9 app tests scripts
+      - name: OpenAPI lint
+        run: python scripts/lint_openapi.py docs/OPENAPI.yaml
       - name: Run tests
         run: pytest --cov=app --cov-report=term-missing --cov-fail-under=70

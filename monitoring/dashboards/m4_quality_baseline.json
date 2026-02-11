@@ -2,7 +2,7 @@
   "by_tier": {
     "TIER0": {
       "avg_cost_usd": 0.0,
-      "avg_evidence_refs": 5.0,
+      "avg_evidence_refs": 4.714286,
       "avg_latency_ms": 4.0,
       "avg_tool_calls": 8.0,
       "citation_consistency_rate": 1.0,
@@ -17,16 +17,16 @@
         "evidence_coverage_failed": 0,
         "schema_failed": 0
       },
-      "latency_p95_ms": 4.0,
+      "latency_p95_ms": 8.9,
       "low_coverage_reports": [],
-      "sample_size": 1,
+      "sample_size": 7,
       "schema_pass_rate": 1.0
     },
     "TIER1": {
       "avg_cost_usd": 0.0,
-      "avg_evidence_refs": 14.0,
-      "avg_latency_ms": 11.0,
-      "avg_tool_calls": 12.0,
+      "avg_evidence_refs": 12.714286,
+      "avg_latency_ms": 5.285714,
+      "avg_tool_calls": 11.857143,
       "citation_consistency_rate": 1.0,
       "consistency_pass_rate": 1.0,
       "cost_budget_max_usd": 0.8,
@@ -39,9 +39,9 @@
         "evidence_coverage_failed": 0,
         "schema_failed": 0
       },
-      "latency_p95_ms": 11.0,
+      "latency_p95_ms": 7.7,
       "low_coverage_reports": [],
-      "sample_size": 1,
+      "sample_size": 7,
       "schema_pass_rate": 1.0
     },
     "TIER2": {
@@ -66,13 +66,13 @@
       "schema_pass_rate": 0.0
     }
   },
-  "effective_sample_size": 2,
-  "generated_at": "2026-02-11T08:24:03.872689+00:00",
+  "effective_sample_size": 14,
+  "generated_at": "2026-02-11T09:17:44.388480+00:00",
   "overall": {
     "avg_cost_usd": 0.0,
-    "avg_evidence_refs": 9.5,
-    "avg_latency_ms": 7.5,
-    "avg_tool_calls": 10.0,
+    "avg_evidence_refs": 8.714286,
+    "avg_latency_ms": 4.642857,
+    "avg_tool_calls": 9.928571,
     "citation_consistency_rate": 1.0,
     "consistency_pass_rate": 1.0,
     "cost_p95_usd": 0.0,
@@ -83,14 +83,40 @@
       "evidence_coverage_failed": 0,
       "schema_failed": 0
     },
-    "latency_p95_ms": 10.65,
+    "latency_p95_ms": 9.05,
     "low_coverage_reports": [],
-    "sample_size": 2,
+    "sample_size": 14,
     "schema_pass_rate": 1.0
   },
-  "overall_status": "FAIL",
-  "raw_sample_size": 206,
+  "overall_status": "PASS",
+  "raw_sample_size": 228,
   "raw_tier1_low_coverage_reports": [
+    {
+      "created_at": "2026-02-11T09:17:00.369525+00:00",
+      "evidence_refs": 5,
+      "missing_rules": [
+        "missing_type=NEWS_DOC"
+      ],
+      "present_types": [
+        "MANUAL_NOTE",
+        "SNAPSHOT_FIELD"
+      ],
+      "report_id": "057de734-4493-45db-ad2e-3277608449a5",
+      "tier": "TIER1"
+    },
+    {
+      "created_at": "2026-02-11T09:00:24.739181+00:00",
+      "evidence_refs": 5,
+      "missing_rules": [
+        "missing_type=NEWS_DOC"
+      ],
+      "present_types": [
+        "MANUAL_NOTE",
+        "SNAPSHOT_FIELD"
+      ],
+      "report_id": "91dc5856-b383-4a0d-b7d2-ed4e5103e3a2",
+      "tier": "TIER1"
+    },
     {
       "created_at": "2026-02-11T08:23:50.152860+00:00",
       "evidence_refs": 5,
@@ -484,7 +510,7 @@
       "threshold": 0.9
     },
     {
-      "actual": 10.65,
+      "actual": 9.05,
       "metric": "latency_p95_ms",
       "operator": "<=",
       "pass": true,
@@ -498,10 +524,10 @@
       "threshold": 0.9
     },
     {
-      "actual": 2.0,
+      "actual": 14.0,
       "metric": "sample_size",
       "operator": ">=",
-      "pass": false,
+      "pass": true,
       "threshold": 10.0
     }
   ],

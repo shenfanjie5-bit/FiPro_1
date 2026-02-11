@@ -21,12 +21,14 @@
   - `TIER2 avg_cost_usd <= 2.50`
 - 生成命令：
   - `make eval-m4`
-  - `make seed-m4 && make eval-m4`（本地先采样再守门）
-  - 或 `python scripts/m4_quality_baseline.py --lookback-days 14`
+  - `make seed-m4 && make eval-m4`（可手动先采样）
+  - 或 `python scripts/m4_quality_baseline.py --lookback-days 14 --auto-topup-samples --enforce-thresholds`
+  - 样本量治理：`--auto-topup-samples` 会在 `sample_size < 10` 时自动补样并重算基线
 - 产物：
   - `monitoring/dashboards/m4_quality_baseline.json`
   - `monitoring/dashboards/m4_quality_baseline.md`
 - CI 接入：
+  - 主 CI：`.github/workflows/ci.yml` 增加 `python scripts/lint_openapi.py docs/OPENAPI.yaml`
   - Workflow：`.github/workflows/m4-quality-baseline.yml`
   - 触发：`schedule (daily)` + `workflow_dispatch`（可在 PR 分支手动触发）
   - 守门：`--enforce-thresholds` 打开时，阈值不达标直接失败
