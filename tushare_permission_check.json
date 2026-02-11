@@ -1,0 +1,2398 @@
+[
+  {
+    "api_name": "stock_basic",
+    "params": {
+      "list_status": "L",
+      "limit": 1
+    },
+    "code": 0,
+    "msg": "",
+    "rows": 1,
+    "fields": [
+      "ts_code",
+      "symbol",
+      "name",
+      "area",
+      "industry",
+      "cnspell",
+      "market",
+      "list_date",
+      "act_name",
+      "act_ent_type"
+    ],
+    "status": "PERMITTED"
+  },
+  {
+    "api_name": "trade_cal",
+    "params": {
+      "exchange": "SSE",
+      "start_date": "20250101",
+      "end_date": "20250110"
+    },
+    "code": 0,
+    "msg": "",
+    "rows": 10,
+    "fields": [
+      "exchange",
+      "cal_date",
+      "is_open",
+      "pretrade_date"
+    ],
+    "status": "PERMITTED"
+  },
+  {
+    "api_name": "namechange",
+    "params": {
+      "ts_code": "000001.SZ",
+      "limit": 1
+    },
+    "code": 0,
+    "msg": "",
+    "rows": 1,
+    "fields": [
+      "ts_code",
+      "name",
+      "start_date",
+      "end_date",
+      "ann_date",
+      "change_reason"
+    ],
+    "status": "PERMITTED"
+  },
+  {
+    "api_name": "hs_const",
+    "params": {
+      "hs_type": "SH"
+    },
+    "code": 0,
+    "msg": "",
+    "rows": 581,
+    "fields": [
+      "ts_code",
+      "hs_type",
+      "in_date",
+      "out_date",
+      "is_new"
+    ],
+    "status": "PERMITTED"
+  },
+  {
+    "api_name": "stock_company",
+    "params": {
+      "exchange": "SZSE"
+    },
+    "code": 0,
+    "msg": "",
+    "rows": 3066,
+    "fields": [
+      "ts_code",
+      "com_name",
+      "com_id",
+      "chairman",
+      "manager",
+      "secretary",
+      "reg_capital",
+      "setup_date",
+      "province",
+      "city",
+      "introduction",
+      "website",
+      "email",
+      "office",
+      "business_scope",
+      "employees",
+      "main_business",
+      "exchange"
+    ],
+    "status": "PERMITTED"
+  },
+  {
+    "api_name": "new_share",
+    "params": {
+      "start_date": "20250101",
+      "end_date": "20250131"
+    },
+    "code": 0,
+    "msg": "",
+    "rows": 8,
+    "fields": [
+      "ts_code",
+      "sub_code",
+      "name",
+      "ipo_date",
+      "issue_date",
+      "amount",
+      "market_amount",
+      "price",
+      "pe",
+      "limit_amount",
+      "funds",
+      "ballot"
+    ],
+    "status": "PERMITTED"
+  },
+  {
+    "api_name": "stk_managers",
+    "params": {
+      "ts_code": "000001.SZ"
+    },
+    "code": 0,
+    "msg": "",
+    "rows": 193,
+    "fields": [
+      "ts_code",
+      "ann_date",
+      "name",
+      "gender",
+      "lev",
+      "title",
+      "edu",
+      "national",
+      "birthday",
+      "begin_date",
+      "end_date"
+    ],
+    "status": "PERMITTED"
+  },
+  {
+    "api_name": "stk_rewards",
+    "params": {
+      "ts_code": "000001.SZ"
+    },
+    "code": 0,
+    "msg": "",
+    "rows": 3575,
+    "fields": [
+      "ts_code",
+      "ann_date",
+      "end_date",
+      "name",
+      "title",
+      "reward",
+      "hold_vol"
+    ],
+    "status": "PERMITTED"
+  },
+  {
+    "api_name": "daily",
+    "params": {
+      "ts_code": "000001.SZ",
+      "start_date": "20250101",
+      "end_date": "20250110"
+    },
+    "code": 0,
+    "msg": "",
+    "rows": 7,
+    "fields": [
+      "ts_code",
+      "trade_date",
+      "open",
+      "high",
+      "low",
+      "close",
+      "pre_close",
+      "change",
+      "pct_chg",
+      "vol",
+      "amount"
+    ],
+    "status": "PERMITTED"
+  },
+  {
+    "api_name": "weekly",
+    "params": {
+      "ts_code": "000001.SZ",
+      "start_date": "20250101",
+      "end_date": "20250110"
+    },
+    "code": 0,
+    "msg": "",
+    "rows": 2,
+    "fields": [
+      "ts_code",
+      "trade_date",
+      "close",
+      "open",
+      "high",
+      "low",
+      "pre_close",
+      "change",
+      "pct_chg",
+      "vol",
+      "amount"
+    ],
+    "status": "PERMITTED"
+  },
+  {
+    "api_name": "monthly",
+    "params": {
+      "ts_code": "000001.SZ",
+      "start_date": "20250101",
+      "end_date": "20250110"
+    },
+    "code": 0,
+    "msg": "",
+    "rows": 0,
+    "fields": [
+      "ts_code",
+      "trade_date",
+      "close",
+      "open",
+      "high",
+      "low",
+      "pre_close",
+      "change",
+      "pct_chg",
+      "vol",
+      "amount"
+    ],
+    "status": "PERMITTED"
+  },
+  {
+    "api_name": "adj_factor",
+    "params": {
+      "ts_code": "000001.SZ",
+      "start_date": "20250101",
+      "end_date": "20250110"
+    },
+    "code": 0,
+    "msg": "",
+    "rows": 7,
+    "fields": [
+      "ts_code",
+      "trade_date",
+      "adj_factor"
+    ],
+    "status": "PERMITTED"
+  },
+  {
+    "api_name": "suspend_d",
+    "params": {
+      "ts_code": "000001.SZ",
+      "start_date": "20250101",
+      "end_date": "20250110"
+    },
+    "code": 0,
+    "msg": "",
+    "rows": 0,
+    "fields": [
+      "ts_code",
+      "trade_date",
+      "suspend_timing",
+      "suspend_type"
+    ],
+    "status": "PERMITTED"
+  },
+  {
+    "api_name": "daily_basic",
+    "params": {
+      "ts_code": "000001.SZ",
+      "start_date": "20250101",
+      "end_date": "20250110"
+    },
+    "code": 0,
+    "msg": "",
+    "rows": 7,
+    "fields": [
+      "ts_code",
+      "trade_date",
+      "close",
+      "turnover_rate",
+      "turnover_rate_f",
+      "volume_ratio",
+      "pe",
+      "pe_ttm",
+      "pb",
+      "ps",
+      "ps_ttm",
+      "dv_ratio",
+      "dv_ttm",
+      "total_share",
+      "float_share",
+      "free_share",
+      "total_mv",
+      "circ_mv"
+    ],
+    "status": "PERMITTED"
+  },
+  {
+    "api_name": "moneyflow",
+    "params": {
+      "ts_code": "000001.SZ",
+      "start_date": "20250101",
+      "end_date": "20250110"
+    },
+    "code": 0,
+    "msg": "",
+    "rows": 7,
+    "fields": [
+      "ts_code",
+      "trade_date",
+      "buy_sm_vol",
+      "buy_sm_amount",
+      "sell_sm_vol",
+      "sell_sm_amount",
+      "buy_md_vol",
+      "buy_md_amount",
+      "sell_md_vol",
+      "sell_md_amount",
+      "buy_lg_vol",
+      "buy_lg_amount",
+      "sell_lg_vol",
+      "sell_lg_amount",
+      "buy_elg_vol",
+      "buy_elg_amount",
+      "sell_elg_vol",
+      "sell_elg_amount",
+      "net_mf_vol",
+      "net_mf_amount"
+    ],
+    "status": "PERMITTED"
+  },
+  {
+    "api_name": "stk_factor",
+    "params": {
+      "ts_code": "000001.SZ",
+      "start_date": "20250101",
+      "end_date": "20250110"
+    },
+    "code": 0,
+    "msg": "",
+    "rows": 7,
+    "fields": [
+      "ts_code",
+      "trade_date",
+      "close",
+      "open",
+      "high",
+      "low",
+      "pre_close",
+      "change",
+      "pct_change",
+      "vol",
+      "amount",
+      "adj_factor",
+      "open_hfq",
+      "open_qfq",
+      "close_hfq",
+      "close_qfq",
+      "high_hfq",
+      "high_qfq",
+      "low_hfq",
+      "low_qfq",
+      "pre_close_hfq",
+      "pre_close_qfq",
+      "macd_dif",
+      "macd_dea",
+      "macd",
+      "kdj_k",
+      "kdj_d",
+      "kdj_j",
+      "rsi_6",
+      "rsi_12",
+      "rsi_24",
+      "boll_upper",
+      "boll_mid",
+      "boll_lower",
+      "cci"
+    ],
+    "status": "PERMITTED"
+  },
+  {
+    "api_name": "cyq_perf",
+    "params": {
+      "ts_code": "000001.SZ",
+      "start_date": "20250101",
+      "end_date": "20250110"
+    },
+    "code": 0,
+    "msg": "",
+    "rows": 7,
+    "fields": [
+      "ts_code",
+      "trade_date",
+      "his_low",
+      "his_high",
+      "cost_5pct",
+      "cost_15pct",
+      "cost_50pct",
+      "cost_85pct",
+      "cost_95pct",
+      "weight_avg",
+      "winner_rate"
+    ],
+    "status": "PERMITTED"
+  },
+  {
+    "api_name": "limit_list_d",
+    "params": {
+      "trade_date": "20250110"
+    },
+    "code": 0,
+    "msg": "",
+    "rows": 114,
+    "fields": [
+      "trade_date",
+      "ts_code",
+      "industry",
+      "name",
+      "close",
+      "pct_chg",
+      "amount",
+      "limit_amount",
+      "float_mv",
+      "total_mv",
+      "turnover_ratio",
+      "fd_amount",
+      "first_time",
+      "last_time",
+      "open_times",
+      "up_stat",
+      "limit_times",
+      "limit"
+    ],
+    "status": "PERMITTED"
+  },
+  {
+    "api_name": "bak_daily",
+    "params": {
+      "trade_date": "20250110"
+    },
+    "code": 0,
+    "msg": "",
+    "rows": 5380,
+    "fields": [
+      "ts_code",
+      "trade_date",
+      "name",
+      "pct_change",
+      "close",
+      "change",
+      "open",
+      "high",
+      "low",
+      "pre_close",
+      "vol_ratio",
+      "turn_over",
+      "swing",
+      "vol",
+      "amount",
+      "selling",
+      "buying",
+      "total_share",
+      "float_share",
+      "pe",
+      "industry",
+      "area",
+      "float_mv",
+      "total_mv",
+      "avg_price",
+      "strength",
+      "activity",
+      "avg_turnover",
+      "attack",
+      "interval_3",
+      "interval_6"
+    ],
+    "status": "PERMITTED"
+  },
+  {
+    "api_name": "moneyflow_hsgt",
+    "params": {
+      "start_date": "20250101",
+      "end_date": "20250110"
+    },
+    "code": 0,
+    "msg": "",
+    "rows": 7,
+    "fields": [
+      "trade_date",
+      "ggt_ss",
+      "ggt_sz",
+      "hgt",
+      "sgt",
+      "north_money",
+      "south_money"
+    ],
+    "status": "PERMITTED"
+  },
+  {
+    "api_name": "hsgt_top10",
+    "params": {
+      "trade_date": "20250110"
+    },
+    "code": 0,
+    "msg": "",
+    "rows": 20,
+    "fields": [
+      "trade_date",
+      "ts_code",
+      "name",
+      "close",
+      "change",
+      "rank",
+      "market_type",
+      "amount",
+      "net_amount",
+      "buy",
+      "sell"
+    ],
+    "status": "PERMITTED"
+  },
+  {
+    "api_name": "ggt_top10",
+    "params": {
+      "trade_date": "20250110"
+    },
+    "code": 0,
+    "msg": "",
+    "rows": 20,
+    "fields": [
+      "trade_date",
+      "ts_code",
+      "name",
+      "close",
+      "p_change",
+      "rank",
+      "market_type",
+      "amount",
+      "net_amount",
+      "sh_amount",
+      "sh_net_amount",
+      "sh_buy",
+      "sh_sell",
+      "sz_amount",
+      "sz_net_amount",
+      "sz_buy",
+      "sz_sell"
+    ],
+    "status": "PERMITTED"
+  },
+  {
+    "api_name": "ggt_daily",
+    "params": {
+      "trade_date": "20250110"
+    },
+    "code": 0,
+    "msg": "",
+    "rows": 1,
+    "fields": [
+      "trade_date",
+      "buy_amount",
+      "buy_volume",
+      "sell_amount",
+      "sell_volume"
+    ],
+    "status": "PERMITTED"
+  },
+  {
+    "api_name": "hk_hold",
+    "params": {
+      "trade_date": "20250110"
+    },
+    "code": 0,
+    "msg": "",
+    "rows": 815,
+    "fields": [
+      "code",
+      "trade_date",
+      "ts_code",
+      "name",
+      "vol",
+      "ratio",
+      "exchange"
+    ],
+    "status": "PERMITTED"
+  },
+  {
+    "api_name": "index_basic",
+    "params": {
+      "market": "SSE"
+    },
+    "code": 0,
+    "msg": "",
+    "rows": 594,
+    "fields": [
+      "ts_code",
+      "name",
+      "market",
+      "publisher",
+      "category",
+      "base_date",
+      "base_point",
+      "list_date"
+    ],
+    "status": "PERMITTED"
+  },
+  {
+    "api_name": "index_daily",
+    "params": {
+      "ts_code": "000001.SH",
+      "start_date": "20250101",
+      "end_date": "20250110"
+    },
+    "code": 0,
+    "msg": "",
+    "rows": 7,
+    "fields": [
+      "ts_code",
+      "trade_date",
+      "close",
+      "open",
+      "high",
+      "low",
+      "pre_close",
+      "change",
+      "pct_chg",
+      "vol",
+      "amount"
+    ],
+    "status": "PERMITTED"
+  },
+  {
+    "api_name": "index_weight",
+    "params": {
+      "index_code": "000300.SH",
+      "start_date": "20250101",
+      "end_date": "20250131"
+    },
+    "code": 0,
+    "msg": "",
+    "rows": 600,
+    "fields": [
+      "index_code",
+      "con_code",
+      "trade_date",
+      "weight"
+    ],
+    "status": "PERMITTED"
+  },
+  {
+    "api_name": "index_member",
+    "params": {
+      "index_code": "000300.SH"
+    },
+    "code": 0,
+    "msg": "",
+    "rows": 0,
+    "fields": [
+      "index_code",
+      "con_code",
+      "in_date",
+      "out_date",
+      "is_new"
+    ],
+    "status": "PERMITTED"
+  },
+  {
+    "api_name": "ths_index",
+    "params": {
+      "exchange": "A",
+      "type": "N"
+    },
+    "code": 0,
+    "msg": "",
+    "rows": 408,
+    "fields": [
+      "ts_code",
+      "name",
+      "count",
+      "exchange",
+      "list_date",
+      "type"
+    ],
+    "status": "PERMITTED"
+  },
+  {
+    "api_name": "ths_member",
+    "params": {
+      "ts_code": "883300.TI"
+    },
+    "code": 0,
+    "msg": "",
+    "rows": 300,
+    "fields": [
+      "ts_code",
+      "con_code",
+      "con_name"
+    ],
+    "status": "PERMITTED"
+  },
+  {
+    "api_name": "fut_basic",
+    "params": {
+      "exchange": "CFFEX"
+    },
+    "code": 0,
+    "msg": "",
+    "rows": 684,
+    "fields": [
+      "ts_code",
+      "symbol",
+      "exchange",
+      "name",
+      "fut_code",
+      "multiplier",
+      "trade_unit",
+      "per_unit",
+      "quote_unit",
+      "quote_unit_desc",
+      "d_mode_desc",
+      "list_date",
+      "delist_date",
+      "d_month",
+      "last_ddate"
+    ],
+    "status": "PERMITTED"
+  },
+  {
+    "api_name": "fut_daily",
+    "params": {
+      "ts_code": "IF9999.CFX",
+      "start_date": "20250101",
+      "end_date": "20250110"
+    },
+    "code": 0,
+    "msg": "",
+    "rows": 0,
+    "fields": [
+      "ts_code",
+      "trade_date",
+      "pre_close",
+      "pre_settle",
+      "open",
+      "high",
+      "low",
+      "close",
+      "settle",
+      "change1",
+      "change2",
+      "vol",
+      "amount",
+      "oi",
+      "oi_chg"
+    ],
+    "status": "PERMITTED"
+  },
+  {
+    "api_name": "opt_basic",
+    "params": {
+      "exchange": "SSE"
+    },
+    "code": 0,
+    "msg": "",
+    "rows": 11102,
+    "fields": [
+      "ts_code",
+      "exchange",
+      "name",
+      "per_unit",
+      "opt_code",
+      "opt_type",
+      "call_put",
+      "exercise_type",
+      "exercise_price",
+      "s_month",
+      "maturity_date",
+      "list_price",
+      "list_date",
+      "delist_date",
+      "last_edate",
+      "last_ddate",
+      "quote_unit",
+      "min_price_chg"
+    ],
+    "status": "PERMITTED"
+  },
+  {
+    "api_name": "opt_daily",
+    "params": {
+      "ts_code": "10001273.SH",
+      "start_date": "20250101",
+      "end_date": "20250110"
+    },
+    "code": 0,
+    "msg": "",
+    "rows": 0,
+    "fields": [
+      "ts_code",
+      "trade_date",
+      "exchange",
+      "pre_settle",
+      "pre_close",
+      "open",
+      "high",
+      "low",
+      "close",
+      "settle",
+      "vol",
+      "amount",
+      "oi"
+    ],
+    "status": "PERMITTED"
+  },
+  {
+    "api_name": "fund_basic",
+    "params": {
+      "market": "E"
+    },
+    "code": 0,
+    "msg": "",
+    "rows": 2497,
+    "fields": [
+      "ts_code",
+      "name",
+      "management",
+      "custodian",
+      "fund_type",
+      "found_date",
+      "due_date",
+      "list_date",
+      "issue_date",
+      "delist_date",
+      "issue_amount",
+      "m_fee",
+      "c_fee",
+      "duration_year",
+      "p_value",
+      "min_amount",
+      "exp_return",
+      "benchmark",
+      "status",
+      "invest_type",
+      "type",
+      "trustee",
+      "purc_startdate",
+      "redm_startdate",
+      "market"
+    ],
+    "status": "PERMITTED"
+  },
+  {
+    "api_name": "fund_daily",
+    "params": {
+      "ts_code": "510300.SH",
+      "start_date": "20250101",
+      "end_date": "20250110"
+    },
+    "code": 0,
+    "msg": "",
+    "rows": 7,
+    "fields": [
+      "ts_code",
+      "trade_date",
+      "pre_close",
+      "open",
+      "high",
+      "low",
+      "close",
+      "change",
+      "pct_chg",
+      "vol",
+      "amount"
+    ],
+    "status": "PERMITTED"
+  },
+  {
+    "api_name": "fund_nav",
+    "params": {
+      "ts_code": "161725.SZ",
+      "start_date": "20250101",
+      "end_date": "20250110"
+    },
+    "code": 0,
+    "msg": "",
+    "rows": 7,
+    "fields": [
+      "ts_code",
+      "ann_date",
+      "nav_date",
+      "unit_nav",
+      "accum_nav",
+      "accum_div",
+      "net_asset",
+      "total_netasset",
+      "adj_nav",
+      "update_flag"
+    ],
+    "status": "PERMITTED"
+  },
+  {
+    "api_name": "fund_manager",
+    "params": {
+      "ts_code": "510300.SH"
+    },
+    "code": 0,
+    "msg": "",
+    "rows": 2,
+    "fields": [
+      "ts_code",
+      "ann_date",
+      "name",
+      "gender",
+      "birth_year",
+      "edu",
+      "nationality",
+      "begin_date",
+      "end_date",
+      "resume"
+    ],
+    "status": "PERMITTED"
+  },
+  {
+    "api_name": "fund_share",
+    "params": {
+      "ts_code": "510300.SH"
+    },
+    "code": 0,
+    "msg": "",
+    "rows": 2000,
+    "fields": [
+      "ts_code",
+      "trade_date",
+      "fd_share",
+      "fund_type",
+      "market"
+    ],
+    "status": "PERMITTED"
+  },
+  {
+    "api_name": "fund_portfolio",
+    "params": {
+      "ts_code": "510300.SH"
+    },
+    "code": 0,
+    "msg": "",
+    "rows": 8000,
+    "fields": [
+      "ts_code",
+      "ann_date",
+      "end_date",
+      "symbol",
+      "mkv",
+      "amount",
+      "stk_mkv_ratio",
+      "stk_float_ratio"
+    ],
+    "status": "PERMITTED"
+  },
+  {
+    "api_name": "fund_div",
+    "params": {
+      "ts_code": "510300.SH"
+    },
+    "code": 0,
+    "msg": "",
+    "rows": 46,
+    "fields": [
+      "ts_code",
+      "ann_date",
+      "imp_anndate",
+      "base_date",
+      "div_proc",
+      "record_date",
+      "ex_date",
+      "pay_date",
+      "earpay_date",
+      "net_ex_date",
+      "div_cash",
+      "base_unit",
+      "ear_distr",
+      "ear_amount",
+      "account_date",
+      "base_year"
+    ],
+    "status": "PERMITTED"
+  },
+  {
+    "api_name": "cb_basic",
+    "params": {},
+    "code": 0,
+    "msg": "",
+    "rows": 1089,
+    "fields": [
+      "ts_code",
+      "bond_full_name",
+      "bond_short_name",
+      "cb_code",
+      "stk_code",
+      "stk_short_name",
+      "maturity",
+      "par",
+      "issue_price",
+      "issue_size",
+      "remain_size",
+      "value_date",
+      "maturity_date",
+      "rate_type",
+      "coupon_rate",
+      "add_rate",
+      "pay_per_year",
+      "list_date",
+      "delist_date",
+      "exchange",
+      "conv_start_date",
+      "conv_end_date",
+      "conv_stop_date",
+      "first_conv_price",
+      "conv_price",
+      "rate_clause"
+    ],
+    "status": "PERMITTED"
+  },
+  {
+    "api_name": "cb_daily",
+    "params": {
+      "ts_code": "110073.SH",
+      "start_date": "20250101",
+      "end_date": "20250110"
+    },
+    "code": 0,
+    "msg": "",
+    "rows": 7,
+    "fields": [
+      "ts_code",
+      "trade_date",
+      "pre_close",
+      "open",
+      "high",
+      "low",
+      "close",
+      "change",
+      "pct_chg",
+      "vol",
+      "amount"
+    ],
+    "status": "PERMITTED"
+  },
+  {
+    "api_name": "income",
+    "params": {
+      "ts_code": "000001.SZ",
+      "limit": 1
+    },
+    "code": 0,
+    "msg": "",
+    "rows": 1,
+    "fields": [
+      "ts_code",
+      "ann_date",
+      "f_ann_date",
+      "end_date",
+      "report_type",
+      "comp_type",
+      "end_type",
+      "basic_eps",
+      "diluted_eps",
+      "total_revenue",
+      "revenue",
+      "int_income",
+      "prem_earned",
+      "comm_income",
+      "n_commis_income",
+      "n_oth_income",
+      "n_oth_b_income",
+      "prem_income",
+      "out_prem",
+      "une_prem_reser",
+      "reins_income",
+      "n_sec_tb_income",
+      "n_sec_uw_income",
+      "n_asset_mg_income",
+      "oth_b_income",
+      "fv_value_chg_gain",
+      "invest_income",
+      "ass_invest_income",
+      "forex_gain",
+      "total_cogs",
+      "oper_cost",
+      "int_exp",
+      "comm_exp",
+      "biz_tax_surchg",
+      "sell_exp",
+      "admin_exp",
+      "fin_exp",
+      "assets_impair_loss",
+      "prem_refund",
+      "compens_payout",
+      "reser_insur_liab",
+      "div_payt",
+      "reins_exp",
+      "oper_exp",
+      "compens_payout_refu",
+      "insur_reser_refu",
+      "reins_cost_refund",
+      "other_bus_cost",
+      "operate_profit",
+      "non_oper_income",
+      "non_oper_exp",
+      "nca_disploss",
+      "total_profit",
+      "income_tax",
+      "n_income",
+      "n_income_attr_p",
+      "minority_gain",
+      "oth_compr_income",
+      "t_compr_income",
+      "compr_inc_attr_p",
+      "compr_inc_attr_m_s",
+      "ebit",
+      "ebitda",
+      "insurance_exp",
+      "undist_profit",
+      "distable_profit",
+      "rd_exp",
+      "fin_exp_int_exp",
+      "fin_exp_int_inc",
+      "transfer_surplus_rese",
+      "transfer_housing_imprest",
+      "transfer_oth",
+      "adj_lossgain",
+      "withdra_legal_surplus",
+      "withdra_legal_pubfund",
+      "withdra_biz_devfund",
+      "withdra_rese_fund",
+      "withdra_oth_ersu",
+      "workers_welfare",
+      "distr_profit_shrhder",
+      "prfshare_payable_dvd",
+      "comshare_payable_dvd",
+      "capit_comstock_div",
+      "continued_net_profit",
+      "update_flag"
+    ],
+    "status": "PERMITTED"
+  },
+  {
+    "api_name": "balancesheet",
+    "params": {
+      "ts_code": "000001.SZ",
+      "limit": 1
+    },
+    "code": 0,
+    "msg": "",
+    "rows": 1,
+    "fields": [
+      "ts_code",
+      "ann_date",
+      "f_ann_date",
+      "end_date",
+      "report_type",
+      "comp_type",
+      "end_type",
+      "total_share",
+      "cap_rese",
+      "undistr_porfit",
+      "surplus_rese",
+      "special_rese",
+      "money_cap",
+      "trad_asset",
+      "notes_receiv",
+      "accounts_receiv",
+      "oth_receiv",
+      "prepayment",
+      "div_receiv",
+      "int_receiv",
+      "inventories",
+      "amor_exp",
+      "nca_within_1y",
+      "sett_rsrv",
+      "loanto_oth_bank_fi",
+      "premium_receiv",
+      "reinsur_receiv",
+      "reinsur_res_receiv",
+      "pur_resale_fa",
+      "oth_cur_assets",
+      "total_cur_assets",
+      "fa_avail_for_sale",
+      "htm_invest",
+      "lt_eqt_invest",
+      "invest_real_estate",
+      "time_deposits",
+      "oth_assets",
+      "lt_rec",
+      "fix_assets",
+      "cip",
+      "const_materials",
+      "fixed_assets_disp",
+      "produc_bio_assets",
+      "oil_and_gas_assets",
+      "intan_assets",
+      "r_and_d",
+      "goodwill",
+      "lt_amor_exp",
+      "defer_tax_assets",
+      "decr_in_disbur",
+      "oth_nca",
+      "total_nca",
+      "cash_reser_cb",
+      "depos_in_oth_bfi",
+      "prec_metals",
+      "deriv_assets",
+      "rr_reins_une_prem",
+      "rr_reins_outstd_cla",
+      "rr_reins_lins_liab",
+      "rr_reins_lthins_liab",
+      "refund_depos",
+      "ph_pledge_loans",
+      "refund_cap_depos",
+      "indep_acct_assets",
+      "client_depos",
+      "client_prov",
+      "transac_seat_fee",
+      "invest_as_receiv",
+      "total_assets",
+      "lt_borr",
+      "st_borr",
+      "cb_borr",
+      "depos_ib_deposits",
+      "loan_oth_bank",
+      "trading_fl",
+      "notes_payable",
+      "acct_payable",
+      "adv_receipts",
+      "sold_for_repur_fa",
+      "comm_payable",
+      "payroll_payable",
+      "taxes_payable",
+      "int_payable",
+      "div_payable",
+      "oth_payable",
+      "acc_exp",
+      "deferred_inc",
+      "st_bonds_payable",
+      "payable_to_reinsurer",
+      "rsrv_insur_cont",
+      "acting_trading_sec",
+      "acting_uw_sec",
+      "non_cur_liab_due_1y",
+      "oth_cur_liab",
+      "total_cur_liab",
+      "bond_payable",
+      "lt_payable",
+      "specific_payables",
+      "estimated_liab",
+      "defer_tax_liab",
+      "defer_inc_non_cur_liab",
+      "oth_ncl",
+      "total_ncl",
+      "depos_oth_bfi",
+      "deriv_liab",
+      "depos",
+      "agency_bus_liab",
+      "oth_liab",
+      "prem_receiv_adva",
+      "depos_received",
+      "ph_invest",
+      "reser_une_prem",
+      "reser_outstd_claims",
+      "reser_lins_liab",
+      "reser_lthins_liab",
+      "indept_acc_liab",
+      "pledge_borr",
+      "indem_payable",
+      "policy_div_payable",
+      "total_liab",
+      "treasury_share",
+      "ordin_risk_reser",
+      "forex_differ",
+      "invest_loss_unconf",
+      "minority_int",
+      "total_hldr_eqy_exc_min_int",
+      "total_hldr_eqy_inc_min_int",
+      "total_liab_hldr_eqy",
+      "lt_payroll_payable",
+      "oth_comp_income",
+      "oth_eqt_tools",
+      "oth_eqt_tools_p_shr",
+      "lending_funds",
+      "acc_receivable",
+      "st_fin_payable",
+      "payables",
+      "hfs_assets",
+      "hfs_sales",
+      "cost_fin_assets",
+      "fair_value_fin_assets",
+      "contract_assets",
+      "contract_liab",
+      "accounts_receiv_bill",
+      "accounts_pay",
+      "oth_rcv_total",
+      "fix_assets_total",
+      "cip_total",
+      "oth_pay_total",
+      "long_pay_total",
+      "debt_invest",
+      "oth_debt_invest",
+      "update_flag"
+    ],
+    "status": "PERMITTED"
+  },
+  {
+    "api_name": "cashflow",
+    "params": {
+      "ts_code": "000001.SZ",
+      "limit": 1
+    },
+    "code": 0,
+    "msg": "",
+    "rows": 1,
+    "fields": [
+      "ts_code",
+      "ann_date",
+      "f_ann_date",
+      "end_date",
+      "comp_type",
+      "report_type",
+      "end_type",
+      "net_profit",
+      "finan_exp",
+      "c_fr_sale_sg",
+      "recp_tax_rends",
+      "n_depos_incr_fi",
+      "n_incr_loans_cb",
+      "n_inc_borr_oth_fi",
+      "prem_fr_orig_contr",
+      "n_incr_insured_dep",
+      "n_reinsur_prem",
+      "n_incr_disp_tfa",
+      "ifc_cash_incr",
+      "n_incr_disp_faas",
+      "n_incr_loans_oth_bank",
+      "n_cap_incr_repur",
+      "c_fr_oth_operate_a",
+      "c_inf_fr_operate_a",
+      "c_paid_goods_s",
+      "c_paid_to_for_empl",
+      "c_paid_for_taxes",
+      "n_incr_clt_loan_adv",
+      "n_incr_dep_cbob",
+      "c_pay_claims_orig_inco",
+      "pay_handling_chrg",
+      "pay_comm_insur_plcy",
+      "oth_cash_pay_oper_act",
+      "st_cash_out_act",
+      "n_cashflow_act",
+      "oth_recp_ral_inv_act",
+      "c_disp_withdrwl_invest",
+      "c_recp_return_invest",
+      "n_recp_disp_fiolta",
+      "n_recp_disp_sobu",
+      "stot_inflows_inv_act",
+      "c_pay_acq_const_fiolta",
+      "c_paid_invest",
+      "n_disp_subs_oth_biz",
+      "oth_pay_ral_inv_act",
+      "n_incr_pledge_loan",
+      "stot_out_inv_act",
+      "n_cashflow_inv_act",
+      "c_recp_borrow",
+      "proc_issue_bonds",
+      "oth_cash_recp_ral_fnc_act",
+      "stot_cash_in_fnc_act",
+      "free_cashflow",
+      "c_prepay_amt_borr",
+      "c_pay_dist_dpcp_int_exp",
+      "incl_dvd_profit_paid_sc_ms",
+      "oth_cashpay_ral_fnc_act",
+      "stot_cashout_fnc_act",
+      "n_cash_flows_fnc_act",
+      "eff_fx_flu_cash",
+      "n_incr_cash_cash_equ",
+      "c_cash_equ_beg_period",
+      "c_cash_equ_end_period",
+      "c_recp_cap_contrib",
+      "incl_cash_rec_saims",
+      "uncon_invest_loss",
+      "prov_depr_assets",
+      "depr_fa_coga_dpba",
+      "amort_intang_assets",
+      "lt_amort_deferred_exp",
+      "decr_deferred_exp",
+      "incr_acc_exp",
+      "loss_disp_fiolta",
+      "loss_scr_fa",
+      "loss_fv_chg",
+      "invest_loss",
+      "decr_def_inc_tax_assets",
+      "incr_def_inc_tax_liab",
+      "decr_inventories",
+      "decr_oper_payable",
+      "incr_oper_payable",
+      "others",
+      "im_net_cashflow_oper_act",
+      "conv_debt_into_cap",
+      "conv_copbonds_due_within_1y",
+      "fa_fnc_leases",
+      "im_n_incr_cash_equ",
+      "net_dism_capital_add",
+      "net_cash_rece_sec",
+      "credit_impa_loss",
+      "use_right_asset_dep",
+      "oth_loss_asset",
+      "end_bal_cash",
+      "beg_bal_cash",
+      "end_bal_cash_equ",
+      "beg_bal_cash_equ",
+      "update_flag"
+    ],
+    "status": "PERMITTED"
+  },
+  {
+    "api_name": "fina_indicator",
+    "params": {
+      "ts_code": "000001.SZ",
+      "limit": 1
+    },
+    "code": 0,
+    "msg": "",
+    "rows": 1,
+    "fields": [
+      "ts_code",
+      "ann_date",
+      "end_date",
+      "eps",
+      "dt_eps",
+      "total_revenue_ps",
+      "revenue_ps",
+      "capital_rese_ps",
+      "surplus_rese_ps",
+      "undist_profit_ps",
+      "extra_item",
+      "profit_dedt",
+      "gross_margin",
+      "current_ratio",
+      "quick_ratio",
+      "cash_ratio",
+      "ar_turn",
+      "ca_turn",
+      "fa_turn",
+      "assets_turn",
+      "op_income",
+      "ebit",
+      "ebitda",
+      "fcff",
+      "fcfe",
+      "current_exint",
+      "noncurrent_exint",
+      "interestdebt",
+      "netdebt",
+      "tangible_asset",
+      "working_capital",
+      "networking_capital",
+      "invest_capital",
+      "retained_earnings",
+      "diluted2_eps",
+      "bps",
+      "ocfps",
+      "retainedps",
+      "cfps",
+      "ebit_ps",
+      "fcff_ps",
+      "fcfe_ps",
+      "netprofit_margin",
+      "grossprofit_margin",
+      "cogs_of_sales",
+      "expense_of_sales",
+      "profit_to_gr",
+      "saleexp_to_gr",
+      "adminexp_of_gr",
+      "finaexp_of_gr",
+      "impai_ttm",
+      "gc_of_gr",
+      "op_of_gr",
+      "ebit_of_gr",
+      "roe",
+      "roe_waa",
+      "roe_dt",
+      "roa",
+      "npta",
+      "roic",
+      "roe_yearly",
+      "roa2_yearly",
+      "debt_to_assets",
+      "assets_to_eqt",
+      "dp_assets_to_eqt",
+      "ca_to_assets",
+      "nca_to_assets",
+      "tbassets_to_totalassets",
+      "int_to_talcap",
+      "eqt_to_talcapital",
+      "currentdebt_to_debt",
+      "longdeb_to_debt",
+      "ocf_to_shortdebt",
+      "debt_to_eqt",
+      "eqt_to_debt",
+      "eqt_to_interestdebt",
+      "tangibleasset_to_debt",
+      "tangasset_to_intdebt",
+      "tangibleasset_to_netdebt",
+      "ocf_to_debt",
+      "turn_days",
+      "roa_yearly",
+      "roa_dp",
+      "fixed_assets",
+      "profit_to_op",
+      "q_saleexp_to_gr",
+      "q_gc_to_gr",
+      "q_roe",
+      "q_dt_roe",
+      "q_npta",
+      "q_ocf_to_sales",
+      "basic_eps_yoy",
+      "dt_eps_yoy",
+      "cfps_yoy",
+      "op_yoy",
+      "ebt_yoy",
+      "netprofit_yoy",
+      "dt_netprofit_yoy",
+      "ocf_yoy",
+      "roe_yoy",
+      "bps_yoy",
+      "assets_yoy",
+      "eqt_yoy",
+      "tr_yoy",
+      "or_yoy",
+      "q_sales_yoy",
+      "q_op_qoq",
+      "equity_yoy"
+    ],
+    "status": "PERMITTED"
+  },
+  {
+    "api_name": "fina_mainbz",
+    "params": {
+      "ts_code": "000001.SZ"
+    },
+    "code": 0,
+    "msg": "",
+    "rows": 150,
+    "fields": [
+      "ts_code",
+      "end_date",
+      "bz_item",
+      "bz_code",
+      "bz_sales",
+      "bz_profit",
+      "bz_cost",
+      "curr_type"
+    ],
+    "status": "PERMITTED"
+  },
+  {
+    "api_name": "forecast",
+    "params": {
+      "ts_code": "000001.SZ",
+      "limit": 1
+    },
+    "code": 0,
+    "msg": "",
+    "rows": 1,
+    "fields": [
+      "ts_code",
+      "ann_date",
+      "end_date",
+      "type",
+      "p_change_min",
+      "p_change_max",
+      "net_profit_min",
+      "net_profit_max",
+      "last_parent_net",
+      "first_ann_date",
+      "summary",
+      "change_reason",
+      "update_flag"
+    ],
+    "status": "PERMITTED"
+  },
+  {
+    "api_name": "express",
+    "params": {
+      "ts_code": "000001.SZ",
+      "limit": 1
+    },
+    "code": 0,
+    "msg": "",
+    "rows": 1,
+    "fields": [
+      "ts_code",
+      "ann_date",
+      "end_date",
+      "revenue",
+      "operate_profit",
+      "total_profit",
+      "n_income",
+      "total_assets",
+      "total_hldr_eqy_exc_min_int",
+      "diluted_eps",
+      "diluted_roe",
+      "yoy_net_profit",
+      "bps",
+      "perf_summary",
+      "update_flag"
+    ],
+    "status": "PERMITTED"
+  },
+  {
+    "api_name": "dividend",
+    "params": {
+      "ts_code": "000001.SZ"
+    },
+    "code": 0,
+    "msg": "",
+    "rows": 50,
+    "fields": [
+      "ts_code",
+      "end_date",
+      "ann_date",
+      "div_proc",
+      "stk_div",
+      "stk_bo_rate",
+      "stk_co_rate",
+      "cash_div",
+      "cash_div_tax",
+      "record_date",
+      "ex_date",
+      "pay_date",
+      "div_listdate",
+      "imp_ann_date"
+    ],
+    "status": "PERMITTED"
+  },
+  {
+    "api_name": "disclosure_date",
+    "params": {
+      "ts_code": "000001.SZ"
+    },
+    "code": 0,
+    "msg": "",
+    "rows": 104,
+    "fields": [
+      "ts_code",
+      "ann_date",
+      "end_date",
+      "pre_date",
+      "actual_date"
+    ],
+    "status": "PERMITTED"
+  },
+  {
+    "api_name": "top10_holders",
+    "params": {
+      "ts_code": "000001.SZ"
+    },
+    "code": 0,
+    "msg": "",
+    "rows": 329,
+    "fields": [
+      "ts_code",
+      "ann_date",
+      "end_date",
+      "holder_name",
+      "hold_amount",
+      "hold_ratio",
+      "hold_float_ratio",
+      "hold_change",
+      "holder_type"
+    ],
+    "status": "PERMITTED"
+  },
+  {
+    "api_name": "top10_floatholders",
+    "params": {
+      "ts_code": "000001.SZ"
+    },
+    "code": 0,
+    "msg": "",
+    "rows": 796,
+    "fields": [
+      "ts_code",
+      "ann_date",
+      "end_date",
+      "holder_name",
+      "hold_amount",
+      "hold_ratio",
+      "hold_float_ratio",
+      "hold_change",
+      "holder_type"
+    ],
+    "status": "PERMITTED"
+  },
+  {
+    "api_name": "margin",
+    "params": {
+      "trade_date": "20250110"
+    },
+    "code": 0,
+    "msg": "",
+    "rows": 3,
+    "fields": [
+      "trade_date",
+      "exchange_id",
+      "rzye",
+      "rzmre",
+      "rzche",
+      "rqye",
+      "rqmcl",
+      "rzrqye",
+      "rqyl"
+    ],
+    "status": "PERMITTED"
+  },
+  {
+    "api_name": "margin_detail",
+    "params": {
+      "trade_date": "20250110",
+      "ts_code": "000001.SZ"
+    },
+    "code": 0,
+    "msg": "",
+    "rows": 1,
+    "fields": [
+      "trade_date",
+      "ts_code",
+      "rzye",
+      "rqye",
+      "rzmre",
+      "rqyl",
+      "rzche",
+      "rqchl",
+      "rqmcl",
+      "rzrqye"
+    ],
+    "status": "PERMITTED"
+  },
+  {
+    "api_name": "top_list",
+    "params": {
+      "trade_date": "20250110"
+    },
+    "code": 0,
+    "msg": "",
+    "rows": 82,
+    "fields": [
+      "trade_date",
+      "ts_code",
+      "name",
+      "close",
+      "pct_change",
+      "turnover_rate",
+      "amount",
+      "l_sell",
+      "l_buy",
+      "l_amount",
+      "net_amount",
+      "net_rate",
+      "amount_rate",
+      "float_values",
+      "reason"
+    ],
+    "status": "PERMITTED"
+  },
+  {
+    "api_name": "top_inst",
+    "params": {
+      "trade_date": "20250110"
+    },
+    "code": 0,
+    "msg": "",
+    "rows": 860,
+    "fields": [
+      "trade_date",
+      "ts_code",
+      "exalter",
+      "buy",
+      "buy_rate",
+      "sell",
+      "sell_rate",
+      "net_buy",
+      "side",
+      "reason"
+    ],
+    "status": "PERMITTED"
+  },
+  {
+    "api_name": "pledge_stat",
+    "params": {
+      "ts_code": "000001.SZ"
+    },
+    "code": 0,
+    "msg": "",
+    "rows": 1047,
+    "fields": [
+      "ts_code",
+      "end_date",
+      "pledge_count",
+      "unrest_pledge",
+      "rest_pledge",
+      "total_share",
+      "pledge_ratio"
+    ],
+    "status": "PERMITTED"
+  },
+  {
+    "api_name": "pledge_detail",
+    "params": {
+      "ts_code": "000001.SZ"
+    },
+    "code": 0,
+    "msg": "",
+    "rows": 0,
+    "fields": [
+      "ts_code",
+      "ann_date",
+      "holder_name",
+      "pledge_amount",
+      "start_date",
+      "end_date",
+      "is_release",
+      "release_date",
+      "pledgor",
+      "holding_amount",
+      "pledged_amount",
+      "p_total_ratio",
+      "h_total_ratio",
+      "is_buyback"
+    ],
+    "status": "PERMITTED"
+  },
+  {
+    "api_name": "repurchase",
+    "params": {
+      "ts_code": "000001.SZ"
+    },
+    "code": 0,
+    "msg": "",
+    "rows": 0,
+    "fields": [
+      "ts_code",
+      "ann_date",
+      "end_date",
+      "proc",
+      "exp_date",
+      "vol",
+      "amount",
+      "high_limit",
+      "low_limit"
+    ],
+    "status": "PERMITTED"
+  },
+  {
+    "api_name": "concept",
+    "params": {},
+    "code": 0,
+    "msg": "",
+    "rows": 879,
+    "fields": [
+      "code",
+      "name",
+      "src"
+    ],
+    "status": "PERMITTED"
+  },
+  {
+    "api_name": "concept_detail",
+    "params": {
+      "id": "鼠疫"
+    },
+    "code": 0,
+    "msg": "",
+    "rows": 0,
+    "fields": [
+      "id",
+      "concept_name",
+      "ts_code",
+      "name"
+    ],
+    "status": "PERMITTED"
+  },
+  {
+    "api_name": "share_float",
+    "params": {
+      "ts_code": "000001.SZ"
+    },
+    "code": 0,
+    "msg": "",
+    "rows": 214,
+    "fields": [
+      "ts_code",
+      "ann_date",
+      "float_date",
+      "float_share",
+      "float_ratio",
+      "holder_name",
+      "share_type"
+    ],
+    "status": "PERMITTED"
+  },
+  {
+    "api_name": "block_trade",
+    "params": {
+      "ts_code": "000001.SZ",
+      "start_date": "20250101",
+      "end_date": "20250110"
+    },
+    "code": 0,
+    "msg": "",
+    "rows": 0,
+    "fields": [
+      "ts_code",
+      "trade_date",
+      "price",
+      "vol",
+      "amount",
+      "buyer",
+      "seller"
+    ],
+    "status": "PERMITTED"
+  },
+  {
+    "api_name": "stk_holdernumber",
+    "params": {
+      "ts_code": "000001.SZ"
+    },
+    "code": 0,
+    "msg": "",
+    "rows": 121,
+    "fields": [
+      "ts_code",
+      "ann_date",
+      "end_date",
+      "holder_num"
+    ],
+    "status": "PERMITTED"
+  },
+  {
+    "api_name": "shibor",
+    "params": {
+      "start_date": "20250101",
+      "end_date": "20250110"
+    },
+    "code": 0,
+    "msg": "",
+    "rows": 7,
+    "fields": [
+      "date",
+      "on",
+      "1w",
+      "2w",
+      "1m",
+      "3m",
+      "6m",
+      "9m",
+      "1y"
+    ],
+    "status": "PERMITTED"
+  },
+  {
+    "api_name": "libor",
+    "params": {
+      "start_date": "20250101",
+      "end_date": "20250110"
+    },
+    "code": 0,
+    "msg": "",
+    "rows": 0,
+    "fields": [
+      "date",
+      "curr_type",
+      "on",
+      "1w",
+      "1m",
+      "2m",
+      "3m",
+      "6m",
+      "12m"
+    ],
+    "status": "PERMITTED"
+  },
+  {
+    "api_name": "hibor",
+    "params": {
+      "start_date": "20250101",
+      "end_date": "20250110"
+    },
+    "code": 0,
+    "msg": "",
+    "rows": 0,
+    "fields": [
+      "date",
+      "on",
+      "1w",
+      "2w",
+      "1m",
+      "2m",
+      "3m",
+      "6m",
+      "12m"
+    ],
+    "status": "PERMITTED"
+  },
+  {
+    "api_name": "wz_index",
+    "params": {
+      "start_date": "20250101",
+      "end_date": "20250110"
+    },
+    "code": 0,
+    "msg": "",
+    "rows": 0,
+    "fields": [
+      "date",
+      "comp_rate",
+      "center_rate",
+      "micro_rate",
+      "cm_rate",
+      "sdb_rate",
+      "om_rate",
+      "aa_rate",
+      "m1_rate",
+      "m3_rate",
+      "m6_rate",
+      "m12_rate",
+      "long_rate"
+    ],
+    "status": "PERMITTED"
+  },
+  {
+    "api_name": "cn_gdp",
+    "params": {
+      "start_q": "2020Q1",
+      "end_q": "2020Q4"
+    },
+    "code": 0,
+    "msg": "",
+    "rows": 4,
+    "fields": [
+      "quarter",
+      "gdp",
+      "gdp_yoy",
+      "pi",
+      "pi_yoy",
+      "si",
+      "si_yoy",
+      "ti",
+      "ti_yoy"
+    ],
+    "status": "PERMITTED"
+  },
+  {
+    "api_name": "cn_cpi",
+    "params": {
+      "start_m": "202001",
+      "end_m": "202012"
+    },
+    "code": 0,
+    "msg": "",
+    "rows": 12,
+    "fields": [
+      "month",
+      "nt_val",
+      "nt_yoy",
+      "nt_mom",
+      "nt_accu",
+      "town_val",
+      "town_yoy",
+      "town_mom",
+      "town_accu",
+      "cnt_val",
+      "cnt_yoy",
+      "cnt_mom",
+      "cnt_accu"
+    ],
+    "status": "PERMITTED"
+  },
+  {
+    "api_name": "cn_ppi",
+    "params": {
+      "start_m": "202001",
+      "end_m": "202012"
+    },
+    "code": 0,
+    "msg": "",
+    "rows": 12,
+    "fields": [
+      "month",
+      "ppi_yoy",
+      "ppi_mp_yoy",
+      "ppi_mp_qm_yoy",
+      "ppi_mp_rm_yoy",
+      "ppi_mp_p_yoy",
+      "ppi_cg_yoy",
+      "ppi_cg_f_yoy",
+      "ppi_cg_c_yoy",
+      "ppi_cg_adu_yoy",
+      "ppi_cg_dcg_yoy",
+      "ppi_mom",
+      "ppi_mp_mom",
+      "ppi_mp_qm_mom",
+      "ppi_mp_rm_mom",
+      "ppi_mp_p_mom",
+      "ppi_cg_mom",
+      "ppi_cg_f_mom",
+      "ppi_cg_c_mom",
+      "ppi_cg_adu_mom",
+      "ppi_cg_dcg_mom",
+      "ppi_accu",
+      "ppi_mp_accu",
+      "ppi_mp_qm_accu",
+      "ppi_mp_rm_accu",
+      "ppi_mp_p_accu",
+      "ppi_cg_accu",
+      "ppi_cg_f_accu",
+      "ppi_cg_c_accu",
+      "ppi_cg_adu_accu",
+      "ppi_cg_dcg_accu"
+    ],
+    "status": "PERMITTED"
+  },
+  {
+    "api_name": "cn_m",
+    "params": {
+      "m": "202501"
+    },
+    "code": 0,
+    "msg": "",
+    "rows": 1,
+    "fields": [
+      "month",
+      "m0",
+      "m0_yoy",
+      "m0_mom",
+      "m1",
+      "m1_yoy",
+      "m1_mom",
+      "m2",
+      "m2_yoy",
+      "m2_mom"
+    ],
+    "status": "PERMITTED"
+  },
+  {
+    "api_name": "cn_sf",
+    "params": {
+      "start_date": "20250101",
+      "end_date": "20250131"
+    },
+    "code": 40101,
+    "msg": "请指定正确的接口名",
+    "rows": 0,
+    "fields": [],
+    "status": "UNKNOWN_API_OR_NOT_FOUND"
+  },
+  {
+    "api_name": "cn_pmi",
+    "params": {
+      "m": "202501"
+    },
+    "code": 0,
+    "msg": "",
+    "rows": 1,
+    "fields": [
+      "PMI030000",
+      "PMI010200",
+      "PMI010603",
+      "PMI020300",
+      "PMI020302",
+      "PMI020400",
+      "PMI020402",
+      "PMI020601",
+      "PMI020700",
+      "PMI010400",
+      "PMI011800",
+      "PMI020102",
+      "PMI020502",
+      "PMI021000",
+      "PMI010701",
+      "PMI010703",
+      "PMI010800",
+      "PMI010300",
+      "UPDATE_TIME",
+      "PMI010000",
+      "PMI010600",
+      "PMI010802",
+      "PMI011000",
+      "PMI011500",
+      "PMI020401",
+      "PMI020900",
+      "PMI010702",
+      "PMI020500",
+      "PMI020501",
+      "UPDATE_BY",
+      "PMI020301",
+      "PMI010601",
+      "PMI010801",
+      "PMI010803",
+      "PMI011300",
+      "PMI020100",
+      "PMI020600",
+      "PMI010900",
+      "PMI020101",
+      "PMI010401",
+      "PMI010402",
+      "PMI011400",
+      "PMI011900",
+      "PMI012000",
+      "MONTH",
+      "PMI010501",
+      "PMI011600",
+      "PMI020200",
+      "PMI020201",
+      "PMI020800",
+      "PMI010500",
+      "PMI010700",
+      "PMI011200",
+      "ID",
+      "PMI010100",
+      "PMI010502",
+      "PMI020602",
+      "CREATE_TIME",
+      "PMI010403",
+      "PMI011100",
+      "PMI011700",
+      "CREATE_BY",
+      "PMI010503",
+      "PMI010602",
+      "PMI020202"
+    ],
+    "status": "PERMITTED"
+  },
+  {
+    "api_name": "cn_bs",
+    "params": {
+      "m": "202501"
+    },
+    "code": 40101,
+    "msg": "请指定正确的接口名",
+    "rows": 0,
+    "fields": [],
+    "status": "UNKNOWN_API_OR_NOT_FOUND"
+  },
+  {
+    "api_name": "us_daily",
+    "params": {
+      "ts_code": "AAPL",
+      "start_date": "20250101",
+      "end_date": "20250110"
+    },
+    "code": 0,
+    "msg": "",
+    "rows": 6,
+    "fields": [
+      "ts_code",
+      "trade_date",
+      "close",
+      "open",
+      "high",
+      "low",
+      "pre_close",
+      "pct_change",
+      "vol",
+      "amount",
+      "vwap"
+    ],
+    "status": "PERMITTED"
+  },
+  {
+    "api_name": "hk_basic",
+    "params": {},
+    "code": 0,
+    "msg": "",
+    "rows": 2720,
+    "fields": [
+      "ts_code",
+      "name",
+      "fullname",
+      "enname",
+      "cn_spell",
+      "market",
+      "list_status",
+      "list_date",
+      "delist_date",
+      "trade_unit",
+      "isin",
+      "curr_type"
+    ],
+    "status": "PERMITTED"
+  },
+  {
+    "api_name": "hk_daily",
+    "params": {
+      "ts_code": "00700.HK",
+      "start_date": "20250101",
+      "end_date": "20250110"
+    },
+    "code": 0,
+    "msg": "",
+    "rows": 7,
+    "fields": [
+      "ts_code",
+      "trade_date",
+      "open",
+      "high",
+      "low",
+      "close",
+      "pre_close",
+      "change",
+      "pct_chg",
+      "vol",
+      "amount"
+    ],
+    "status": "PERMITTED"
+  },
+  {
+    "api_name": "sw_basic",
+    "params": {},
+    "code": 40101,
+    "msg": "请指定正确的接口名",
+    "rows": 0,
+    "fields": [],
+    "status": "UNKNOWN_API_OR_NOT_FOUND"
+  },
+  {
+    "api_name": "sw_daily",
+    "params": {
+      "ts_code": "801010.SI",
+      "start_date": "20250101",
+      "end_date": "20250110"
+    },
+    "code": 0,
+    "msg": "",
+    "rows": 7,
+    "fields": [
+      "ts_code",
+      "trade_date",
+      "name",
+      "open",
+      "low",
+      "high",
+      "close",
+      "change",
+      "pct_change",
+      "vol",
+      "amount",
+      "pe",
+      "pb",
+      "float_mv",
+      "total_mv"
+    ],
+    "status": "PERMITTED"
+  },
+  {
+    "api_name": "news",
+    "params": {
+      "src": "sina",
+      "start_date": "2025-01-01 00:00:00",
+      "end_date": "2025-01-02 00:00:00"
+    },
+    "code": 0,
+    "msg": "",
+    "rows": 884,
+    "fields": [
+      "datetime",
+      "content",
+      "title"
+    ],
+    "status": "PERMITTED"
+  }
+]

@@ -1,0 +1,1397 @@
+[
+  {
+    "api_name": "adj_factor",
+    "params": {
+      "ts_code": "000001.SZ",
+      "start_date": "20250101",
+      "end_date": "20250110"
+    },
+    "code": 0,
+    "msg": "",
+    "rows": 7,
+    "status": "PERMITTED",
+    "attempts": 1
+  },
+  {
+    "api_name": "anns_d",
+    "params": {
+      "ann_date": "20250110"
+    },
+    "code": 0,
+    "msg": "",
+    "rows": 1057,
+    "status": "PERMITTED",
+    "attempts": 1
+  },
+  {
+    "api_name": "bak_basic",
+    "params": {
+      "trade_date": "20250110"
+    },
+    "code": 0,
+    "msg": "",
+    "rows": 5380,
+    "status": "PERMITTED",
+    "attempts": 1
+  },
+  {
+    "api_name": "bak_daily",
+    "params": {
+      "trade_date": "20250110"
+    },
+    "code": 0,
+    "msg": "",
+    "rows": 5380,
+    "status": "PERMITTED",
+    "attempts": 1
+  },
+  {
+    "api_name": "bc_bestotcqt",
+    "params": {
+      "trade_date": "20250110"
+    },
+    "code": 0,
+    "msg": "",
+    "rows": 537,
+    "status": "PERMITTED",
+    "attempts": 1
+  },
+  {
+    "api_name": "bc_otcqt",
+    "params": {
+      "trade_date": "20250110"
+    },
+    "code": 0,
+    "msg": "",
+    "rows": 2000,
+    "status": "PERMITTED",
+    "attempts": 1
+  },
+  {
+    "api_name": "block_trade",
+    "params": {
+      "ts_code": "000001.SZ",
+      "start_date": "20250101",
+      "end_date": "20250110"
+    },
+    "code": 0,
+    "msg": "",
+    "rows": 0,
+    "status": "PERMITTED",
+    "attempts": 1
+  },
+  {
+    "api_name": "bo_cinema",
+    "params": {
+      "date": "20250101"
+    },
+    "code": 0,
+    "msg": "",
+    "rows": 0,
+    "status": "PERMITTED",
+    "attempts": 1
+  },
+  {
+    "api_name": "bo_daily",
+    "params": {
+      "date": "20250101"
+    },
+    "code": 0,
+    "msg": "",
+    "rows": 0,
+    "status": "PERMITTED",
+    "attempts": 1
+  },
+  {
+    "api_name": "bo_weekly",
+    "params": {
+      "date": "20250101"
+    },
+    "code": 0,
+    "msg": "",
+    "rows": 0,
+    "status": "PERMITTED",
+    "attempts": 1
+  },
+  {
+    "api_name": "bond_blk",
+    "params": {
+      "trade_date": "20250110"
+    },
+    "code": 0,
+    "msg": "",
+    "rows": 4,
+    "status": "PERMITTED",
+    "attempts": 1
+  },
+  {
+    "api_name": "bond_blk_detail",
+    "params": {
+      "trade_date": "20250110"
+    },
+    "code": 0,
+    "msg": "",
+    "rows": 11,
+    "status": "PERMITTED",
+    "attempts": 1
+  },
+  {
+    "api_name": "broker_recommend",
+    "params": {
+      "month": "202501"
+    },
+    "code": 0,
+    "msg": "",
+    "rows": 201,
+    "status": "PERMITTED",
+    "attempts": 1
+  },
+  {
+    "api_name": "bse_mapping",
+    "params": {},
+    "code": 0,
+    "msg": "",
+    "rows": 248,
+    "status": "PERMITTED",
+    "attempts": 1
+  },
+  {
+    "api_name": "cashflow_vip",
+    "params": {
+      "ts_code": "000001.SZ"
+    },
+    "code": 0,
+    "msg": "",
+    "rows": 88,
+    "status": "PERMITTED",
+    "attempts": 1
+  },
+  {
+    "api_name": "cb_call",
+    "params": {
+      "ts_code": "110073.SH"
+    },
+    "code": 0,
+    "msg": "",
+    "rows": 0,
+    "status": "PERMITTED",
+    "attempts": 1
+  },
+  {
+    "api_name": "cb_daily",
+    "params": {
+      "ts_code": "110073.SH",
+      "start_date": "20250101",
+      "end_date": "20250110"
+    },
+    "code": 0,
+    "msg": "",
+    "rows": 7,
+    "status": "PERMITTED",
+    "attempts": 1
+  },
+  {
+    "api_name": "cb_factor_pro",
+    "params": {
+      "ts_code": "110073.SH"
+    },
+    "code": 0,
+    "msg": "",
+    "rows": 1329,
+    "status": "PERMITTED",
+    "attempts": 1
+  },
+  {
+    "api_name": "cb_issue",
+    "params": {
+      "ts_code": "110073.SH"
+    },
+    "code": 0,
+    "msg": "",
+    "rows": 1,
+    "status": "PERMITTED",
+    "attempts": 1
+  },
+  {
+    "api_name": "cb_price_chg",
+    "params": {
+      "ts_code": "110073.SH"
+    },
+    "code": 0,
+    "msg": "",
+    "rows": 6,
+    "status": "PERMITTED",
+    "attempts": 1
+  },
+  {
+    "api_name": "cb_rate",
+    "params": {
+      "ts_code": "110073.SH"
+    },
+    "code": 0,
+    "msg": "",
+    "rows": 6,
+    "status": "PERMITTED",
+    "attempts": 1
+  },
+  {
+    "api_name": "ccass_hold",
+    "params": {
+      "trade_date": "20250110"
+    },
+    "code": 0,
+    "msg": "",
+    "rows": 815,
+    "status": "PERMITTED",
+    "attempts": 1
+  },
+  {
+    "api_name": "ccass_hold_detail",
+    "params": {
+      "trade_date": "20250110"
+    },
+    "code": 0,
+    "msg": "",
+    "rows": 7000,
+    "status": "PERMITTED",
+    "attempts": 1
+  },
+  {
+    "api_name": "ci_daily",
+    "params": {
+      "ts_code": "CI005005.WI",
+      "start_date": "20250101",
+      "end_date": "20250110"
+    },
+    "code": 0,
+    "msg": "",
+    "rows": 0,
+    "status": "PERMITTED",
+    "attempts": 1
+  },
+  {
+    "api_name": "cn_gdp",
+    "params": {
+      "start_q": "2020Q1",
+      "end_q": "2020Q4"
+    },
+    "code": 0,
+    "msg": "",
+    "rows": 4,
+    "status": "PERMITTED",
+    "attempts": 1
+  },
+  {
+    "api_name": "cn_pmi",
+    "params": {
+      "m": "202501"
+    },
+    "code": 0,
+    "msg": "",
+    "rows": 1,
+    "status": "PERMITTED",
+    "attempts": 1
+  },
+  {
+    "api_name": "cn_ppi",
+    "params": {
+      "start_m": "202001",
+      "end_m": "202012"
+    },
+    "code": 0,
+    "msg": "",
+    "rows": 12,
+    "status": "PERMITTED",
+    "attempts": 1
+  },
+  {
+    "api_name": "daily_basic",
+    "params": {
+      "ts_code": "000001.SZ",
+      "start_date": "20250101",
+      "end_date": "20250110"
+    },
+    "code": 0,
+    "msg": "",
+    "rows": 7,
+    "status": "PERMITTED",
+    "attempts": 1
+  },
+  {
+    "api_name": "daily_info",
+    "params": {
+      "trade_date": "20250110"
+    },
+    "code": 0,
+    "msg": "",
+    "rows": 12,
+    "status": "PERMITTED",
+    "attempts": 1
+  },
+  {
+    "api_name": "dc_hot",
+    "params": {
+      "trade_date": "20250110"
+    },
+    "code": 0,
+    "msg": "",
+    "rows": 790,
+    "status": "PERMITTED",
+    "attempts": 1
+  },
+  {
+    "api_name": "dc_member",
+    "params": {
+      "ts_code": "BK0475.DC"
+    },
+    "code": 0,
+    "msg": "",
+    "rows": 8000,
+    "status": "PERMITTED",
+    "attempts": 1
+  },
+  {
+    "api_name": "disclosure_date",
+    "params": {
+      "ts_code": "000001.SZ"
+    },
+    "code": 0,
+    "msg": "",
+    "rows": 104,
+    "status": "PERMITTED",
+    "attempts": 1
+  },
+  {
+    "api_name": "eco_cal",
+    "params": {
+      "start_date": "2025-01-01",
+      "end_date": "2025-01-02"
+    },
+    "code": 0,
+    "msg": "",
+    "rows": 0,
+    "status": "PERMITTED",
+    "attempts": 1
+  },
+  {
+    "api_name": "etf_basic",
+    "params": {
+      "market": "E"
+    },
+    "code": 0,
+    "msg": "",
+    "rows": 3168,
+    "status": "PERMITTED",
+    "attempts": 1
+  },
+  {
+    "api_name": "etf_index",
+    "params": {
+      "ts_code": "510300.SH"
+    },
+    "code": 0,
+    "msg": "",
+    "rows": 0,
+    "status": "PERMITTED",
+    "attempts": 1
+  },
+  {
+    "api_name": "express",
+    "params": {
+      "ts_code": "000001.SZ"
+    },
+    "code": 0,
+    "msg": "",
+    "rows": 4,
+    "status": "PERMITTED",
+    "attempts": 1
+  },
+  {
+    "api_name": "express_vip",
+    "params": {
+      "ts_code": "000001.SZ"
+    },
+    "code": 0,
+    "msg": "",
+    "rows": 4,
+    "status": "PERMITTED",
+    "attempts": 1
+  },
+  {
+    "api_name": "film_record",
+    "params": {
+      "month": "202501"
+    },
+    "code": 40101,
+    "msg": "请指定正确的接口名",
+    "rows": 0,
+    "status": "UNKNOWN_API_OR_NOT_FOUND",
+    "attempts": 1
+  },
+  {
+    "api_name": "fina_audit",
+    "params": {
+      "ts_code": "000001.SZ"
+    },
+    "code": 0,
+    "msg": "",
+    "rows": 38,
+    "status": "PERMITTED",
+    "attempts": 1
+  },
+  {
+    "api_name": "fina_mainbz",
+    "params": {
+      "ts_code": "000001.SZ"
+    },
+    "code": 0,
+    "msg": "",
+    "rows": 150,
+    "status": "PERMITTED",
+    "attempts": 1
+  },
+  {
+    "api_name": "fina_mainbz_vip",
+    "params": {
+      "ts_code": "000001.SZ"
+    },
+    "code": 0,
+    "msg": "",
+    "rows": 1669,
+    "status": "PERMITTED",
+    "attempts": 1
+  },
+  {
+    "api_name": "forecast",
+    "params": {
+      "ts_code": "000001.SZ"
+    },
+    "code": 0,
+    "msg": "",
+    "rows": 16,
+    "status": "PERMITTED",
+    "attempts": 1
+  },
+  {
+    "api_name": "forecast_vip",
+    "params": {
+      "ts_code": "000001.SZ"
+    },
+    "code": 0,
+    "msg": "",
+    "rows": 16,
+    "status": "PERMITTED",
+    "attempts": 1
+  },
+  {
+    "api_name": "ft_mins",
+    "params": {
+      "ts_code": "159915.SZ",
+      "trade_date": "20250110",
+      "freq": "1min"
+    },
+    "code": 0,
+    "msg": "",
+    "rows": 0,
+    "status": "PERMITTED",
+    "attempts": 1
+  },
+  {
+    "api_name": "fund_company",
+    "params": {},
+    "code": 0,
+    "msg": "",
+    "rows": 15279,
+    "status": "PERMITTED",
+    "attempts": 1
+  },
+  {
+    "api_name": "fund_div",
+    "params": {
+      "ts_code": "510300.SH"
+    },
+    "code": 0,
+    "msg": "",
+    "rows": 46,
+    "status": "PERMITTED",
+    "attempts": 1
+  },
+  {
+    "api_name": "fund_portfolio",
+    "params": {
+      "ts_code": "510300.SH"
+    },
+    "code": 0,
+    "msg": "",
+    "rows": 8000,
+    "status": "PERMITTED",
+    "attempts": 1
+  },
+  {
+    "api_name": "fund_sales_ratio",
+    "params": {
+      "year": "2024"
+    },
+    "code": 0,
+    "msg": "",
+    "rows": 5,
+    "status": "PERMITTED",
+    "attempts": 1
+  },
+  {
+    "api_name": "fund_sales_vol",
+    "params": {
+      "year": "2024"
+    },
+    "code": 0,
+    "msg": "",
+    "rows": 0,
+    "status": "PERMITTED",
+    "attempts": 1
+  },
+  {
+    "api_name": "fut_basic",
+    "params": {
+      "exchange": "CFFEX"
+    },
+    "code": 0,
+    "msg": "",
+    "rows": 684,
+    "status": "PERMITTED",
+    "attempts": 1
+  },
+  {
+    "api_name": "fut_daily",
+    "params": {
+      "ts_code": "IF9999.CFX",
+      "start_date": "20250101",
+      "end_date": "20250110"
+    },
+    "code": 0,
+    "msg": "",
+    "rows": 0,
+    "status": "PERMITTED",
+    "attempts": 1
+  },
+  {
+    "api_name": "fut_settle",
+    "params": {
+      "trade_date": "20250110"
+    },
+    "code": 0,
+    "msg": "",
+    "rows": 276,
+    "status": "PERMITTED",
+    "attempts": 1
+  },
+  {
+    "api_name": "fx_daily",
+    "params": {
+      "ts_code": "USDJPY.FXCM",
+      "start_date": "20250101",
+      "end_date": "20250110"
+    },
+    "code": 0,
+    "msg": "",
+    "rows": 8,
+    "status": "PERMITTED",
+    "attempts": 1
+  },
+  {
+    "api_name": "fx_obasic",
+    "params": {},
+    "code": 0,
+    "msg": "",
+    "rows": 69,
+    "status": "PERMITTED",
+    "attempts": 1
+  },
+  {
+    "api_name": "ggt_daily",
+    "params": {
+      "trade_date": "20250110"
+    },
+    "code": 0,
+    "msg": "",
+    "rows": 1,
+    "status": "PERMITTED",
+    "attempts": 1
+  },
+  {
+    "api_name": "ggt_monthly",
+    "params": {
+      "month": "202501"
+    },
+    "code": 0,
+    "msg": "",
+    "rows": 0,
+    "status": "PERMITTED",
+    "attempts": 1
+  },
+  {
+    "api_name": "ggt_top10",
+    "params": {
+      "trade_date": "20250110"
+    },
+    "code": 0,
+    "msg": "",
+    "rows": 20,
+    "status": "PERMITTED",
+    "attempts": 1
+  },
+  {
+    "api_name": "gz_index",
+    "params": {
+      "start_date": "20250101",
+      "end_date": "20250110"
+    },
+    "code": 0,
+    "msg": "",
+    "rows": 0,
+    "status": "PERMITTED",
+    "attempts": 1
+  },
+  {
+    "api_name": "hk_cashflow",
+    "params": {
+      "ts_code": "00700.HK"
+    },
+    "code": 0,
+    "msg": "",
+    "rows": 1718,
+    "status": "PERMITTED",
+    "attempts": 1
+  },
+  {
+    "api_name": "hk_daily_adj",
+    "params": {
+      "ts_code": "00700.HK",
+      "start_date": "20250101",
+      "end_date": "20250110"
+    },
+    "code": 0,
+    "msg": "",
+    "rows": 7,
+    "status": "PERMITTED",
+    "attempts": 1
+  },
+  {
+    "api_name": "hk_income",
+    "params": {
+      "ts_code": "00700.HK"
+    },
+    "code": 0,
+    "msg": "",
+    "rows": 2160,
+    "status": "PERMITTED",
+    "attempts": 1
+  },
+  {
+    "api_name": "hk_mins",
+    "params": {
+      "ts_code": "00700.HK",
+      "trade_date": "20250110",
+      "freq": "1min"
+    },
+    "code": 40203,
+    "msg": "抱歉，您每小时最多访问该接口2次，权限的具体详情访问：https://tushare.pro/document/1?doc_id=108。",
+    "rows": 0,
+    "status": "OTHER_ERROR",
+    "attempts": 1
+  },
+  {
+    "api_name": "hm_detail",
+    "params": {
+      "ts_code": "000001.SZ"
+    },
+    "code": 0,
+    "msg": "",
+    "rows": 10,
+    "status": "PERMITTED",
+    "attempts": 1
+  },
+  {
+    "api_name": "hm_list",
+    "params": {},
+    "code": 0,
+    "msg": "",
+    "rows": 109,
+    "status": "PERMITTED",
+    "attempts": 1
+  },
+  {
+    "api_name": "index_global",
+    "params": {
+      "ts_code": "HSI",
+      "start_date": "20250101",
+      "end_date": "20250110"
+    },
+    "code": 0,
+    "msg": "",
+    "rows": 7,
+    "status": "PERMITTED",
+    "attempts": 1
+  },
+  {
+    "api_name": "index_member_all",
+    "params": {
+      "index_code": "000300.SH"
+    },
+    "code": 0,
+    "msg": "",
+    "rows": 3000,
+    "status": "PERMITTED",
+    "attempts": 1
+  },
+  {
+    "api_name": "index_monthly",
+    "params": {
+      "ts_code": "000001.SH",
+      "start_date": "20250101",
+      "end_date": "20250110"
+    },
+    "code": 0,
+    "msg": "",
+    "rows": 0,
+    "status": "PERMITTED",
+    "attempts": 1
+  },
+  {
+    "api_name": "index_weekly",
+    "params": {
+      "ts_code": "000001.SH",
+      "start_date": "20250101",
+      "end_date": "20250110"
+    },
+    "code": 0,
+    "msg": "",
+    "rows": 2,
+    "status": "PERMITTED",
+    "attempts": 1
+  },
+  {
+    "api_name": "index_weight",
+    "params": {
+      "index_code": "000300.SH",
+      "start_date": "20250101",
+      "end_date": "20250131"
+    },
+    "code": 0,
+    "msg": "",
+    "rows": 600,
+    "status": "PERMITTED",
+    "attempts": 1
+  },
+  {
+    "api_name": "irm_qa_sh",
+    "params": {
+      "ts_code": "600000.SH"
+    },
+    "code": 0,
+    "msg": "",
+    "rows": 155,
+    "status": "PERMITTED",
+    "attempts": 1
+  },
+  {
+    "api_name": "limit_cpt_list",
+    "params": {},
+    "code": 0,
+    "msg": "",
+    "rows": 2000,
+    "status": "PERMITTED",
+    "attempts": 1
+  },
+  {
+    "api_name": "limit_list_d",
+    "params": {
+      "trade_date": "20250110"
+    },
+    "code": 0,
+    "msg": "",
+    "rows": 114,
+    "status": "PERMITTED",
+    "attempts": 1
+  },
+  {
+    "api_name": "limit_list_ths",
+    "params": {
+      "trade_date": "20250110"
+    },
+    "code": 0,
+    "msg": "",
+    "rows": 44,
+    "status": "PERMITTED",
+    "attempts": 1
+  },
+  {
+    "api_name": "margin",
+    "params": {
+      "trade_date": "20250110"
+    },
+    "code": 0,
+    "msg": "",
+    "rows": 3,
+    "status": "PERMITTED",
+    "attempts": 1
+  },
+  {
+    "api_name": "margin_detail",
+    "params": {
+      "trade_date": "20250110",
+      "ts_code": "000001.SZ"
+    },
+    "code": 0,
+    "msg": "",
+    "rows": 1,
+    "status": "PERMITTED",
+    "attempts": 1
+  },
+  {
+    "api_name": "margin_secs",
+    "params": {
+      "trade_date": "20250110"
+    },
+    "code": 0,
+    "msg": "",
+    "rows": 3988,
+    "status": "PERMITTED",
+    "attempts": 1
+  },
+  {
+    "api_name": "moneyflow",
+    "params": {
+      "ts_code": "000001.SZ",
+      "start_date": "20250101",
+      "end_date": "20250110"
+    },
+    "code": 0,
+    "msg": "",
+    "rows": 7,
+    "status": "PERMITTED",
+    "attempts": 1
+  },
+  {
+    "api_name": "moneyflow_cnt_ths",
+    "params": {
+      "trade_date": "20250110"
+    },
+    "code": 0,
+    "msg": "",
+    "rows": 389,
+    "status": "PERMITTED",
+    "attempts": 1
+  },
+  {
+    "api_name": "moneyflow_ind_dc",
+    "params": {
+      "trade_date": "20250110"
+    },
+    "code": 0,
+    "msg": "",
+    "rows": 86,
+    "status": "PERMITTED",
+    "attempts": 1
+  },
+  {
+    "api_name": "moneyflow_ind_ths",
+    "params": {
+      "trade_date": "20250110"
+    },
+    "code": 0,
+    "msg": "",
+    "rows": 90,
+    "status": "PERMITTED",
+    "attempts": 1
+  },
+  {
+    "api_name": "monthly",
+    "params": {
+      "ts_code": "000001.SZ",
+      "start_date": "20250101",
+      "end_date": "20250110"
+    },
+    "code": 0,
+    "msg": "",
+    "rows": 0,
+    "status": "PERMITTED",
+    "attempts": 1
+  },
+  {
+    "api_name": "namechange",
+    "params": {
+      "ts_code": "000001.SZ"
+    },
+    "code": 0,
+    "msg": "",
+    "rows": 8,
+    "status": "PERMITTED",
+    "attempts": 1
+  },
+  {
+    "api_name": "new_share",
+    "params": {
+      "start_date": "20250101",
+      "end_date": "20250131"
+    },
+    "code": 0,
+    "msg": "",
+    "rows": 8,
+    "status": "PERMITTED",
+    "attempts": 1
+  },
+  {
+    "api_name": "news",
+    "params": {
+      "src": "sina",
+      "start_date": "2025-01-01 00:00:00",
+      "end_date": "2025-01-02 00:00:00"
+    },
+    "code": 40203,
+    "msg": "抱歉，您每小时最多访问该接口2次，权限的具体详情访问：https://tushare.pro/document/1?doc_id=108。",
+    "rows": 0,
+    "status": "OTHER_ERROR",
+    "attempts": 1
+  },
+  {
+    "api_name": "opt_mins",
+    "params": {
+      "ts_code": "10001273.SH",
+      "trade_date": "20250110",
+      "freq": "1min"
+    },
+    "code": 0,
+    "msg": "",
+    "rows": 0,
+    "status": "PERMITTED",
+    "attempts": 1
+  },
+  {
+    "api_name": "pledge_detail",
+    "params": {
+      "ts_code": "000001.SZ"
+    },
+    "code": 0,
+    "msg": "",
+    "rows": 0,
+    "status": "PERMITTED",
+    "attempts": 1
+  },
+  {
+    "api_name": "pledge_stat",
+    "params": {
+      "ts_code": "000001.SZ"
+    },
+    "code": 0,
+    "msg": "",
+    "rows": 1047,
+    "status": "PERMITTED",
+    "attempts": 1
+  },
+  {
+    "api_name": "repurchase",
+    "params": {
+      "ts_code": "000001.SZ"
+    },
+    "code": 0,
+    "msg": "",
+    "rows": 0,
+    "status": "PERMITTED",
+    "attempts": 1
+  },
+  {
+    "api_name": "rt_fut_min",
+    "params": {
+      "ts_code": "IF9999.CFX",
+      "freq": "1min"
+    },
+    "code": 40203,
+    "msg": "抱歉，您没有接口访问权限，权限的具体详情访问：https://tushare.pro/document/1?doc_id=108。",
+    "rows": 0,
+    "status": "NO_PERMISSION",
+    "attempts": 1
+  },
+  {
+    "api_name": "rt_hk_k",
+    "params": {
+      "ts_code": "00700.HK"
+    },
+    "code": 0,
+    "msg": "",
+    "rows": 1,
+    "status": "PERMITTED",
+    "attempts": 1
+  },
+  {
+    "api_name": "slb_len_mm",
+    "params": {
+      "month": "202501"
+    },
+    "code": 0,
+    "msg": "",
+    "rows": 5000,
+    "status": "PERMITTED",
+    "attempts": 1
+  },
+  {
+    "api_name": "st",
+    "params": {
+      "trade_date": "20250110"
+    },
+    "code": 0,
+    "msg": "",
+    "rows": 1000,
+    "status": "PERMITTED",
+    "attempts": 1
+  },
+  {
+    "api_name": "stk_account",
+    "params": {},
+    "code": 0,
+    "msg": "",
+    "rows": 192,
+    "status": "PERMITTED",
+    "attempts": 1
+  },
+  {
+    "api_name": "stk_ah_comparison",
+    "params": {},
+    "code": 0,
+    "msg": "",
+    "rows": 1000,
+    "status": "PERMITTED",
+    "attempts": 1
+  },
+  {
+    "api_name": "stk_auction",
+    "params": {},
+    "code": 0,
+    "msg": "",
+    "rows": 8000,
+    "status": "PERMITTED",
+    "attempts": 1
+  },
+  {
+    "api_name": "stk_auction_c",
+    "params": {},
+    "code": 0,
+    "msg": "",
+    "rows": 10000,
+    "status": "PERMITTED",
+    "attempts": 1
+  },
+  {
+    "api_name": "stk_auction_o",
+    "params": {},
+    "code": 0,
+    "msg": "",
+    "rows": 10000,
+    "status": "PERMITTED",
+    "attempts": 1
+  },
+  {
+    "api_name": "stk_holdernumber",
+    "params": {
+      "ts_code": "000001.SZ"
+    },
+    "code": 0,
+    "msg": "",
+    "rows": 121,
+    "status": "PERMITTED",
+    "attempts": 1
+  },
+  {
+    "api_name": "stk_limit",
+    "params": {
+      "trade_date": "20250110"
+    },
+    "code": 0,
+    "msg": "",
+    "rows": 6984,
+    "status": "PERMITTED",
+    "attempts": 1
+  },
+  {
+    "api_name": "stk_managers",
+    "params": {
+      "ts_code": "000001.SZ"
+    },
+    "code": 0,
+    "msg": "",
+    "rows": 193,
+    "status": "PERMITTED",
+    "attempts": 1
+  },
+  {
+    "api_name": "stk_rewards",
+    "params": {
+      "ts_code": "000001.SZ"
+    },
+    "code": 0,
+    "msg": "",
+    "rows": 3575,
+    "status": "PERMITTED",
+    "attempts": 1
+  },
+  {
+    "api_name": "stk_week_month_adj",
+    "params": {
+      "ts_code": "000001.SZ",
+      "start_date": "20250101",
+      "end_date": "20250110",
+      "freq": "week"
+    },
+    "code": 0,
+    "msg": "",
+    "rows": 2,
+    "status": "PERMITTED",
+    "attempts": 1
+  },
+  {
+    "api_name": "stk_weekly_monthly",
+    "params": {
+      "ts_code": "000001.SZ",
+      "start_date": "20250101",
+      "end_date": "20250110",
+      "freq": "week"
+    },
+    "code": 0,
+    "msg": "",
+    "rows": 2,
+    "status": "PERMITTED",
+    "attempts": 1
+  },
+  {
+    "api_name": "stock_company",
+    "params": {
+      "exchange": "SZSE"
+    },
+    "code": 0,
+    "msg": "",
+    "rows": 3066,
+    "status": "PERMITTED",
+    "attempts": 1
+  },
+  {
+    "api_name": "stock_st",
+    "params": {
+      "trade_date": "20250110"
+    },
+    "code": 0,
+    "msg": "",
+    "rows": 130,
+    "status": "PERMITTED",
+    "attempts": 1
+  },
+  {
+    "api_name": "suspend_d",
+    "params": {
+      "ts_code": "000001.SZ",
+      "start_date": "20250101",
+      "end_date": "20250110"
+    },
+    "code": 0,
+    "msg": "",
+    "rows": 0,
+    "status": "PERMITTED",
+    "attempts": 1
+  },
+  {
+    "api_name": "tdx_index",
+    "params": {
+      "ts_code": "880001.TDX",
+      "start_date": "20250101",
+      "end_date": "20250110"
+    },
+    "code": 0,
+    "msg": "",
+    "rows": 0,
+    "status": "PERMITTED",
+    "attempts": 1
+  },
+  {
+    "api_name": "tdx_member",
+    "params": {
+      "ts_code": "880001.TDX"
+    },
+    "code": 0,
+    "msg": "",
+    "rows": 0,
+    "status": "PERMITTED",
+    "attempts": 1
+  },
+  {
+    "api_name": "teleplay_record",
+    "params": {
+      "month": "202501"
+    },
+    "code": 0,
+    "msg": "",
+    "rows": 1000,
+    "status": "PERMITTED",
+    "attempts": 1
+  },
+  {
+    "api_name": "ths_daily",
+    "params": {
+      "ts_code": "885431.TI",
+      "start_date": "20250101",
+      "end_date": "20250110"
+    },
+    "code": 0,
+    "msg": "",
+    "rows": 7,
+    "status": "PERMITTED",
+    "attempts": 1
+  },
+  {
+    "api_name": "tmt_twincome",
+    "params": {
+      "item": "电子",
+      "start_m": "202401",
+      "end_m": "202412"
+    },
+    "code": 0,
+    "msg": "",
+    "rows": 0,
+    "status": "PERMITTED",
+    "attempts": 1
+  },
+  {
+    "api_name": "trade_cal",
+    "params": {
+      "exchange": "SSE",
+      "start_date": "20250101",
+      "end_date": "20250110"
+    },
+    "code": 0,
+    "msg": "",
+    "rows": 10,
+    "status": "PERMITTED",
+    "attempts": 1
+  },
+  {
+    "api_name": "us_basic",
+    "params": {},
+    "code": 0,
+    "msg": "",
+    "rows": 6000,
+    "status": "PERMITTED",
+    "attempts": 1
+  },
+  {
+    "api_name": "us_daily",
+    "params": {
+      "ts_code": "AAPL",
+      "start_date": "20250101",
+      "end_date": "20250110"
+    },
+    "code": 0,
+    "msg": "",
+    "rows": 6,
+    "status": "PERMITTED",
+    "attempts": 1
+  },
+  {
+    "api_name": "us_daily_adj",
+    "params": {
+      "ts_code": "AAPL",
+      "start_date": "20250101",
+      "end_date": "20250110"
+    },
+    "code": 40203,
+    "msg": "抱歉，您每小时最多访问该接口1次，权限的具体详情访问：https://tushare.pro/document/1?doc_id=108。",
+    "rows": 0,
+    "status": "OTHER_ERROR",
+    "attempts": 1
+  },
+  {
+    "api_name": "us_fina_indicator",
+    "params": {
+      "ts_code": "AAPL"
+    },
+    "code": 0,
+    "msg": "",
+    "rows": 104,
+    "status": "PERMITTED",
+    "attempts": 1
+  },
+  {
+    "api_name": "us_income",
+    "params": {
+      "ts_code": "AAPL"
+    },
+    "code": 0,
+    "msg": "",
+    "rows": 2624,
+    "status": "PERMITTED",
+    "attempts": 1
+  },
+  {
+    "api_name": "us_tbr",
+    "params": {
+      "start_date": "2025-01-01",
+      "end_date": "2025-01-10"
+    },
+    "code": 0,
+    "msg": "",
+    "rows": 0,
+    "status": "PERMITTED",
+    "attempts": 1
+  },
+  {
+    "api_name": "us_trltr",
+    "params": {
+      "start_date": "2025-01-01",
+      "end_date": "2025-01-10"
+    },
+    "code": 0,
+    "msg": "",
+    "rows": 0,
+    "status": "PERMITTED",
+    "attempts": 1
+  },
+  {
+    "api_name": "us_trycr",
+    "params": {
+      "start_date": "2025-01-01",
+      "end_date": "2025-01-10"
+    },
+    "code": 0,
+    "msg": "",
+    "rows": 0,
+    "status": "PERMITTED",
+    "attempts": 1
+  },
+  {
+    "api_name": "us_tycr",
+    "params": {},
+    "code": 0,
+    "msg": "",
+    "rows": 2000,
+    "status": "PERMITTED",
+    "attempts": 1
+  },
+  {
+    "api_name": "weekly",
+    "params": {
+      "ts_code": "000001.SZ",
+      "start_date": "20250101",
+      "end_date": "20250110"
+    },
+    "code": 0,
+    "msg": "",
+    "rows": 2,
+    "status": "PERMITTED",
+    "attempts": 1
+  },
+  {
+    "api_name": "wz_index",
+    "params": {},
+    "code": 0,
+    "msg": "",
+    "rows": 2324,
+    "status": "PERMITTED",
+    "attempts": 1
+  }
+]
