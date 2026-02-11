@@ -1,6 +1,9 @@
 name: m4-quality-baseline
 
 on:
+  pull_request:
+    branches:
+      - main
   workflow_dispatch:
     inputs:
       mode:
