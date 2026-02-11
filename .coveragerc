@@ -1,0 +1,4 @@
+[run]
+omit =
+    app/db/migrations/*
+    app/db/models.py

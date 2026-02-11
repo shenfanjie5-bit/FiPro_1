@@ -20,4 +20,4 @@ jobs:
       - name: Lint
         run: ruff check --select F,E9 app tests scripts
       - name: Run tests
-        run: pytest
+        run: pytest --cov=app --cov-report=term-missing --cov-fail-under=70

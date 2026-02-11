@@ -45,6 +45,7 @@ def test_generate_report_tier0() -> None:
     assert artifacts['decision_logs'] >= 1
     assert artifacts['tool_traces'] >= 1
     assert artifacts['memory_notes'] >= 1
+    assert artifacts['snapshots'] >= 3
 
     checkpoint_state = get_latest_checkpoint(thread_id)
     assert checkpoint_state is not None
