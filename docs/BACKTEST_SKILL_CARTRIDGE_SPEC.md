@@ -311,7 +311,7 @@ skill_packs/
 1. 已完成：`skill_pack` 模板目录与文件结构落地。
 2. 已完成：回测与工作流在运行时加载 `skill_pack`，并回传模板摘要。
 3. 已完成：模板驱动评分函数（读取 `factors/formula/policy/risk`）接入 `score_signal_node`。
-4. 待完成：事件因子在 RAG/公告链路后的实时回填（当前默认缺失走惩罚）。
+4. 已完成：事件因子在 RAG/公告链路后的实时回填（`event.policy_signal`/`event.governance_signal`），并在进入 LLM 前刷新评分。
 5. 待完成：`candidate -> champion` 自动评估与晋级执行器。
 
 ## 11. 当前需要确认的参数（细化清单）

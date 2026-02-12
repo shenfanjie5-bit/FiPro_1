@@ -1172,6 +1172,160 @@ def _attempt_tier1_coverage_repair(state: dict, evidence_refs: list[dict[str, An
     _refresh_tool_stats(state)
 
 
+def _parse_iso_datetime(value: Any) -> datetime | None:
+    text = str(value or '').strip()
+    if not text:
+        return None
+    try:
+        parsed = datetime.fromisoformat(text.replace('Z', '+00:00'))
+    except ValueError:
+        return None
+    if parsed.tzinfo is None:
+        parsed = parsed.replace(tzinfo=timezone.utc)
+    return parsed
+
+
+def _direction_to_signal(direction: Any) -> float:
+    normalized = str(direction or '').strip().upper()
+    if normalized == 'POS':
+        return 1.0
+    if normalized == 'NEG':
+        return -1.0
+    if normalized in {'MIXED', 'UNCERTAIN'}:
+        return 0.0
+    return 0.0
+
+
+def _event_signal_rollup(state: dict) -> dict[str, Any]:
+    extracted_events = [item for item in state.get('extracted_events', []) if isinstance(item, dict)]
+    policy_types = {'POLICY', 'GEOPOLITICS', 'LOGISTICS', 'COMMODITY'}
+    governance_types = {'EARNINGS', 'COMPETITION', 'OTHER'}
+
+    policy_sum = 0.0
+    policy_weight = 0.0
+    governance_sum = 0.0
+    governance_weight = 0.0
+    used_events = 0
+
+    for event in extracted_events:
+        event_type = str(event.get('type', 'OTHER')).strip().upper()
+        direction = _direction_to_signal(event.get('direction'))
+        confidence = max(0.0, min(1.0, float(event.get('confidence', 0.0) or 0.0)))
+        if confidence <= 0:
+            continue
+        contribution = direction * confidence
+        if event_type in policy_types:
+            policy_sum += contribution
+            policy_weight += confidence
+            used_events += 1
+            continue
+        if event_type in governance_types:
+            governance_sum += contribution
+            governance_weight += confidence
+            used_events += 1
+            continue
+
+    policy_signal = (policy_sum / policy_weight) if policy_weight > 0 else None
+    governance_signal = (governance_sum / governance_weight) if governance_weight > 0 else None
+    return {
+        'policy_signal': policy_signal,
+        'governance_signal': governance_signal,
+        'used_event_count': used_events,
+        'event_count': len(extracted_events),
+    }
+
+
+def _event_staleness_score(state: dict) -> float:
+    req_asof = _parse_iso_datetime(state.get('request', {}).get('asof'))
+    if req_asof is None:
+        return 0.5
+    published_times: list[datetime] = []
+    for doc in state.get('event_docs', []):
+        if not isinstance(doc, dict):
+            continue
+        published = _parse_iso_datetime(doc.get('published_at'))
+        if published is None:
+            published = _parse_iso_datetime(doc.get('captured_at'))
+        if published is not None:
+            published_times.append(published)
+    if not published_times:
+        return 0.6
+    latest = max(published_times)
+    delta_days = max(0.0, (req_asof - latest).total_seconds() / 86400.0)
+    return max(0.0, min(1.0, delta_days / 14.0))
+
+
+def _evidence_coverage_score(state: dict) -> float:
+    coverage = state.get('evidence_coverage', {})
+    if not isinstance(coverage, dict):
+        return 0.5
+    min_total_refs = max(1, int(coverage.get('min_total_refs', 1)))
+    actual_total_refs = max(0, int(coverage.get('actual_total_refs', 0)))
+    min_type_count = max(1, int(coverage.get('min_type_count', 1)))
+    actual_type_count = max(0, int(coverage.get('actual_type_count', 0)))
+    total_ratio = min(1.0, actual_total_refs / float(min_total_refs))
+    type_ratio = min(1.0, actual_type_count / float(min_type_count))
+    base = 0.5 * total_ratio + 0.5 * type_ratio
+    missing_rules = [str(item) for item in coverage.get('missing_rules', []) if str(item).strip()]
+    if not missing_rules and bool(coverage.get('ok', False)):
+        base = max(base, 0.95)
+    if missing_rules:
+        base = max(0.0, base - min(0.4, 0.08 * len(missing_rules)))
+    return max(0.0, min(1.0, base))
+
+
+def _refresh_score_with_event_factors(state: dict) -> None:
+    skill_pack = state.get('skill_pack')
+    if not isinstance(skill_pack, dict):
+        return
+
+    features = dict(state.get('features', {}))
+    rollup = _event_signal_rollup(state)
+    policy_signal = rollup.get('policy_signal')
+    governance_signal = rollup.get('governance_signal')
+    if isinstance(policy_signal, (int, float)):
+        features['event_policy_signal'] = round(float(policy_signal), 6)
+    if isinstance(governance_signal, (int, float)):
+        features['event_governance_signal'] = round(float(governance_signal), 6)
+    features['evidence_coverage'] = round(_evidence_coverage_score(state), 6)
+    features['staleness'] = round(_event_staleness_score(state), 6)
+    features['event_feature_meta'] = {
+        'event_count': int(rollup.get('event_count', 0)),
+        'used_event_count': int(rollup.get('used_event_count', 0)),
+    }
+    state['features'] = features
+
+    try:
+        refreshed_score = score_signal_skill_pack(
+            features=features,
+            snapshots=state.get('snapshots', {}),
+            skill_pack=skill_pack,
+            data_quality_status=state.get('data_quality', {}).get('status', 'OK'),
+            current_pos=0.0,
+            hard_risk_triggered=False,
+        )
+    except Exception as exc:  # noqa: BLE001
+        state['data_quality'] = _merge_data_quality(
+            state['data_quality'],
+            {
+                'status': 'PARTIAL',
+                'missing_fields': ['score.event_factor_refresh'],
+                'notes': f'event factor refresh failed: {exc}',
+            },
+        )
+        _note_degradation(state, 'data_source', status='PARTIAL', reason='event factor refresh failed', mode='FALLBACK')
+        return
+
+    state['score'] = refreshed_score
+    state['score_id'] = str(refreshed_score.get('score_id', state.get('score_id', '')))
+
+    market = state.get('snapshots', {}).get('get_market_snapshot', {})
+    base_price = market.get('close', market.get('last_price', 100.0))
+    bands = generate_price_bands(base_price=base_price, score=int(refreshed_score.get('overall_score', 50)))
+    state['price_band_set_id'] = bands.get('price_band_set_id', state.get('price_band_set_id'))
+    state['price_bands'] = bands.get('price_bands', state.get('price_bands', []))
+
+
 def build_context(state: dict) -> dict:
     evidence_refs: list[dict[str, Any]] = []
     now_iso = datetime.now(timezone.utc).isoformat()
@@ -1247,6 +1401,7 @@ def build_context(state: dict) -> dict:
     if not coverage.get('ok', False):
         _attempt_tier1_coverage_repair(state, evidence_refs, now_iso)
         _enforce_evidence_coverage(state, evidence_refs)
+    _refresh_score_with_event_factors(state)
     _sync_data_quality_from_matrix(state)
     _refresh_tool_stats(state)
     req = state['request']
