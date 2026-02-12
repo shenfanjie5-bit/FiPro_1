@@ -12,6 +12,15 @@
     "max_position": 1.0,
     "target_position_formula": "clamp(((final_score - 50) / 50) * confidence, 0, max_position)"
   },
+  "thresholds": {
+    "buy_score_min": 72,
+    "buy_confidence_min": 0.62,
+    "add_gap_min": 0.15,
+    "hold_gap_max": 0.1,
+    "reduce_gap_min": 0.15,
+    "sell_score_max": 35,
+    "flat_non_buy_action": "AVOID"
+  },
   "rules": [
     {
       "rule_id": "open_buy",

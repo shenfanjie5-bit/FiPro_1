@@ -391,6 +391,7 @@ uv run python scripts/validate_skill_pack.py --skill-pack-id cn_a_core --version
 
 - `skill_pack_id`（默认 `cn_a_core`）
 - `skill_pack_version`（默认 `0.1.0`）
+- 当前工作流评分节点已优先采用模板中的 `factors/formula/policy/risk` 进行计算。
 
 ---
 

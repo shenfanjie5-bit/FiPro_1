@@ -1,12 +1,15 @@
 from __future__ import annotations
 
 from datetime import datetime, timedelta, timezone
+import hashlib
+import json
 import uuid
 from typing import Any
 
+from app.backtest.skill_pack import load_skill_pack
 from app.core.runtime_config import get_runtime_config
 from app.llm.provider import LLMProvider
-from app.tools.deterministic import generate_price_bands, risk_gate, score_signal
+from app.tools.deterministic import generate_price_bands, risk_gate, score_signal, score_signal_skill_pack
 from app.tools.facts import (
     get_flow_sentiment_snapshot,
     get_fundamentals_snapshot,
@@ -24,6 +27,9 @@ from app.workflows.persistence import persist_workflow_state
 
 STATUS_RANK = {'OK': 0, 'PARTIAL': 1, 'DEGRADED': 2}
 DEGRADATION_DEPENDENCIES = ('budget', 'data_source', 'rag', 'graph', 'llm')
+
+DEFAULT_SKILL_PACK_ID = 'cn_a_core'
+DEFAULT_SKILL_PACK_VERSION = '0.1.0'
 
 
 def _merge_status(a: str, b: str) -> str:
@@ -208,6 +214,41 @@ def load_strategy_config(state: dict) -> dict:
     req = state.get('request', {})
     req_tier = str(req.get('tier', 'TIER0'))
     selected_tier = tier_policy.get(req_tier, tier_policy['TIER0'])
+    skill_pack_id = str(req.get('skill_pack_id', DEFAULT_SKILL_PACK_ID) or DEFAULT_SKILL_PACK_ID).strip() or DEFAULT_SKILL_PACK_ID
+    skill_pack_version = str(req.get('skill_pack_version', DEFAULT_SKILL_PACK_VERSION) or DEFAULT_SKILL_PACK_VERSION).strip() or DEFAULT_SKILL_PACK_VERSION
+    skill_pack_warning = ''
+    try:
+        resolved_skill_pack = load_skill_pack(skill_pack_id=skill_pack_id, version=skill_pack_version)
+    except ValueError as exc:
+        skill_pack_warning = str(exc)
+        resolved_skill_pack = load_skill_pack(skill_pack_id=DEFAULT_SKILL_PACK_ID, version=DEFAULT_SKILL_PACK_VERSION)
+        skill_pack_id = DEFAULT_SKILL_PACK_ID
+        skill_pack_version = DEFAULT_SKILL_PACK_VERSION
+
+    summary = dict(resolved_skill_pack.get('summary', {}))
+    state['skill_pack'] = resolved_skill_pack
+    state['request'] = dict(req)
+    state['request']['skill_pack_id'] = str(summary.get('skill_pack_id', skill_pack_id))
+    state['request']['skill_pack_version'] = str(summary.get('version', skill_pack_version))
+
+    factors_payload = resolved_skill_pack.get('factors', {})
+    factors = factors_payload.get('factors', []) if isinstance(factors_payload, dict) else []
+    weight_digest_payload = {
+        'skill_pack_id': state['request']['skill_pack_id'],
+        'version': state['request']['skill_pack_version'],
+        'weights': [
+            {
+                'factor_id': str(item.get('factor_id', '')),
+                'enabled': bool(item.get('enabled', True)),
+                'weight': float(item.get('weight', 0.0)),
+            }
+            for item in factors
+            if isinstance(item, dict) and str(item.get('factor_id', '')).strip()
+        ],
+    }
+    raw = json.dumps(weight_digest_payload, sort_keys=True, ensure_ascii=True, separators=(',', ':'))
+    weights_hash = f"w_skill_{hashlib.sha256(raw.encode('utf-8')).hexdigest()[:12]}"
+
     state['config'] = {
         'weights': {
             'hotness': 0.25,
@@ -219,8 +260,10 @@ def load_strategy_config(state: dict) -> dict:
         'risk_profile': 'LOW',
         'router_policy_version': 'router_m6_v1',
         'tier_policy': tier_policy,
+        'skill_pack': summary,
+        'skill_pack_warning': skill_pack_warning,
     }
-    state['weights_hash'] = 'w_mock_hash_v1'
+    state['weights_hash'] = weights_hash
     state['budget'] = {
         'max_tool_calls': selected_tier['budget']['max_tool_calls'],
         'max_cost_usd': selected_tier['budget']['max_cost_usd'],
@@ -427,7 +470,22 @@ def build_features(state: dict) -> dict:
 
 def score_signal_node(state: dict) -> dict:
     weights = state['config']['weights']
-    res = execute_tool('score_signal', {'features': state['features'], 'weights': weights}, score_signal)
+    skill_pack = state.get('skill_pack')
+    if isinstance(skill_pack, dict):
+        res = execute_tool(
+            'score_signal',
+            {
+                'features': state['features'],
+                'snapshots': state.get('snapshots', {}),
+                'skill_pack': skill_pack,
+                'data_quality_status': state.get('data_quality', {}).get('status', 'OK'),
+                'current_pos': 0.0,
+                'hard_risk_triggered': False,
+            },
+            score_signal_skill_pack,
+        )
+    else:
+        res = execute_tool('score_signal', {'features': state['features'], 'weights': weights}, score_signal)
     state['tool_traces'].append(res['trace'])
     state['score'] = res['output']
     state['score_id'] = res['output']['score_id']
@@ -1217,6 +1275,8 @@ def build_context(state: dict) -> dict:
         'tool_call_stats': state['tool_call_stats'],
         'budget': state.get('budget', {}),
         'router_policy': state.get('config', {}).get('router_policy_version', 'router_m6_v1'),
+        'skill_pack': state.get('config', {}).get('skill_pack', {}),
+        'skill_pack_warning': state.get('config', {}).get('skill_pack_warning', ''),
         'degradation_matrix': state.get('degradation_matrix', {}),
     }
     return state
@@ -1324,6 +1384,7 @@ def _fallback_report_from_context(state: dict, reason: str) -> dict[str, Any]:
             'router_policy': state.get('config', {}).get('router_policy_version', 'router_m6_v1'),
             'snapshot_ids': list(context.get('snapshot_ids', [])),
             'weights_hash': context.get('weights_hash', state.get('weights_hash', 'w_mock_hash_v1')),
+            'skill_pack': context.get('skill_pack', state.get('config', {}).get('skill_pack', {})),
             'run_mode': req.get('run_mode', 'LIVE'),
             'tool_call_stats': dict(state.get('tool_call_stats', {})),
         },
@@ -1657,6 +1718,7 @@ def persist_node(state: dict) -> dict:
     report['provenance']['tool_call_stats'] = state['tool_call_stats']
     report['provenance']['router_policy'] = state.get('config', {}).get('router_policy_version', 'router_m6_v1')
     report['provenance']['budget'] = state.get('budget', {})
+    report['provenance']['skill_pack'] = state.get('config', {}).get('skill_pack', {})
     report['provenance']['degradation_matrix'] = state.get('degradation_matrix', {})
     persist_refs = persist_workflow_state(state, thread_id=state['thread_id'])
     persist_refs['memory_note_id'] = write_memory['output'].get('note_id', persist_refs.get('memory_note_id', ''))

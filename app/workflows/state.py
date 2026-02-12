@@ -7,6 +7,7 @@ class ResearchState(TypedDict, total=False):
     thread_id: str
     request: dict[str, Any]
     config: dict[str, Any]
+    skill_pack: dict[str, Any]
     budget: dict[str, Any]
     data_quality: dict[str, Any]
     snapshots: dict[str, Any]

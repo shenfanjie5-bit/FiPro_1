@@ -125,6 +125,19 @@ def _validate_policy(policy_payload: dict[str, Any]) -> None:
     action_set = {str(item).strip().upper() for item in actions if str(item).strip()}
     if not _ALLOWED_ACTIONS.issubset(action_set):
         raise ValueError(f'policy.actions must contain all {_ALLOWED_ACTIONS}')
+    thresholds = policy_payload.get('thresholds')
+    if not isinstance(thresholds, dict):
+        raise ValueError('policy.thresholds must be object')
+    for key in (
+        'buy_score_min',
+        'buy_confidence_min',
+        'add_gap_min',
+        'hold_gap_max',
+        'reduce_gap_min',
+        'sell_score_max',
+    ):
+        if key not in thresholds:
+            raise ValueError(f'policy.thresholds.{key} is required')
     rules = _require_list(policy_payload, 'rules', label='policy')
     if not rules:
         raise ValueError('policy.rules must contain at least one rule')
@@ -244,4 +257,3 @@ def load_skill_pack(
 
 def clear_skill_pack_cache() -> None:
     _cached.cache_clear()
-
