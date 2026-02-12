@@ -6,6 +6,7 @@ import time
 import uuid
 from typing import Any, Callable
 
+from app.backtest.promotion import resolve_champion_version
 from app.backtest.skill_pack import load_skill_pack
 
 
@@ -50,6 +51,16 @@ def _safe_text(value: Any) -> str:
 
 def _parse_iso_datetime(value: str) -> datetime:
     return datetime.fromisoformat(str(value).replace('Z', '+00:00'))
+
+
+def _resolve_skill_pack_version(skill_pack_id: str, requested_version: Any) -> tuple[str, str]:
+    normalized = _safe_text(requested_version)
+    if normalized and normalized.lower() not in {'champion', 'auto'}:
+        return normalized, 'explicit'
+    champion_version = resolve_champion_version(skill_pack_id)
+    if champion_version:
+        return champion_version, 'champion'
+    return '0.1.0', 'default'
 
 
 def _parse_hhmmss(value: str) -> tuple[int, int, int]:
@@ -272,12 +283,14 @@ def run_batch_backtest(
     tier = _safe_text(payload.get('tier')).upper() or 'TIER0'
     market = _safe_text(payload.get('market')).upper() or 'OTHER'
     skill_pack_id = _safe_text(payload.get('skill_pack_id')) or 'cn_a_core'
-    skill_pack_version = _safe_text(payload.get('skill_pack_version')) or '0.1.0'
+    requested_skill_pack_version = payload.get('skill_pack_version')
+    skill_pack_version, skill_pack_version_source = _resolve_skill_pack_version(skill_pack_id, requested_skill_pack_version)
     try:
         resolved_skill_pack = load_skill_pack(skill_pack_id=skill_pack_id, version=skill_pack_version)
     except ValueError as exc:
         raise ValueError(f'invalid skill pack configuration: {exc}') from exc
     skill_pack_summary = dict(resolved_skill_pack.get('summary', {}))
+    skill_pack_summary['version_source'] = skill_pack_version_source
     benchmark_ticker = _resolve_benchmark_ticker(market, payload.get('benchmark_ticker'))
     benchmark_snapshot_loader = benchmark_loader or snapshot_loader
     initial_capital_cny = _safe_float(payload.get('initial_capital_cny'), default=DEFAULT_INITIAL_CAPITAL_CNY)
@@ -390,6 +403,7 @@ def run_batch_backtest(
             'run_mode': 'BACKTEST',
             'skill_pack_id': skill_pack_summary.get('skill_pack_id', skill_pack_id),
             'skill_pack_version': skill_pack_summary.get('version', skill_pack_version),
+            'skill_pack_version_source': skill_pack_version_source,
         }
         wall_started = time.perf_counter()
         try:
@@ -439,6 +453,7 @@ def run_batch_backtest(
                     'forward_return_note': return_note,
                     'skill_pack_id': skill_pack_summary.get('skill_pack_id', skill_pack_id),
                     'skill_pack_version': skill_pack_summary.get('version', skill_pack_version),
+                    'skill_pack_version_source': skill_pack_version_source,
                 }
             )
             processed_points += 1
@@ -483,6 +498,7 @@ def run_batch_backtest(
                     'forward_return_note': '',
                     'skill_pack_id': skill_pack_summary.get('skill_pack_id', skill_pack_id),
                     'skill_pack_version': skill_pack_summary.get('version', skill_pack_version),
+                    'skill_pack_version_source': skill_pack_version_source,
                     'error': str(exc),
                 }
             )

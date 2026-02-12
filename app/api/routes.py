@@ -396,7 +396,7 @@ class BatchBacktestRequest(BaseModel):
     strategy_version_id: str
     tier: str = Field(pattern='^(TIER0|TIER1|TIER2)$')
     skill_pack_id: str = Field(default='cn_a_core', min_length=1, max_length=64)
-    skill_pack_version: str = Field(default='0.1.0', min_length=1, max_length=32)
+    skill_pack_version: str = Field(default='champion', min_length=1, max_length=32)
     start_date: date
     end_date: date
     step_days: int = Field(default=1, ge=1, le=30)

@@ -101,6 +101,25 @@ def test_event_signal_rollup_maps_policy_and_governance() -> None:
     assert -1.0 <= rolled['governance_signal'] <= 1.0
 
 
+def test_load_strategy_config_prefers_champion_when_version_missing(monkeypatch) -> None:
+    monkeypatch.setattr(nodes_module, 'resolve_champion_version', lambda skill_pack_id: '0.9.0')  # noqa: ARG005
+
+    def fake_load_skill_pack(skill_pack_id: str, version: str) -> dict:
+        return {
+            'summary': {'skill_pack_id': skill_pack_id, 'version': version, 'market': 'CN_A', 'status': 'champion'},
+            'factors': {'factors': [{'factor_id': 'f1', 'enabled': True, 'weight': 0.1}]},
+        }
+
+    monkeypatch.setattr(nodes_module, 'load_skill_pack', fake_load_skill_pack)
+    state = {'request': {'ticker': '600519.SH', 'tier': 'TIER0', 'run_mode': 'LIVE'}}
+    updated = nodes_module.load_strategy_config(state)
+
+    assert updated['request']['skill_pack_id'] == 'cn_a_core'
+    assert updated['request']['skill_pack_version'] == '0.9.0'
+    assert updated['request']['skill_pack_version_source'] == 'champion'
+    assert updated['config']['skill_pack']['version'] == '0.9.0'
+
+
 def test_memory_write_and_retrieve_supports_dedupe(monkeypatch, tmp_path) -> None:
     runtime_db = tmp_path / 'memory-runtime.db'
     monkeypatch.setenv('WORKFLOW_RUNTIME_DB', str(runtime_db))

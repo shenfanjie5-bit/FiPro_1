@@ -5,6 +5,7 @@ from datetime import datetime
 from fastapi.testclient import TestClient
 import pytest
 
+import app.backtest.batch as batch_module
 from app.api import routes as routes_module
 from app.main import app
 
@@ -297,6 +298,64 @@ def test_batch_backtest_uses_index_loader_for_benchmark(monkeypatch: pytest.Monk
     assert set(benchmark_calls) == {'000300.SH'}
     assert body['runs'][0]['benchmark_price'] == 210.0
     assert body['runs'][1]['benchmark_price'] == 211.0
+
+
+def test_batch_backtest_resolves_champion_skill_pack_alias(monkeypatch: pytest.MonkeyPatch) -> None:
+    seen_versions: list[str] = []
+
+    def fake_runner(request_data: dict, thread_id: str) -> dict:
+        _ = thread_id
+        seen_versions.append(str(request_data.get('skill_pack_version', '')))
+        return {
+            'final_report': {
+                'report_id': 'report_alias_001',
+                'decision': {'action': 'WATCH', 'overall_score': 50, 'confidence': 0.5, 'summary': 'ok'},
+                'data_quality': {'status': 'OK'},
+                'provenance': {'model': {'primary': 'openclaw:main'}, 'tool_call_stats': {}},
+            },
+            'persist_refs': {},
+        }
+
+    monkeypatch.setattr(routes_module, 'run_research_workflow', fake_runner)
+    monkeypatch.setattr(routes_module, 'get_market_snapshot', _fake_snapshot)
+    monkeypatch.setattr(routes_module, 'get_index_market_snapshot', _fake_snapshot)
+    monkeypatch.setattr(batch_module, 'resolve_champion_version', lambda skill_pack_id: '0.9.0')  # noqa: ARG005
+    monkeypatch.setattr(
+        batch_module,
+        'load_skill_pack',
+        lambda skill_pack_id, version: {  # noqa: ARG005
+            'summary': {
+                'skill_pack_id': skill_pack_id,
+                'version': version,
+                'market': 'CN_A',
+                'status': 'champion',
+                'factor_count': 1,
+                'enabled_factor_count': 1,
+                'zero_weight_factor_count': 0,
+                'llm_mapping_count': 1,
+            }
+        },
+    )
+
+    payload = {
+        'ticker': '600519.SH',
+        'market': 'CN_A',
+        'strategy_version_id': 'stg_v1',
+        'tier': 'TIER0',
+        'skill_pack_id': 'cn_a_core',
+        'skill_pack_version': 'champion',
+        'start_date': '2026-02-10',
+        'end_date': '2026-02-11',
+        'step_days': 1,
+        'trading_days_only': True,
+        'max_runs': 10,
+    }
+    resp = client.post('/backtests/run', json=payload)
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body['request']['skill_pack']['version'] == '0.9.0'
+    assert body['request']['skill_pack']['version_source'] == 'champion'
+    assert seen_versions == ['0.9.0', '0.9.0']
 
 
 def test_backtest_job_endpoints(monkeypatch: pytest.MonkeyPatch) -> None:

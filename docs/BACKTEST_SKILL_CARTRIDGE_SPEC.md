@@ -313,6 +313,7 @@ skill_packs/
 3. 已完成：模板驱动评分函数（读取 `factors/formula/policy/risk`）接入 `score_signal_node`。
 4. 已完成：事件因子在 RAG/公告链路后的实时回填（`event.policy_signal`/`event.governance_signal`），并在进入 LLM 前刷新评分。
 5. 已完成：`candidate -> champion` 自动评估与晋级执行器（支持 `dry_run` 与 `manual_approval`）。
+6. 已完成：工作流与回测支持 `champion/auto` 版本别名，优先在线加载 champion skill。
 
 ## 11. 当前需要确认的参数（细化清单）
 

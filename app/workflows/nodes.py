@@ -6,6 +6,7 @@ import json
 import uuid
 from typing import Any
 
+from app.backtest.promotion import resolve_champion_version
 from app.backtest.skill_pack import load_skill_pack
 from app.core.runtime_config import get_runtime_config
 from app.llm.provider import LLMProvider
@@ -209,13 +210,23 @@ def _budget_guardrail(
     return True
 
 
+def _resolve_skill_pack_version(skill_pack_id: str, requested_version: Any) -> tuple[str, str]:
+    normalized = str(requested_version or '').strip()
+    if normalized and normalized.lower() not in {'champion', 'auto'}:
+        return normalized, 'explicit'
+    champion_version = resolve_champion_version(skill_pack_id)
+    if champion_version:
+        return champion_version, 'champion'
+    return DEFAULT_SKILL_PACK_VERSION, 'default'
+
+
 def load_strategy_config(state: dict) -> dict:
     tier_policy = _default_tier_policy()
     req = state.get('request', {})
     req_tier = str(req.get('tier', 'TIER0'))
     selected_tier = tier_policy.get(req_tier, tier_policy['TIER0'])
     skill_pack_id = str(req.get('skill_pack_id', DEFAULT_SKILL_PACK_ID) or DEFAULT_SKILL_PACK_ID).strip() or DEFAULT_SKILL_PACK_ID
-    skill_pack_version = str(req.get('skill_pack_version', DEFAULT_SKILL_PACK_VERSION) or DEFAULT_SKILL_PACK_VERSION).strip() or DEFAULT_SKILL_PACK_VERSION
+    skill_pack_version, skill_pack_version_source = _resolve_skill_pack_version(skill_pack_id, req.get('skill_pack_version'))
     skill_pack_warning = ''
     try:
         resolved_skill_pack = load_skill_pack(skill_pack_id=skill_pack_id, version=skill_pack_version)
@@ -224,12 +235,14 @@ def load_strategy_config(state: dict) -> dict:
         resolved_skill_pack = load_skill_pack(skill_pack_id=DEFAULT_SKILL_PACK_ID, version=DEFAULT_SKILL_PACK_VERSION)
         skill_pack_id = DEFAULT_SKILL_PACK_ID
         skill_pack_version = DEFAULT_SKILL_PACK_VERSION
+        skill_pack_version_source = 'fallback_default'
 
     summary = dict(resolved_skill_pack.get('summary', {}))
     state['skill_pack'] = resolved_skill_pack
     state['request'] = dict(req)
     state['request']['skill_pack_id'] = str(summary.get('skill_pack_id', skill_pack_id))
     state['request']['skill_pack_version'] = str(summary.get('version', skill_pack_version))
+    state['request']['skill_pack_version_source'] = skill_pack_version_source
 
     factors_payload = resolved_skill_pack.get('factors', {})
     factors = factors_payload.get('factors', []) if isinstance(factors_payload, dict) else []
@@ -262,6 +275,7 @@ def load_strategy_config(state: dict) -> dict:
         'tier_policy': tier_policy,
         'skill_pack': summary,
         'skill_pack_warning': skill_pack_warning,
+        'skill_pack_version_source': skill_pack_version_source,
     }
     state['weights_hash'] = weights_hash
     state['budget'] = {
@@ -1431,6 +1445,7 @@ def build_context(state: dict) -> dict:
         'budget': state.get('budget', {}),
         'router_policy': state.get('config', {}).get('router_policy_version', 'router_m6_v1'),
         'skill_pack': state.get('config', {}).get('skill_pack', {}),
+        'skill_pack_version_source': state.get('config', {}).get('skill_pack_version_source', ''),
         'skill_pack_warning': state.get('config', {}).get('skill_pack_warning', ''),
         'degradation_matrix': state.get('degradation_matrix', {}),
     }
@@ -1540,6 +1555,10 @@ def _fallback_report_from_context(state: dict, reason: str) -> dict[str, Any]:
             'snapshot_ids': list(context.get('snapshot_ids', [])),
             'weights_hash': context.get('weights_hash', state.get('weights_hash', 'w_mock_hash_v1')),
             'skill_pack': context.get('skill_pack', state.get('config', {}).get('skill_pack', {})),
+            'skill_pack_version_source': context.get(
+                'skill_pack_version_source',
+                state.get('config', {}).get('skill_pack_version_source', ''),
+            ),
             'run_mode': req.get('run_mode', 'LIVE'),
             'tool_call_stats': dict(state.get('tool_call_stats', {})),
         },
@@ -1874,6 +1893,7 @@ def persist_node(state: dict) -> dict:
     report['provenance']['router_policy'] = state.get('config', {}).get('router_policy_version', 'router_m6_v1')
     report['provenance']['budget'] = state.get('budget', {})
     report['provenance']['skill_pack'] = state.get('config', {}).get('skill_pack', {})
+    report['provenance']['skill_pack_version_source'] = state.get('config', {}).get('skill_pack_version_source', '')
     report['provenance']['degradation_matrix'] = state.get('degradation_matrix', {})
     persist_refs = persist_workflow_state(state, thread_id=state['thread_id'])
     persist_refs['memory_note_id'] = write_memory['output'].get('note_id', persist_refs.get('memory_note_id', ''))
