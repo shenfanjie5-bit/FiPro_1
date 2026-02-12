@@ -2,8 +2,10 @@ from datetime import datetime, timezone
 import uuid
 
 from fastapi import APIRouter, Header, HTTPException
+from fastapi.responses import HTMLResponse, RedirectResponse
 from pydantic import BaseModel, Field
 
+from app.core.runtime_config import get_runtime_config, get_runtime_config_public, update_runtime_config
 from app.tools.facts import get_market_snapshot
 from app.tools.graph import compute_exposure_score, find_impact_paths, query_supply_chain_subtree
 from app.tools.memory import retrieve_memory_notes, write_memory_note
@@ -19,6 +21,342 @@ router = APIRouter()
 REPORT_STORE: dict[str, dict] = {}
 WATCHLIST_STORE: dict[str, dict] = {}
 
+GUI_HTML = """
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>FiPro_1 GUI</title>
+  <style>
+    :root {
+      --bg-a: #0b1e2f;
+      --bg-b: #142f45;
+      --card: rgba(255, 255, 255, 0.92);
+      --ink: #11212d;
+      --muted: #476173;
+      --accent: #0e7490;
+      --accent-2: #155e75;
+      --danger: #b91c1c;
+      --ring: rgba(14, 116, 144, 0.25);
+      --radius: 14px;
+      --shadow: 0 12px 30px rgba(8, 28, 43, 0.25);
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      font-family: "IBM Plex Sans", "Avenir Next", "Segoe UI", sans-serif;
+      color: var(--ink);
+      background:
+        radial-gradient(80rem 30rem at 85% -10%, rgba(190, 242, 100, 0.14), transparent 58%),
+        radial-gradient(70rem 40rem at -5% 95%, rgba(125, 211, 252, 0.18), transparent 60%),
+        linear-gradient(140deg, var(--bg-a), var(--bg-b));
+      padding: 40px 18px;
+      display: grid;
+      place-items: start center;
+    }
+
+    .shell {
+      width: min(980px, 100%);
+      background: var(--card);
+      border-radius: calc(var(--radius) + 4px);
+      box-shadow: var(--shadow);
+      overflow: hidden;
+      border: 1px solid rgba(17, 33, 45, 0.08);
+    }
+
+    .topbar {
+      padding: 20px 24px;
+      background: linear-gradient(120deg, #082f49, #0f766e);
+      color: #ecfeff;
+      display: flex;
+      gap: 16px;
+      align-items: baseline;
+      justify-content: space-between;
+      flex-wrap: wrap;
+    }
+
+    .title {
+      margin: 0;
+      font-size: 1.35rem;
+      font-weight: 650;
+      letter-spacing: 0.01em;
+    }
+
+    .subtitle {
+      margin: 4px 0 0;
+      color: #c7f9ff;
+      font-size: 0.92rem;
+    }
+
+    .body {
+      padding: 22px;
+      display: grid;
+      gap: 18px;
+    }
+
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 14px;
+    }
+
+    .field {
+      display: grid;
+      gap: 6px;
+    }
+
+    label {
+      font-size: 0.86rem;
+      color: var(--muted);
+      font-weight: 560;
+      letter-spacing: 0.01em;
+    }
+
+    input, select, button {
+      font: inherit;
+    }
+
+    input, select {
+      width: 100%;
+      border: 1px solid rgba(17, 33, 45, 0.16);
+      border-radius: 10px;
+      padding: 10px 12px;
+      background: #fff;
+      color: var(--ink);
+      transition: border-color 0.18s, box-shadow 0.18s, transform 0.06s;
+    }
+
+    input:focus, select:focus {
+      border-color: var(--accent);
+      outline: none;
+      box-shadow: 0 0 0 4px var(--ring);
+    }
+
+    .actions {
+      display: flex;
+      gap: 10px;
+      align-items: center;
+      flex-wrap: wrap;
+    }
+
+    button {
+      border: 0;
+      border-radius: 10px;
+      padding: 11px 16px;
+      font-weight: 620;
+      letter-spacing: 0.01em;
+      cursor: pointer;
+      background: linear-gradient(120deg, var(--accent), var(--accent-2));
+      color: #ecfeff;
+      transition: transform 0.08s ease, filter 0.16s ease;
+    }
+
+    button:hover {
+      filter: brightness(1.06);
+    }
+
+    button:active {
+      transform: translateY(1px);
+    }
+
+    button:disabled {
+      cursor: wait;
+      filter: grayscale(0.25);
+      opacity: 0.8;
+    }
+
+    .status {
+      font-size: 0.9rem;
+      color: var(--muted);
+      min-height: 1.2rem;
+    }
+
+    .status.error {
+      color: var(--danger);
+    }
+
+    .result {
+      margin: 0;
+      border-radius: 12px;
+      border: 1px solid rgba(17, 33, 45, 0.14);
+      background: #06141e;
+      color: #d8f6ff;
+      padding: 14px;
+      font-family: "IBM Plex Mono", "SFMono-Regular", Menlo, monospace;
+      font-size: 0.84rem;
+      line-height: 1.45;
+      white-space: pre-wrap;
+      min-height: 220px;
+      max-height: 55vh;
+      overflow: auto;
+    }
+
+    @media (max-width: 760px) {
+      .grid {
+        grid-template-columns: 1fr;
+      }
+      .topbar {
+        padding: 18px;
+      }
+      .body {
+        padding: 16px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <main class="shell">
+    <header class="topbar">
+      <div>
+        <h1 class="title">FiPro_1 Minimal GUI</h1>
+        <p class="subtitle">Input parameters, generate report, inspect JSON response.</p>
+      </div>
+    </header>
+
+    <section class="body">
+      <form id="report-form" autocomplete="off">
+        <div class="grid">
+          <div class="field">
+            <label for="ticker">Ticker</label>
+            <input id="ticker" name="ticker" value="600519.SH" required>
+          </div>
+
+          <div class="field">
+            <label for="market">Market</label>
+            <select id="market" name="market">
+              <option value="CN_A" selected>CN_A</option>
+              <option value="US">US</option>
+              <option value="HK">HK</option>
+              <option value="OTHER">OTHER</option>
+            </select>
+          </div>
+
+          <div class="field">
+            <label for="asof">As Of (Local Time)</label>
+            <input id="asof" name="asof" type="datetime-local" required>
+          </div>
+
+          <div class="field">
+            <label for="strategy_version_id">Strategy Version ID</label>
+            <input id="strategy_version_id" name="strategy_version_id" value="stg_v1" required>
+          </div>
+
+          <div class="field">
+            <label for="tier">Tier</label>
+            <select id="tier" name="tier">
+              <option value="TIER0" selected>TIER0</option>
+              <option value="TIER1">TIER1</option>
+              <option value="TIER2">TIER2</option>
+            </select>
+          </div>
+
+          <div class="field">
+            <label for="run_mode">Run Mode</label>
+            <select id="run_mode" name="run_mode">
+              <option value="LIVE" selected>LIVE</option>
+              <option value="SHADOW">SHADOW</option>
+              <option value="BACKTEST">BACKTEST</option>
+            </select>
+          </div>
+
+          <div class="field" style="grid-column: 1 / -1;">
+            <label for="thread_id">Thread ID (Optional)</label>
+            <input id="thread_id" name="thread_id" placeholder="custom thread id">
+          </div>
+        </div>
+
+        <div class="actions" style="margin-top: 16px;">
+          <button id="submit-btn" type="submit">Generate Report</button>
+          <div id="status" class="status"></div>
+        </div>
+      </form>
+
+      <pre id="result" class="result">{
+  "hint": "Submit the form to call POST /reports/generate"
+}</pre>
+    </section>
+  </main>
+
+  <script>
+    const form = document.getElementById("report-form");
+    const submitBtn = document.getElementById("submit-btn");
+    const statusEl = document.getElementById("status");
+    const resultEl = document.getElementById("result");
+    const asofInput = document.getElementById("asof");
+
+    function setStatus(message, isError) {
+      statusEl.textContent = message || "";
+      statusEl.classList.toggle("error", Boolean(isError));
+    }
+
+    function seedAsofNow() {
+      const now = new Date();
+      const local = new Date(now.getTime() - now.getTimezoneOffset() * 60000);
+      asofInput.value = local.toISOString().slice(0, 16);
+    }
+
+    seedAsofNow();
+
+    form.addEventListener("submit", async (event) => {
+      event.preventDefault();
+      setStatus("Sending request...", false);
+      submitBtn.disabled = true;
+
+      const formData = new FormData(form);
+      const asofLocal = String(formData.get("asof") || "").trim();
+      const asofDate = new Date(asofLocal);
+      if (!asofLocal || Number.isNaN(asofDate.getTime())) {
+        setStatus("Invalid as-of datetime.", true);
+        submitBtn.disabled = false;
+        return;
+      }
+
+      const payload = {
+        ticker: String(formData.get("ticker") || "").trim(),
+        market: String(formData.get("market") || "OTHER"),
+        asof: asofDate.toISOString(),
+        strategy_version_id: String(formData.get("strategy_version_id") || "").trim(),
+        tier: String(formData.get("tier") || "TIER0"),
+        run_mode: String(formData.get("run_mode") || "LIVE")
+      };
+
+      const threadId = String(formData.get("thread_id") || "").trim();
+      const headers = { "Content-Type": "application/json" };
+      if (threadId) {
+        headers["x-thread-id"] = threadId;
+      }
+
+      try {
+        const response = await fetch("/reports/generate", {
+          method: "POST",
+          headers,
+          body: JSON.stringify(payload)
+        });
+        const body = await response.json();
+        if (!response.ok) {
+          const detail = typeof body?.detail === "string" ? body.detail : "Request failed";
+          throw new Error(detail);
+        }
+        resultEl.textContent = JSON.stringify(body, null, 2);
+        setStatus("Report generated successfully.", false);
+      } catch (error) {
+        const message = error instanceof Error ? error.message : "Unknown error";
+        setStatus(message, true);
+      } finally {
+        submitBtn.disabled = false;
+      }
+    });
+  </script>
+</body>
+</html>
+"""
+
 
 class GenerateReportRequest(BaseModel):
     ticker: str
@@ -26,7 +364,18 @@ class GenerateReportRequest(BaseModel):
     asof: datetime
     strategy_version_id: str
     tier: str = Field(pattern='^(TIER0|TIER1|TIER2)$')
-    run_mode: str = Field(default='LIVE', pattern='^(LIVE|SHADOW|BACKTEST)$')
+    run_mode: str | None = Field(default=None, pattern='^(LIVE|SHADOW|BACKTEST)$')
+
+
+class RuntimeConfigUpdateRequest(BaseModel):
+    default_run_mode: str | None = Field(default=None, pattern='^(LIVE|SHADOW|BACKTEST)$')
+    llm_provider: str | None = None
+    llm_base_url: str | None = None
+    llm_primary_model: str | None = None
+    llm_reviewer_model: str | None = None
+    llm_shadow_model: str | None = None
+    llm_shadow_reviewer_model: str | None = None
+    llm_api_key: str | None = None
 
 
 class CreateStrategyRequest(BaseModel):
@@ -49,14 +398,36 @@ def health() -> dict:
     return {'status': 'ok'}
 
 
+@router.get('/', include_in_schema=False)
+def root_redirect() -> RedirectResponse:
+    return RedirectResponse(url='/gui')
+
+
+@router.get('/gui', response_class=HTMLResponse, include_in_schema=False)
+def gui() -> HTMLResponse:
+    return HTMLResponse(content=GUI_HTML)
+
+
 @router.get('/version')
 def version() -> dict:
     return {'version': '0.1.0'}
 
 
+@router.get('/runtime/config')
+def get_runtime_config_api() -> dict:
+    return get_runtime_config_public()
+
+
+@router.put('/runtime/config')
+def update_runtime_config_api(payload: RuntimeConfigUpdateRequest) -> dict:
+    return update_runtime_config(payload.model_dump(exclude_none=True))
+
+
 @router.post('/reports/generate')
 def generate_report(payload: GenerateReportRequest, x_thread_id: str | None = Header(default=None)) -> dict:
-    request_data = payload.model_dump(mode='json')
+    request_data = payload.model_dump(mode='json', exclude_none=True)
+    if 'run_mode' not in request_data:
+        request_data['run_mode'] = get_runtime_config()['default_run_mode']
     thread_id = x_thread_id or f"thread_{payload.ticker}_{datetime.now(timezone.utc).strftime('%Y%m%d%H%M%S')}"
 
     result = run_research_workflow(request_data=request_data, thread_id=thread_id)

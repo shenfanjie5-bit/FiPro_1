@@ -1,10 +1,10 @@
 from __future__ import annotations
 
 from datetime import datetime, timedelta, timezone
-import os
 import uuid
 from typing import Any
 
+from app.core.runtime_config import get_runtime_config
 from app.llm.provider import LLMProvider
 from app.tools.deterministic import generate_price_bands, risk_gate, score_signal
 from app.tools.facts import (
@@ -17,6 +17,7 @@ from app.tools.graph import compute_exposure_score, find_impact_paths, query_sup
 from app.tools.memory import retrieve_memory_notes, write_memory_note
 from app.tools.qa import consistency_check, validate_report_schema_tool
 from app.tools.rag import extract_events_from_docs, rerank_docs, search_event_docs
+from app.tools.skills import retrieve_skill_notes, write_skill_from_report
 from app.tools.wrapper import execute_tool
 from app.workflows.persistence import persist_workflow_state
 
@@ -236,6 +237,8 @@ def init_data_quality(state: dict) -> dict:
     state['data_quality'] = {'status': 'OK', 'missing_fields': [], 'notes': ''}
     state['tool_traces'] = []
     state['tool_call_stats'] = {'tool_calls': 0, 'latency_ms': 0, 'cost_usd_est': 0, 'tool_failures': 0, 'retry_count': 0, 'retry_wait_ms': 0}
+    state['memory_notes'] = []
+    state['skill_notes'] = []
     state['doc_queries'] = []
     state['doc_candidates'] = []
     state['ranked_docs'] = []
@@ -451,6 +454,7 @@ def retrieve_memory_node(state: dict) -> dict:
     memory_window_days = int(memory_cfg.get('time_range_days', 180))
     if not _budget_guardrail(state, stage='memory.retrieve', reserve_tool_calls=1):
         state['memory_notes'] = []
+        state['skill_notes'] = []
         _sync_data_quality_from_matrix(state)
         return state
     res = execute_tool(
@@ -477,6 +481,20 @@ def retrieve_memory_node(state: dict) -> dict:
             },
         )
         _note_degradation(state, 'data_source', status='PARTIAL', reason='memory retrieval failed', mode='FALLBACK')
+
+    skill_query = f"{req['ticker']} action={state.get('score', {}).get('proposed_action', 'WATCH')} risks invalidations"
+    skill_result = retrieve_skill_notes(
+        ticker=req['ticker'],
+        query=skill_query,
+        top_k=4,
+        include_global=True,
+        lookback_days=365,
+    )
+    if isinstance(skill_result, dict) and isinstance(skill_result.get('error'), dict):
+        state['skill_notes'] = []
+        _note_degradation(state, 'data_source', status='PARTIAL', reason='skill retrieval failed', mode='FALLBACK')
+    else:
+        state['skill_notes'] = list(skill_result.get('skills', []))
     _refresh_tool_stats(state)
     rag_cfg = dict(_tier_params(state).get('rag', {}))
     req_tier = str(req.get('tier', 'TIER0'))
@@ -1135,6 +1153,21 @@ def build_context(state: dict) -> dict:
             }
         )
 
+    for skill in state.get('skill_notes', [])[:4]:
+        skill_id = str(skill.get('skill_id', '')).strip() or uuid.uuid4().hex[:8]
+        evidence_refs.append(
+            {
+                'evidence_id': f'ev_skill_{skill_id}',
+                'type': 'MANUAL_NOTE',
+                'title': f"skill {str(skill.get('title', skill_id))[:120]}",
+                'source': 'skills.runtime',
+                'captured_at': skill.get('created_at', now_iso),
+                'uri': None,
+                'snippet': str(skill.get('summary', ''))[:240],
+                'checksum': skill_id,
+            }
+        )
+
     _append_graph_evidence_refs(state, evidence_refs, now_iso)
 
     if not evidence_refs:
@@ -1167,6 +1200,7 @@ def build_context(state: dict) -> dict:
         'price_band_set_id': state.get('price_band_set_id'),
         'price_bands': state['price_bands'],
         'memory_notes': state.get('memory_notes', []),
+        'skill_notes': state.get('skill_notes', []),
         'doc_queries': state.get('doc_queries', []),
         'event_docs': state.get('event_docs', []),
         'ranked_doc_ids': state.get('ranked_doc_ids', []),
@@ -1305,12 +1339,13 @@ def _fallback_report_from_context(state: dict, reason: str) -> dict[str, Any]:
 
 def draft_report_node(state: dict) -> dict:
     run_mode = str(state.get('request', {}).get('run_mode', 'LIVE')).strip().upper() or 'LIVE'
+    runtime_config = get_runtime_config()
     if run_mode == 'SHADOW':
-        primary_model = os.getenv('LLM_SHADOW_MODEL', 'mock-challenger-v1').strip() or 'mock-challenger-v1'
-        reviewer_model = os.getenv('LLM_SHADOW_REVIEWER_MODEL', 'NONE').strip() or 'NONE'
+        primary_model = runtime_config['llm_shadow_model']
+        reviewer_model = runtime_config['llm_shadow_reviewer_model']
     else:
-        primary_model = os.getenv('LLM_PRIMARY_MODEL', 'mock-primary-v1').strip() or 'mock-primary-v1'
-        reviewer_model = os.getenv('LLM_REVIEWER_MODEL', 'NONE').strip() or 'NONE'
+        primary_model = runtime_config['llm_primary_model']
+        reviewer_model = runtime_config['llm_reviewer_model']
     provider = LLMProvider(primary_model=primary_model, reviewer_model=reviewer_model)
     if not _budget_guardrail(state, stage='llm.draft', reserve_tool_calls=1):
         reason = 'LLM draft skipped by budget guardrail'
@@ -1600,6 +1635,21 @@ def persist_node(state: dict) -> dict:
             reason=f"write_memory_note failed ({err.get('code', 'INTERNAL_ERROR')})",
             mode='FALLBACK',
         )
+    skill_refs: dict[str, str] = {}
+    run_mode = str(report.get('provenance', {}).get('run_mode', state.get('request', {}).get('run_mode', 'LIVE'))).upper()
+    if run_mode == 'BACKTEST':
+        write_skill = write_skill_from_report(report)
+        if isinstance(write_skill, dict) and write_skill.get('ok'):
+            skill_refs['skill_note_id'] = str(write_skill.get('skill_id', ''))
+        elif isinstance(write_skill, dict) and isinstance(write_skill.get('error'), dict):
+            err = write_skill.get('error', {})
+            _note_degradation(
+                state,
+                'data_source',
+                status='PARTIAL',
+                reason=f"write_skill_from_report failed ({err.get('code', 'INTERNAL_ERROR')})",
+                mode='FALLBACK',
+            )
     _refresh_tool_stats(state)
     _sync_data_quality_from_matrix(state)
     report['data_quality'] = _merge_data_quality(_normalize_report_data_quality(report), state.get('data_quality', {}))
@@ -1610,6 +1660,7 @@ def persist_node(state: dict) -> dict:
     report['provenance']['degradation_matrix'] = state.get('degradation_matrix', {})
     persist_refs = persist_workflow_state(state, thread_id=state['thread_id'])
     persist_refs['memory_note_id'] = write_memory['output'].get('note_id', persist_refs.get('memory_note_id', ''))
+    persist_refs.update(skill_refs)
     state['persist_refs'] = persist_refs
     state['final_report'] = report
     return state

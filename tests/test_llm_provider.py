@@ -1,0 +1,103 @@
+from __future__ import annotations
+
+import pytest
+
+from app.llm.provider import LLMProvider
+from app.tools.wrapper import ToolExecutionError
+from app.validation.schema_validator import validate_report_schema
+
+
+def _context() -> dict:
+    return {
+        'request': {
+            'ticker': '600519.SH',
+            'market': 'CN_A',
+            'asof': '2026-02-10T09:30:00+08:00',
+            'strategy_version_id': 'stg_v1',
+            'tier': 'TIER0',
+            'run_mode': 'LIVE',
+        },
+        'score': {'overall_score': 66, 'confidence': 0.63, 'proposed_action': 'WATCH'},
+        'price_bands': [
+            {
+                'band_id': 'B1',
+                'range': {'currency': 'CNY', 'min': 95, 'max': 100},
+                'score': 60,
+                'confidence': 0.58,
+                'rationale': 'mock rationale',
+                'entry_conditions': [{'type': 'TECHNICAL', 'description': 'support holds', 'priority': 'MEDIUM'}],
+                'exit_conditions': [{'type': 'RISK', 'description': 'support breaks', 'priority': 'HIGH'}],
+            }
+        ],
+        'evidence_refs': [
+            {
+                'evidence_id': 'ev_001',
+                'type': 'SNAPSHOT_FIELD',
+                'title': 'snapshot',
+                'source': 'mock',
+                'captured_at': '2026-02-10T01:30:00Z',
+                'uri': None,
+                'snippet': 'close=100',
+                'checksum': 'abc',
+            }
+        ],
+        'data_quality': {'status': 'OK', 'missing_fields': [], 'notes': ''},
+        'snapshot_ids': ['snap_001'],
+        'weights_hash': 'w_mock_hash_v1',
+        'tool_call_stats': {'tool_calls': 3, 'latency_ms': 120, 'cost_usd_est': 0},
+        'router_policy': 'router_m6_v1',
+        'graph_refs': [],
+        'event_docs': [],
+        'memory_notes': [],
+    }
+
+
+def test_llm_provider_mock_mode_returns_schema_valid_report(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv('LLM_PROVIDER', 'mock')
+    monkeypatch.delenv('LLM_API_KEY', raising=False)
+    provider = LLMProvider(primary_model='mock-primary-v1')
+
+    report = provider.generate_report_draft(_context())
+
+    ok, errors = validate_report_schema(report)
+    assert ok, errors
+    assert report['provenance']['model']['primary'] == 'mock-primary-v1'
+
+
+def test_llm_provider_non_mock_without_key_raises(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv('LLM_PROVIDER', 'openai')
+    monkeypatch.delenv('LLM_API_KEY', raising=False)
+    provider = LLMProvider(primary_model='gpt-test')
+
+    with pytest.raises(ToolExecutionError) as exc_info:
+        provider.generate_report_draft(_context())
+    assert exc_info.value.code == 'DATA_UNAVAILABLE'
+
+
+def test_llm_provider_live_analysis_merges_when_available(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv('LLM_PROVIDER', 'openai')
+    monkeypatch.setenv('LLM_API_KEY', 'sk-test')
+
+    def fake_live_call(self: LLMProvider, context: dict) -> dict:
+        assert context['request']['ticker'] == '600519.SH'
+        return {
+            'decision_summary': 'Live model summary from upstream.',
+            'base_case': 'Cash flow stability supports a watch stance.',
+            'bull_case': 'Demand upside can improve rerating momentum.',
+            'bear_case': 'Macro risk can compress valuation quickly.',
+            'next_steps': ['Track turnover and policy tone', 'Watch volume-price confirmation'],
+            'driver_focus': 'Demand and inventory cadence',
+            'risk_flags': [{'severity': 'HIGH', 'description': 'Policy uncertainty may spike volatility'}],
+            'invalidations': [{'priority': 'HIGH', 'description': 'Volume breakdown below key support'}],
+            'memory_summary': 'Live summary cached for next review.',
+        }
+
+    monkeypatch.setattr(LLMProvider, '_call_openai_chat_completion', fake_live_call)
+    provider = LLMProvider(primary_model='gpt-test')
+
+    report = provider.generate_report_draft(_context())
+    ok, errors = validate_report_schema(report)
+    assert ok, errors
+    assert report['decision']['summary'] == 'Live model summary from upstream.'
+    assert report['thesis']['base_case'] == 'Cash flow stability supports a watch stance.'
+    assert report['provenance']['model']['primary'] == 'gpt-test'

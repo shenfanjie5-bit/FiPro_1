@@ -18,6 +18,7 @@ class ResearchState(TypedDict, total=False):
     price_band_set_id: str
     price_bands: list[dict[str, Any]]
     memory_notes: list[dict[str, Any]]
+    skill_notes: list[dict[str, Any]]
     doc_queries: list[str]
     doc_candidates: list[dict[str, Any]]
     ranked_docs: list[dict[str, Any]]

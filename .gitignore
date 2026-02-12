@@ -6,3 +6,11 @@ __pycache__/
 .env
 *.egg-info/
 checkpoint.db
+checkpoint.db-shm
+checkpoint.db-wal
+frontend/node_modules/
+frontend/dist/
+frontend/.vite/
+frontend/*.tsbuildinfo
+frontend/vite.config.js
+frontend/vite.config.d.ts

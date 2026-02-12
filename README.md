@@ -36,6 +36,33 @@ uvicorn app.main:app --reload --port 8000
 curl http://localhost:8000/health
 ```
 
+## Frontend GUI Seed (Generate + Result Routes)
+
+Start backend first, then run frontend:
+
+```bash
+cd frontend
+npm install
+npm run dev
+```
+
+Open `http://127.0.0.1:5173`.
+
+- `/generate`: submit report request form
+- `/results/:reportId`: show generated report and fetch by id fallback
+
+If backend is not at `http://127.0.0.1:8000`, set:
+
+```bash
+VITE_API_BASE_URL=http://your-host:port npm run dev
+```
+
+## Skill Distillation (Backtest -> Local Skills)
+
+- Workflow now retrieves local skill notes during context build and passes them into LLM drafting.
+- When `run_mode=BACKTEST`, report outputs are auto-distilled into local skill notes for future runs.
+- Skill runtime store is persisted in `WORKFLOW_RUNTIME_DB` / `WORKFLOW_CHECKPOINT_DB` (`skills_runtime` table).
+
 ## Generate Report (MVP TIER0)
 
 ```bash
