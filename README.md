@@ -317,6 +317,48 @@ curl -X POST http://127.0.0.1:8000/reports/<report_id>/feedback \
   }'
 ```
 
+### 7.8 Skill Pack 晋级评估与执行
+
+先查看版本与当前 champion：
+
+```bash
+curl http://127.0.0.1:8000/skill-packs/cn_a_core/versions
+```
+
+执行 candidate vs champion 回测评估，并尝试晋级：
+
+```bash
+curl -X POST http://127.0.0.1:8000/skill-packs/promotions/run \
+  -H "Content-Type: application/json" \
+  -d '{
+    "skill_pack_id": "cn_a_core",
+    "candidate_version": "0.1.0",
+    "champion_version": "0.0.1",
+    "execute": true,
+    "dry_run": true,
+    "manual_approved": false,
+    "backtest": {
+      "ticker": "600519.SH",
+      "market": "CN_A",
+      "strategy_version_id": "stg_v1",
+      "tier": "TIER0",
+      "start_date": "2026-01-01",
+      "end_date": "2026-01-31",
+      "step_days": 1,
+      "trading_days_only": true,
+      "asof_time": "09:30",
+      "timezone_offset": "+08:00",
+      "max_runs": 60,
+      "evaluation_horizon_days": 5
+    }
+  }'
+```
+
+说明：
+
+- `dry_run=true` 时只评估不改状态。
+- 当 `gate.json` 配置 `manual_approval_required=true` 且 `manual_approved=false`，决策会是 `PENDING_MANUAL_APPROVAL`。
+
 ---
 
 ## 8. LLM 配置说明

@@ -351,3 +351,87 @@ def test_backtest_job_endpoints(monkeypatch: pytest.MonkeyPatch) -> None:
 
     not_found_resp = client.get('/backtests/jobs/not_found')
     assert not_found_resp.status_code == 404
+
+
+def test_skill_pack_promotion_run_endpoint(monkeypatch: pytest.MonkeyPatch) -> None:
+    candidate_result = {
+        'batch_id': 'bt_candidate',
+        'request': {'skill_pack_version': '0.1.0'},
+        'summary': {'strategy_total_return_pct': 12.0, 'excess_return_pct': 1.4},
+    }
+    champion_result = {
+        'batch_id': 'bt_champion',
+        'request': {'skill_pack_version': '0.0.1'},
+        'summary': {'strategy_total_return_pct': 9.0, 'excess_return_pct': 0.4},
+    }
+
+    def fake_run_batch_backtest(payload: dict, runner, snapshot_loader, benchmark_loader):  # noqa: ANN001
+        _ = runner
+        _ = snapshot_loader
+        _ = benchmark_loader
+        if payload.get('skill_pack_version') == '0.1.0':
+            return candidate_result
+        return champion_result
+
+    monkeypatch.setattr(routes_module, 'run_batch_backtest', fake_run_batch_backtest)
+    monkeypatch.setattr(routes_module, 'resolve_champion_version', lambda skill_pack_id: '0.0.1')  # noqa: ARG005
+    monkeypatch.setattr(routes_module, 'load_promotion_gate', lambda skill_pack_id, version: {'promotion_rule': {'all_of': []}})  # noqa: ARG005
+    monkeypatch.setattr(
+        routes_module,
+        'evaluate_skill_pack_promotion',
+        lambda **kwargs: {'decision': 'ALLOW', 'failed_checks': [], 'checks': [], **kwargs},  # noqa: ARG005
+    )
+    monkeypatch.setattr(
+        routes_module,
+        'execute_skill_pack_promotion',
+        lambda **kwargs: {'executed': True, 'dry_run': kwargs.get('dry_run', False)},  # noqa: ARG005
+    )
+
+    payload = {
+        'skill_pack_id': 'cn_a_core',
+        'candidate_version': '0.1.0',
+        'execute': True,
+        'dry_run': False,
+        'manual_approved': True,
+        'backtest': {
+            'ticker': '600519.SH',
+            'market': 'CN_A',
+            'strategy_version_id': 'stg_v1',
+            'tier': 'TIER0',
+            'start_date': '2026-02-10',
+            'end_date': '2026-02-11',
+            'step_days': 1,
+            'trading_days_only': True,
+            'max_runs': 10,
+        },
+    }
+
+    resp = client.post('/skill-packs/promotions/run', json=payload)
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body['skill_pack_id'] == 'cn_a_core'
+    assert body['candidate_version'] == '0.1.0'
+    assert body['champion_version'] == '0.0.1'
+    assert body['evaluation']['decision'] == 'ALLOW'
+    assert body['execution']['executed'] is True
+    assert body['candidate_backtest']['batch_id'] == 'bt_candidate'
+    assert body['champion_backtest']['batch_id'] == 'bt_champion'
+
+
+def test_skill_pack_versions_endpoint(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(
+        routes_module,
+        'list_skill_pack_versions',
+        lambda skill_pack_id: [  # noqa: ARG005
+            {'version': '0.1.0', 'status': 'candidate'},
+            {'version': '0.0.1', 'status': 'champion'},
+        ],
+    )
+    monkeypatch.setattr(routes_module, 'resolve_champion_version', lambda skill_pack_id: '0.0.1')  # noqa: ARG005
+
+    resp = client.get('/skill-packs/cn_a_core/versions')
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body['skill_pack_id'] == 'cn_a_core'
+    assert body['champion_version'] == '0.0.1'
+    assert len(body['items']) == 2

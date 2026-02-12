@@ -5,7 +5,17 @@ from fastapi import APIRouter, Header, HTTPException
 from fastapi.responses import HTMLResponse, RedirectResponse
 from pydantic import BaseModel, Field
 
-from app.backtest import cancel_backtest_job, get_backtest_job, run_batch_backtest, submit_backtest_job
+from app.backtest import (
+    cancel_backtest_job,
+    evaluate_skill_pack_promotion,
+    execute_skill_pack_promotion,
+    get_backtest_job,
+    list_skill_pack_versions,
+    load_promotion_gate,
+    resolve_champion_version,
+    run_batch_backtest,
+    submit_backtest_job,
+)
 from app.core.runtime_config import get_runtime_config, get_runtime_config_public, update_runtime_config
 from app.tools.facts import get_index_market_snapshot, get_market_snapshot
 from app.tools.graph import compute_exposure_score, find_impact_paths, query_supply_chain_subtree
@@ -400,6 +410,16 @@ class BatchBacktestRequest(BaseModel):
     thread_prefix: str | None = None
 
 
+class SkillPackPromotionRunRequest(BaseModel):
+    skill_pack_id: str = Field(default='cn_a_core', min_length=1, max_length=64)
+    candidate_version: str = Field(min_length=1, max_length=32)
+    champion_version: str | None = Field(default=None, min_length=1, max_length=32)
+    execute: bool = False
+    dry_run: bool = True
+    manual_approved: bool = False
+    backtest: BatchBacktestRequest
+
+
 class RuntimeConfigUpdateRequest(BaseModel):
     default_run_mode: str | None = Field(default=None, pattern='^(LIVE|SHADOW|BACKTEST)$')
     llm_provider: str | None = None
@@ -507,6 +527,107 @@ def cancel_backtest_job_api(job_id: str) -> dict:
     if job is None:
         raise HTTPException(status_code=404, detail='backtest job not found')
     return job
+
+
+@router.get('/skill-packs/{skill_pack_id}/versions')
+def get_skill_pack_versions(skill_pack_id: str) -> dict:
+    versions = list_skill_pack_versions(skill_pack_id)
+    return {
+        'skill_pack_id': skill_pack_id,
+        'champion_version': resolve_champion_version(skill_pack_id) or '',
+        'items': versions,
+    }
+
+
+@router.post('/skill-packs/promotions/run')
+def run_skill_pack_promotion(payload: SkillPackPromotionRunRequest) -> dict:
+    skill_pack_id = payload.skill_pack_id.strip()
+    candidate_version = payload.candidate_version.strip()
+    champion_version = payload.champion_version.strip() if payload.champion_version else resolve_champion_version(skill_pack_id)
+    if champion_version and champion_version == candidate_version:
+        raise HTTPException(status_code=422, detail='candidate_version must be different from champion_version')
+
+    base_backtest_payload = payload.backtest.model_dump(mode='json', exclude_none=True)
+    candidate_backtest_payload = {
+        **base_backtest_payload,
+        'skill_pack_id': skill_pack_id,
+        'skill_pack_version': candidate_version,
+    }
+    try:
+        candidate_result = run_batch_backtest(
+            candidate_backtest_payload,
+            runner=run_research_workflow,
+            snapshot_loader=get_market_snapshot,
+            benchmark_loader=get_index_market_snapshot,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=f'candidate backtest failed: {exc}') from exc
+
+    champion_result = None
+    if champion_version:
+        champion_backtest_payload = {
+            **base_backtest_payload,
+            'skill_pack_id': skill_pack_id,
+            'skill_pack_version': champion_version,
+        }
+        try:
+            champion_result = run_batch_backtest(
+                champion_backtest_payload,
+                runner=run_research_workflow,
+                snapshot_loader=get_market_snapshot,
+                benchmark_loader=get_index_market_snapshot,
+            )
+        except ValueError as exc:
+            raise HTTPException(status_code=422, detail=f'champion backtest failed: {exc}') from exc
+
+    try:
+        gate_config = load_promotion_gate(skill_pack_id, candidate_version)
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=f'load promotion gate failed: {exc}') from exc
+
+    evaluation = evaluate_skill_pack_promotion(
+        candidate_backtest_result=candidate_result,
+        champion_backtest_result=champion_result,
+        gate_config=gate_config,
+        candidate_version=candidate_version,
+        champion_version=champion_version,
+        manual_approved=payload.manual_approved,
+    )
+
+    execution = None
+    if payload.execute:
+        try:
+            execution = execute_skill_pack_promotion(
+                skill_pack_id=skill_pack_id,
+                candidate_version=candidate_version,
+                evaluation=evaluation,
+                champion_version=champion_version,
+                dry_run=payload.dry_run,
+            )
+        except ValueError as exc:
+            raise HTTPException(status_code=422, detail=f'promotion execute failed: {exc}') from exc
+
+    return {
+        'skill_pack_id': skill_pack_id,
+        'candidate_version': candidate_version,
+        'champion_version': champion_version or '',
+        'evaluation': evaluation,
+        'execution': execution,
+        'candidate_backtest': {
+            'batch_id': candidate_result.get('batch_id', ''),
+            'request': candidate_result.get('request', {}),
+            'summary': candidate_result.get('summary', {}),
+        },
+        'champion_backtest': (
+            {
+                'batch_id': champion_result.get('batch_id', ''),
+                'request': champion_result.get('request', {}),
+                'summary': champion_result.get('summary', {}),
+            }
+            if isinstance(champion_result, dict)
+            else None
+        ),
+    }
 
 
 @router.get('/reports/{report_id}')
