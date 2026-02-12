@@ -1,12 +1,13 @@
-from datetime import datetime, timezone
+from datetime import date, datetime, timezone
 import uuid
 
 from fastapi import APIRouter, Header, HTTPException
 from fastapi.responses import HTMLResponse, RedirectResponse
 from pydantic import BaseModel, Field
 
+from app.backtest import cancel_backtest_job, get_backtest_job, run_batch_backtest, submit_backtest_job
 from app.core.runtime_config import get_runtime_config, get_runtime_config_public, update_runtime_config
-from app.tools.facts import get_market_snapshot
+from app.tools.facts import get_index_market_snapshot, get_market_snapshot
 from app.tools.graph import compute_exposure_score, find_impact_paths, query_supply_chain_subtree
 from app.tools.memory import retrieve_memory_notes, write_memory_note
 from app.workflows.graph import run_research_workflow
@@ -23,11 +24,11 @@ WATCHLIST_STORE: dict[str, dict] = {}
 
 GUI_HTML = """
 <!DOCTYPE html>
-<html lang="en">
+<html lang="zh-CN">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>FiPro_1 GUI</title>
+  <title>FiPro_1 图形界面</title>
   <style>
     :root {
       --bg-a: #0b1e2f;
@@ -214,8 +215,8 @@ GUI_HTML = """
   <main class="shell">
     <header class="topbar">
       <div>
-        <h1 class="title">FiPro_1 Minimal GUI</h1>
-        <p class="subtitle">Input parameters, generate report, inspect JSON response.</p>
+        <h1 class="title">FiPro_1 最小界面</h1>
+        <p class="subtitle">填写参数，生成报告，并查看 JSON 响应。</p>
       </div>
     </header>
 
@@ -223,12 +224,12 @@ GUI_HTML = """
       <form id="report-form" autocomplete="off">
         <div class="grid">
           <div class="field">
-            <label for="ticker">Ticker</label>
+            <label for="ticker">股票代码</label>
             <input id="ticker" name="ticker" value="600519.SH" required>
           </div>
 
           <div class="field">
-            <label for="market">Market</label>
+            <label for="market">市场</label>
             <select id="market" name="market">
               <option value="CN_A" selected>CN_A</option>
               <option value="US">US</option>
@@ -238,17 +239,17 @@ GUI_HTML = """
           </div>
 
           <div class="field">
-            <label for="asof">As Of (Local Time)</label>
+            <label for="asof">分析时间（本地）</label>
             <input id="asof" name="asof" type="datetime-local" required>
           </div>
 
           <div class="field">
-            <label for="strategy_version_id">Strategy Version ID</label>
+            <label for="strategy_version_id">策略版本 ID</label>
             <input id="strategy_version_id" name="strategy_version_id" value="stg_v1" required>
           </div>
 
           <div class="field">
-            <label for="tier">Tier</label>
+            <label for="tier">分层</label>
             <select id="tier" name="tier">
               <option value="TIER0" selected>TIER0</option>
               <option value="TIER1">TIER1</option>
@@ -257,28 +258,28 @@ GUI_HTML = """
           </div>
 
           <div class="field">
-            <label for="run_mode">Run Mode</label>
+            <label for="run_mode">运行模式</label>
             <select id="run_mode" name="run_mode">
-              <option value="LIVE" selected>LIVE</option>
-              <option value="SHADOW">SHADOW</option>
-              <option value="BACKTEST">BACKTEST</option>
+              <option value="LIVE" selected>LIVE（实盘）</option>
+              <option value="SHADOW">SHADOW（影子）</option>
+              <option value="BACKTEST">BACKTEST（回测）</option>
             </select>
           </div>
 
           <div class="field" style="grid-column: 1 / -1;">
-            <label for="thread_id">Thread ID (Optional)</label>
-            <input id="thread_id" name="thread_id" placeholder="custom thread id">
+            <label for="thread_id">线程 ID（可选）</label>
+            <input id="thread_id" name="thread_id" placeholder="自定义线程 ID">
           </div>
         </div>
 
         <div class="actions" style="margin-top: 16px;">
-          <button id="submit-btn" type="submit">Generate Report</button>
+          <button id="submit-btn" type="submit">生成报告</button>
           <div id="status" class="status"></div>
         </div>
       </form>
 
       <pre id="result" class="result">{
-  "hint": "Submit the form to call POST /reports/generate"
+  "hint": "提交表单后会调用 POST /reports/generate"
 }</pre>
     </section>
   </main>
@@ -305,14 +306,14 @@ GUI_HTML = """
 
     form.addEventListener("submit", async (event) => {
       event.preventDefault();
-      setStatus("Sending request...", false);
+      setStatus("请求发送中...", false);
       submitBtn.disabled = true;
 
       const formData = new FormData(form);
       const asofLocal = String(formData.get("asof") || "").trim();
       const asofDate = new Date(asofLocal);
       if (!asofLocal || Number.isNaN(asofDate.getTime())) {
-        setStatus("Invalid as-of datetime.", true);
+        setStatus("分析时间格式无效。", true);
         submitBtn.disabled = false;
         return;
       }
@@ -338,15 +339,27 @@ GUI_HTML = """
           headers,
           body: JSON.stringify(payload)
         });
-        const body = await response.json();
+        const raw = await response.text();
+        let body = null;
+        try {
+          body = raw ? JSON.parse(raw) : null;
+        } catch (_) {
+          body = raw;
+        }
         if (!response.ok) {
-          const detail = typeof body?.detail === "string" ? body.detail : "Request failed";
+          const detail = typeof body?.detail === "string"
+            ? body.detail
+            : (typeof body === "string" && body.trim() ? body : `请求失败（${response.status}）`);
           throw new Error(detail);
         }
-        resultEl.textContent = JSON.stringify(body, null, 2);
-        setStatus("Report generated successfully.", false);
+        if (body && typeof body === "object") {
+          resultEl.textContent = JSON.stringify(body, null, 2);
+        } else {
+          resultEl.textContent = String(body || "");
+        }
+        setStatus("报告生成成功。", false);
       } catch (error) {
-        const message = error instanceof Error ? error.message : "Unknown error";
+        const message = error instanceof Error ? error.message : "未知错误";
         setStatus(message, true);
       } finally {
         submitBtn.disabled = false;
@@ -365,6 +378,26 @@ class GenerateReportRequest(BaseModel):
     strategy_version_id: str
     tier: str = Field(pattern='^(TIER0|TIER1|TIER2)$')
     run_mode: str | None = Field(default=None, pattern='^(LIVE|SHADOW|BACKTEST)$')
+
+
+class BatchBacktestRequest(BaseModel):
+    ticker: str
+    market: str = Field(default='OTHER', pattern='^(CN_A|US|HK|CRYPTO|OTHER)$')
+    strategy_version_id: str
+    tier: str = Field(pattern='^(TIER0|TIER1|TIER2)$')
+    skill_pack_id: str = Field(default='cn_a_core', min_length=1, max_length=64)
+    skill_pack_version: str = Field(default='0.1.0', min_length=1, max_length=32)
+    start_date: date
+    end_date: date
+    step_days: int = Field(default=1, ge=1, le=30)
+    trading_days_only: bool = True
+    asof_time: str = Field(default='09:30', pattern=r'^\d{2}:\d{2}(:\d{2})?$')
+    timezone_offset: str = Field(default='+08:00', pattern=r'^[+-]\d{2}:\d{2}$')
+    max_runs: int = Field(default=60, ge=1, le=500)
+    evaluation_horizon_days: int = Field(default=5, ge=1, le=120)
+    benchmark_ticker: str | None = None
+    initial_capital_cny: float = Field(default=1000000, gt=0)
+    thread_prefix: str | None = None
 
 
 class RuntimeConfigUpdateRequest(BaseModel):
@@ -435,6 +468,45 @@ def generate_report(payload: GenerateReportRequest, x_thread_id: str | None = He
     REPORT_STORE[report_id] = result['final_report']
 
     return {'report_id': report_id, 'final_report': result['final_report']}
+
+
+@router.post('/backtests/run')
+def batch_backtest(payload: BatchBacktestRequest) -> dict:
+    try:
+        return run_batch_backtest(
+            payload.model_dump(mode='json', exclude_none=True),
+            runner=run_research_workflow,
+            snapshot_loader=get_market_snapshot,
+            benchmark_loader=get_index_market_snapshot,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+
+@router.post('/backtests/jobs', status_code=202)
+def create_backtest_job(payload: BatchBacktestRequest) -> dict:
+    return submit_backtest_job(
+        payload.model_dump(mode='json', exclude_none=True),
+        runner=run_research_workflow,
+        snapshot_loader=get_market_snapshot,
+        benchmark_loader=get_index_market_snapshot,
+    )
+
+
+@router.get('/backtests/jobs/{job_id}')
+def fetch_backtest_job(job_id: str) -> dict:
+    job = get_backtest_job(job_id)
+    if job is None:
+        raise HTTPException(status_code=404, detail='backtest job not found')
+    return job
+
+
+@router.post('/backtests/jobs/{job_id}/cancel')
+def cancel_backtest_job_api(job_id: str) -> dict:
+    job = cancel_backtest_job(job_id)
+    if job is None:
+        raise HTTPException(status_code=404, detail='backtest job not found')
+    return job
 
 
 @router.get('/reports/{report_id}')
