@@ -77,5 +77,9 @@ def check_consistency(report_json: dict) -> list[str]:
     disagreement = _safe_float(ta_hybrid.get('disagreement'), default=0.0) if isinstance(ta_hybrid, dict) else 0.0
     if disagreement > 0.75 and str(decision.get('action', '')).upper() == 'BUY':
         errors.append('BUY is not allowed when ta_hybrid.disagreement is above 0.75')
+    if isinstance(ta_hybrid, dict) and ta_hybrid.get('horizon_days_hint') is not None:
+        horizon_days_hint = _safe_float(ta_hybrid.get('horizon_days_hint'), default=-1.0)
+        if horizon_days_hint < 1 or horizon_days_hint > 120:
+            errors.append('ta_hybrid.horizon_days_hint must be within [1, 120] when provided')
 
     return errors

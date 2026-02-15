@@ -44,5 +44,35 @@ def test_schema_valid_report() -> None:
             'tool_call_stats': {'tool_calls': 3, 'latency_ms': 120, 'cost_usd_est': 0},
         }
     )
+    report.setdefault('provenance', {})
+    report['provenance']['ta_hybrid'] = {
+        'mode': 'ANALYZE_ONLY',
+        'status': 'ANALYZED',
+        'applied': False,
+        'version': 'ta_hybrid_m2_v1',
+        'require_evidence_refs': True,
+        'research_rounds_used': 1,
+        'risk_rounds_used': 1,
+        'llm_calls_used': 0,
+        'llm_call_cap': 6,
+        'directional_bias': 0.12,
+        'risk_bias': 0.05,
+        'conviction': 0.58,
+        'disagreement': 0.18,
+        'horizon_days_hint': 7,
+        'degraded_reasons': [],
+    }
+    report['evidence_refs'].append(
+        {
+            'evidence_id': 'ev_ta_001',
+            'type': 'AGENT_REASONING',
+            'title': 'ta reasoning',
+            'source': 'ta_hybrid.research',
+            'captured_at': '2026-02-10T02:00:00Z',
+            'uri': None,
+            'snippet': 'ta summary',
+            'checksum': 'ta_001',
+        }
+    )
     ok, errors = validate_report_schema(report)
     assert ok, errors

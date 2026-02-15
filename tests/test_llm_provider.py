@@ -143,3 +143,82 @@ def test_openclaw_mode_injects_isolation_headers(monkeypatch: pytest.MonkeyPatch
     assert report['decision']['summary'] == 'isolated'
     assert captured_headers.get('x-openclaw-agent-id') == 'main'
     assert str(captured_headers.get('x-openclaw-session-key', '')).startswith('fipro1-isolated:')
+
+
+def test_llm_provider_mock_ta_hybrid_view_contract(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv('LLM_PROVIDER', 'mock')
+    monkeypatch.delenv('LLM_API_KEY', raising=False)
+    provider = LLMProvider(primary_model='mock-primary-v1')
+    ta_input = {
+        'ticker': '600519.SH',
+        'asof': '2026-02-10T09:30:00+08:00',
+        'run_mode': 'LIVE',
+        'policy_signal': 0.3,
+        'governance_signal': -0.1,
+        'directional_bias_base': 0.12,
+        'risk_bias_base': 0.08,
+        'conviction_base': 0.55,
+        'disagreement_base': 0.2,
+        'horizon_days_hint': 7,
+    }
+    view = provider.generate_ta_hybrid_view(
+        stage='research',
+        role='bull',
+        ta_input=ta_input,
+        upstream=None,
+        round_idx=1,
+    )
+    assert view['summary']
+    assert -1.0 <= view['directional_bias'] <= 1.0
+    assert -1.0 <= view['risk_bias'] <= 1.0
+    assert 0.0 <= view['conviction'] <= 1.0
+    assert 0.0 <= view['disagreement'] <= 1.0
+    assert 1 <= int(view['horizon_days_hint']) <= 120
+
+
+def test_llm_provider_live_ta_hybrid_view_normalizes_ranges(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv('LLM_PROVIDER', 'openai')
+    monkeypatch.setenv('LLM_API_KEY', 'sk-test')
+
+    def fake_call(self: LLMProvider, *, prompt: str, temperature: float = 0.2, system_prompt: str = 'x', call_context=None):  # noqa: ANN001, ARG001
+        _ = prompt
+        _ = temperature
+        _ = system_prompt
+        _ = call_context
+        return {
+            'summary': 'live ta node result',
+            'stance': 'bullish',
+            'directional_bias': 9.0,
+            'risk_bias': -9.0,
+            'conviction': 9.0,
+            'disagreement': -3.0,
+            'horizon_days_hint': 500,
+            'rationale_points': ['a', 'b'],
+        }
+
+    monkeypatch.setattr(LLMProvider, '_call_openai_chat_json', fake_call)
+    provider = LLMProvider(primary_model='gpt-test')
+    ta_input = {
+        'ticker': '600519.SH',
+        'asof': '2026-02-10T09:30:00+08:00',
+        'run_mode': 'LIVE',
+        'policy_signal': 0.3,
+        'governance_signal': -0.1,
+        'directional_bias_base': 0.12,
+        'risk_bias_base': 0.08,
+        'conviction_base': 0.55,
+        'disagreement_base': 0.2,
+        'horizon_days_hint': 7,
+    }
+    view = provider.generate_ta_hybrid_view(
+        stage='risk_judge',
+        role='judge',
+        ta_input=ta_input,
+        upstream={'risk_aggressive': {'risk_bias': -0.1}},
+        round_idx=2,
+    )
+    assert view['directional_bias'] == 1.0
+    assert view['risk_bias'] == -1.0
+    assert view['conviction'] == 1.0
+    assert view['disagreement'] == 0.0
+    assert view['horizon_days_hint'] == 120

@@ -40,6 +40,10 @@ def _safe_int(value: Any, default: int = 0) -> int:
         return int(default)
 
 
+def _clamp(value: float, minimum: float, maximum: float) -> float:
+    return max(minimum, min(maximum, value))
+
+
 def _clean_text(value: Any, *, max_len: int = 500) -> str:
     if not isinstance(value, str):
         return ''
@@ -832,3 +836,239 @@ class LLMProvider:
         if memory_summary:
             merged['memory_update']['summary'] = memory_summary
         return merged
+
+    def _mock_ta_hybrid_view(
+        self,
+        *,
+        stage: str,
+        role: str,
+        ta_input: dict[str, Any],
+        upstream: dict[str, Any] | None = None,
+        round_idx: int = 1,
+    ) -> dict[str, Any]:
+        upstream_payload = upstream if isinstance(upstream, dict) else {}
+        directional_base = _clamp(_safe_float(ta_input.get('directional_bias_base'), 0.0), -1.0, 1.0)
+        risk_base = _clamp(_safe_float(ta_input.get('risk_bias_base'), 0.0), -1.0, 1.0)
+        conviction_base = _clamp(_safe_float(ta_input.get('conviction_base'), 0.0), 0.0, 1.0)
+        disagreement_base = _clamp(_safe_float(ta_input.get('disagreement_base'), 0.0), 0.0, 1.0)
+        horizon_hint = _normalize_horizon_days(ta_input.get('horizon_days_hint'))
+        if horizon_hint is None:
+            horizon_hint = 5
+
+        directional = directional_base
+        risk_bias = risk_base
+        conviction = conviction_base
+        disagreement = disagreement_base
+        stance = 'NEUTRAL'
+        role_key = f'{stage}:{role}'
+        if role_key == 'research:bull':
+            directional = _clamp(directional_base + 0.12, -1.0, 1.0)
+            conviction = _clamp(conviction_base + 0.08, 0.0, 1.0)
+            stance = 'BULLISH'
+        elif role_key == 'research:bear':
+            directional = _clamp(directional_base - 0.12, -1.0, 1.0)
+            risk_bias = _clamp(risk_base + 0.08, -1.0, 1.0)
+            conviction = _clamp(conviction_base - 0.06, 0.0, 1.0)
+            stance = 'BEARISH'
+        elif role_key == 'research_judge:judge':
+            bull = upstream_payload.get('bull', {}) if isinstance(upstream_payload.get('bull', {}), dict) else {}
+            bear = upstream_payload.get('bear', {}) if isinstance(upstream_payload.get('bear', {}), dict) else {}
+            directional = _clamp(
+                (_safe_float(bull.get('directional_bias'), directional_base) + _safe_float(bear.get('directional_bias'), directional_base))
+                / 2.0,
+                -1.0,
+                1.0,
+            )
+            disagreement = _clamp(
+                abs(_safe_float(bull.get('directional_bias'), directional_base) - _safe_float(bear.get('directional_bias'), directional_base))
+                / 2.0,
+                0.0,
+                1.0,
+            )
+            conviction = _clamp(conviction_base - (0.12 * disagreement), 0.0, 1.0)
+            stance = 'BULL_LEAN' if directional > 0.1 else ('BEAR_LEAN' if directional < -0.1 else 'NEUTRAL')
+        elif role_key == 'risk:aggressive':
+            risk_bias = _clamp(risk_base - 0.12, -1.0, 1.0)
+            conviction = _clamp(conviction_base + 0.08, 0.0, 1.0)
+            stance = 'RISK_ON'
+        elif role_key == 'risk:conservative':
+            risk_bias = _clamp(risk_base + 0.12, -1.0, 1.0)
+            conviction = _clamp(conviction_base - 0.08, 0.0, 1.0)
+            stance = 'RISK_OFF'
+        elif role_key == 'risk:neutral':
+            stance = 'BALANCED'
+        elif role_key == 'risk_judge:judge':
+            aggr = upstream_payload.get('risk_aggressive', {}) if isinstance(upstream_payload.get('risk_aggressive', {}), dict) else {}
+            cons = upstream_payload.get('risk_conservative', {}) if isinstance(upstream_payload.get('risk_conservative', {}), dict) else {}
+            neu = upstream_payload.get('risk_neutral', {}) if isinstance(upstream_payload.get('risk_neutral', {}), dict) else {}
+            risk_bias = _clamp(
+                (
+                    _safe_float(aggr.get('risk_bias'), risk_base)
+                    + _safe_float(cons.get('risk_bias'), risk_base)
+                    + _safe_float(neu.get('risk_bias'), risk_base)
+                )
+                / 3.0,
+                -1.0,
+                1.0,
+            )
+            conviction = _clamp(
+                (
+                    _safe_float(aggr.get('conviction'), conviction_base)
+                    + _safe_float(cons.get('conviction'), conviction_base)
+                    + _safe_float(neu.get('conviction'), conviction_base)
+                )
+                / 3.0,
+                0.0,
+                1.0,
+            )
+            stance = 'CAUTIOUS' if risk_bias > 0.2 else ('OPEN' if risk_bias < -0.2 else 'NEUTRAL')
+
+        summary = (
+            f'{stage}.{role} round={max(1, int(round_idx))}: '
+            f'directional_bias={directional:.3f}, risk_bias={risk_bias:.3f}, '
+            f'conviction={conviction:.3f}, disagreement={disagreement:.3f}, horizon={horizon_hint}d.'
+        )
+        return {
+            'summary': summary,
+            'stance': stance,
+            'directional_bias': directional,
+            'risk_bias': risk_bias,
+            'conviction': conviction,
+            'disagreement': disagreement,
+            'horizon_days_hint': horizon_hint,
+            'rationale_points': [
+                f'round={max(1, int(round_idx))}',
+                f'policy_signal={_safe_float(ta_input.get("policy_signal"), 0.0):.3f}',
+                f'governance_signal={_safe_float(ta_input.get("governance_signal"), 0.0):.3f}',
+            ],
+        }
+
+    def _build_ta_hybrid_prompt(
+        self,
+        *,
+        stage: str,
+        role: str,
+        ta_input: dict[str, Any],
+        upstream: dict[str, Any] | None = None,
+        round_idx: int = 1,
+    ) -> str:
+        upstream_payload = upstream if isinstance(upstream, dict) else {}
+        payload = {
+            'stage': stage,
+            'role': role,
+            'round_idx': max(1, int(round_idx)),
+            'ta_input': ta_input,
+            'upstream': upstream_payload,
+            'constraints': {
+                'directional_bias_range': [-1, 1],
+                'risk_bias_range': [-1, 1],
+                'conviction_range': [0, 1],
+                'disagreement_range': [0, 1],
+                'horizon_days_hint_range': [1, 120],
+            },
+        }
+        return (
+            'You are one node in a multi-agent TA hybrid workflow. '
+            'Return strict JSON only with keys: '
+            'summary, stance, directional_bias, risk_bias, conviction, disagreement, horizon_days_hint, rationale_points. '
+            'Do not output final trading action, target_position, or order quantity. '
+            'summary must be concise and factual. rationale_points must be an array of short strings.\n\n'
+            f'Context JSON:\n{json.dumps(payload, ensure_ascii=True, separators=(",", ":"))}'
+        )
+
+    def _normalize_ta_hybrid_view(
+        self,
+        *,
+        payload: dict[str, Any],
+        stage: str,
+        role: str,
+        ta_input: dict[str, Any],
+    ) -> dict[str, Any]:
+        baseline = self._mock_ta_hybrid_view(stage=stage, role=role, ta_input=ta_input, upstream=None, round_idx=1)
+        summary = _clean_text(payload.get('summary'), max_len=320) or str(baseline.get('summary', ''))
+        stance = _clean_text(payload.get('stance'), max_len=32).upper() or str(baseline.get('stance', 'NEUTRAL')).upper()
+        directional_bias = _clamp(
+            _safe_float(payload.get('directional_bias'), _safe_float(baseline.get('directional_bias'), 0.0)),
+            -1.0,
+            1.0,
+        )
+        risk_bias = _clamp(
+            _safe_float(payload.get('risk_bias'), _safe_float(baseline.get('risk_bias'), 0.0)),
+            -1.0,
+            1.0,
+        )
+        conviction = _clamp(
+            _safe_float(payload.get('conviction'), _safe_float(baseline.get('conviction'), 0.0)),
+            0.0,
+            1.0,
+        )
+        disagreement = _clamp(
+            _safe_float(payload.get('disagreement'), _safe_float(baseline.get('disagreement'), 0.0)),
+            0.0,
+            1.0,
+        )
+        horizon_days_hint = _normalize_horizon_days(payload.get('horizon_days_hint'))
+        if horizon_days_hint is None:
+            horizon_days_hint = _normalize_horizon_days(ta_input.get('horizon_days_hint'))
+        if horizon_days_hint is None:
+            horizon_days_hint = int(_safe_float(baseline.get('horizon_days_hint'), 5))
+        rationale_points_raw = payload.get('rationale_points')
+        rationale_points = []
+        if isinstance(rationale_points_raw, list):
+            rationale_points = [_clean_text(item, max_len=120) for item in rationale_points_raw]
+            rationale_points = [item for item in rationale_points if item]
+        if not rationale_points:
+            rationale_points = [f'{stage}.{role} normalized fallback']
+        return {
+            'summary': summary,
+            'stance': stance,
+            'directional_bias': round(directional_bias, 6),
+            'risk_bias': round(risk_bias, 6),
+            'conviction': round(conviction, 6),
+            'disagreement': round(disagreement, 6),
+            'horizon_days_hint': int(max(1, min(120, horizon_days_hint))),
+            'rationale_points': rationale_points[:6],
+        }
+
+    def generate_ta_hybrid_view(
+        self,
+        *,
+        stage: str,
+        role: str,
+        ta_input: dict[str, Any],
+        upstream: dict[str, Any] | None = None,
+        round_idx: int = 1,
+    ) -> dict[str, Any]:
+        normalized_stage = _clean_text(stage, max_len=32).lower() or 'research'
+        normalized_role = _clean_text(role, max_len=32).lower() or 'judge'
+        if self.provider == 'mock':
+            return self._mock_ta_hybrid_view(
+                stage=normalized_stage,
+                role=normalized_role,
+                ta_input=ta_input,
+                upstream=upstream,
+                round_idx=round_idx,
+            )
+        self._ensure_live_provider_ready()
+        payload = self._call_openai_chat_json(
+            prompt=self._build_ta_hybrid_prompt(
+                stage=normalized_stage,
+                role=normalized_role,
+                ta_input=ta_input,
+                upstream=upstream,
+                round_idx=round_idx,
+            ),
+            temperature=0.15,
+            call_context={
+                'stage': f'ta_hybrid.{normalized_stage}.{normalized_role}',
+                'ticker': _clean_text(ta_input.get('ticker'), max_len=32),
+                'asof': _clean_text(ta_input.get('asof'), max_len=48),
+                'run_mode': _clean_text(ta_input.get('run_mode'), max_len=24),
+            },
+        )
+        return self._normalize_ta_hybrid_view(
+            payload=payload,
+            stage=normalized_stage,
+            role=normalized_role,
+            ta_input=ta_input,
+        )

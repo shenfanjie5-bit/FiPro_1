@@ -62,13 +62,24 @@ def _route_after_memory(state: ResearchState) -> Literal['direct_context', 'rag_
     return 'direct_context'
 
 
-def _route_after_context(state: ResearchState) -> Literal['direct_draft', 'ta_hybrid_chain']:
+def _route_ta_hybrid(state: ResearchState) -> Literal['direct_draft', 'ta_hybrid_chain']:
     req = state.get('request', {})
     analysis_mode = str(req.get('analysis_mode', 'BASELINE')).strip().upper() or 'BASELINE'
     ta_hybrid_mode = str(req.get('ta_hybrid_mode', 'OFF')).strip().upper() or 'OFF'
     if analysis_mode not in {'TA_HYBRID', 'AUTO'}:
         return 'direct_draft'
     if ta_hybrid_mode not in {'ANALYZE_ONLY', 'BLEND'}:
+        return 'direct_draft'
+    tier = str(req.get('tier', 'TIER0')).strip().upper() or 'TIER0'
+    if tier not in {'TIER0', 'TIER1', 'TIER2'}:
+        return 'direct_draft'
+    if analysis_mode == 'AUTO' and tier == 'TIER0':
+        return 'direct_draft'
+
+    matrix = state.get('degradation_matrix', {})
+    llm_entry = matrix.get('llm', {}) if isinstance(matrix, dict) else {}
+    llm_status = str(llm_entry.get('status', 'OK')).strip().upper() if isinstance(llm_entry, dict) else 'OK'
+    if llm_status != 'OK':
         return 'direct_draft'
 
     budget = state.get('budget', {})
@@ -79,6 +90,11 @@ def _route_after_context(state: ResearchState) -> Literal['direct_draft', 'ta_hy
     if budget_degraded or budget_exhausted:
         return 'direct_draft'
     return 'ta_hybrid_chain'
+
+
+def _route_after_context(state: ResearchState) -> Literal['direct_draft', 'ta_hybrid_chain']:
+    # Backward-compatible alias for previous test imports.
+    return _route_ta_hybrid(state)
 
 
 def _route_need_review(state: ResearchState) -> Literal['review', 'validate']:
@@ -153,7 +169,7 @@ def _build_graph():
     builder.add_edge('impact_paths_node', 'build_context')
     builder.add_conditional_edges(
         'build_context',
-        _route_after_context,
+        _route_ta_hybrid,
         {
             'direct_draft': 'draft_report_node',
             'ta_hybrid_chain': 'ta_hybrid_node',

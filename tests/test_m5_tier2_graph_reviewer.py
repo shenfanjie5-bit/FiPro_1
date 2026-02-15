@@ -40,6 +40,11 @@ def test_tier2_workflow_runs_graph_and_reviewer(monkeypatch) -> None:
         'strategy_version_id': 'stg_v1',
         'tier': 'TIER2',
         'run_mode': 'LIVE',
+        'analysis_mode': 'TA_HYBRID',
+        'ta_hybrid_mode': 'ANALYZE_ONLY',
+        'ta_research_rounds': 1,
+        'ta_risk_rounds': 1,
+        'ta_llm_call_cap': 6,
     }
     thread_id = f"thread_m5_tier2_{uuid.uuid4().hex[:8]}"
     result = run_research_workflow(request_data=payload, thread_id=thread_id)
@@ -51,6 +56,9 @@ def test_tier2_workflow_runs_graph_and_reviewer(monkeypatch) -> None:
 
     assert report['provenance']['router_policy'] == 'router_m6_v1'
     assert report['provenance']['model']['reviewer'] == 'rule-reviewer-v1'
+    assert report['provenance']['ta_hybrid']['mode'] == 'ANALYZE_ONLY'
+    assert report['provenance']['ta_hybrid']['status'] == 'ANALYZED'
+    assert any(str(ref.get('type', '')).upper() == 'AGENT_REASONING' for ref in report['evidence_refs'])
     assert any(str(ref.get('type', '')).upper() == 'GRAPH_QUERY' for ref in report['evidence_refs'])
     graph_checksums = {
         str(ref.get('checksum', '')).strip()

@@ -1,24 +1,35 @@
 from __future__ import annotations
 
 from app.backtest.skill_pack import load_skill_pack
-from app.workflows.graph import _route_after_context
+from app.workflows.graph import _route_ta_hybrid
 from app.workflows.nodes import ta_hybrid_node
 
 
-def test_route_after_context_defaults_to_direct_draft() -> None:
+def test_route_ta_hybrid_defaults_to_direct_draft() -> None:
     state = {
         'request': {},
         'budget': {'max_tool_calls': 20, 'used_tool_calls': 0, 'degraded': False},
+        'degradation_matrix': {'llm': {'status': 'OK'}},
     }
-    assert _route_after_context(state) == 'direct_draft'
+    assert _route_ta_hybrid(state) == 'direct_draft'
 
 
-def test_route_after_context_ta_hybrid_enabled() -> None:
+def test_route_ta_hybrid_enabled() -> None:
     state = {
-        'request': {'analysis_mode': 'TA_HYBRID', 'ta_hybrid_mode': 'ANALYZE_ONLY'},
+        'request': {'tier': 'TIER1', 'analysis_mode': 'TA_HYBRID', 'ta_hybrid_mode': 'ANALYZE_ONLY'},
         'budget': {'max_tool_calls': 20, 'used_tool_calls': 5, 'degraded': False},
+        'degradation_matrix': {'llm': {'status': 'OK'}},
     }
-    assert _route_after_context(state) == 'ta_hybrid_chain'
+    assert _route_ta_hybrid(state) == 'ta_hybrid_chain'
+
+
+def test_route_ta_hybrid_skips_when_llm_degraded() -> None:
+    state = {
+        'request': {'tier': 'TIER2', 'analysis_mode': 'TA_HYBRID', 'ta_hybrid_mode': 'BLEND'},
+        'budget': {'max_tool_calls': 20, 'used_tool_calls': 5, 'degraded': False},
+        'degradation_matrix': {'llm': {'status': 'PARTIAL'}},
+    }
+    assert _route_ta_hybrid(state) == 'direct_draft'
 
 
 def test_ta_hybrid_node_populates_analyze_only_payload() -> None:

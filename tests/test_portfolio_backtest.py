@@ -8,7 +8,17 @@ import app.backtest.portfolio as portfolio_module
 from app.backtest.portfolio import run_portfolio_backtest
 
 
-def _fake_component_result(*, ticker: str, initial_capital_cny: float, final_ratio: float, benchmark_ratio: float) -> dict[str, Any]:
+def _fake_component_result(
+    *,
+    ticker: str,
+    initial_capital_cny: float,
+    final_ratio: float,
+    benchmark_ratio: float,
+    ta_hybrid_applied_runs: int = 0,
+    avg_ta_directional_bias: float = 0.0,
+    avg_ta_conviction: float = 0.0,
+    avg_ta_disagreement: float = 0.0,
+) -> dict[str, Any]:
     final_capital = initial_capital_cny * final_ratio
     benchmark_final = initial_capital_cny * benchmark_ratio
     asof_start = '2026-02-10T09:30:00+08:00'
@@ -31,6 +41,10 @@ def _fake_component_result(*, ticker: str, initial_capital_cny: float, final_rat
             'excess_return_pct': round((final_ratio - benchmark_ratio) * 100.0, 6),
             'total_trade_cost_cny': 120.0,
             'total_turnover': 1.6,
+            'ta_hybrid_applied_runs': ta_hybrid_applied_runs,
+            'avg_ta_directional_bias': avg_ta_directional_bias,
+            'avg_ta_conviction': avg_ta_conviction,
+            'avg_ta_disagreement': avg_ta_disagreement,
         },
         'equity_curve': {
             'strategy': [
@@ -50,9 +64,27 @@ def test_run_portfolio_backtest_aggregates_component_results(monkeypatch: pytest
         ticker = str(payload.get('ticker', '')).upper()
         init_cap = float(payload.get('initial_capital_cny', 0))
         if ticker == '600519.SH':
-            return _fake_component_result(ticker=ticker, initial_capital_cny=init_cap, final_ratio=1.1, benchmark_ratio=1.05)
+            return _fake_component_result(
+                ticker=ticker,
+                initial_capital_cny=init_cap,
+                final_ratio=1.1,
+                benchmark_ratio=1.05,
+                ta_hybrid_applied_runs=2,
+                avg_ta_directional_bias=0.2,
+                avg_ta_conviction=0.6,
+                avg_ta_disagreement=0.1,
+            )
         if ticker == '000001.SZ':
-            return _fake_component_result(ticker=ticker, initial_capital_cny=init_cap, final_ratio=0.9, benchmark_ratio=1.0)
+            return _fake_component_result(
+                ticker=ticker,
+                initial_capital_cny=init_cap,
+                final_ratio=0.9,
+                benchmark_ratio=1.0,
+                ta_hybrid_applied_runs=1,
+                avg_ta_directional_bias=-0.1,
+                avg_ta_conviction=0.4,
+                avg_ta_disagreement=0.3,
+            )
         raise ValueError(f'unexpected ticker: {ticker}')
 
     monkeypatch.setattr(portfolio_module, 'run_batch_backtest', fake_run_batch_backtest)
@@ -95,6 +127,10 @@ def test_run_portfolio_backtest_aggregates_component_results(monkeypatch: pytest
     assert summary['excess_return_pct'] == -1.0
     assert summary['total_trade_cost_cny'] == 240.0
     assert summary['benchmark_ticker'] == '000300.SH'
+    assert summary['ta_hybrid_applied_runs'] == 3
+    assert summary['avg_ta_directional_bias'] == 0.05
+    assert summary['avg_ta_conviction'] == 0.5
+    assert summary['avg_ta_disagreement'] == 0.2
     assert request['initial_capital_cny'] == 1_000_000.0
     assert len(request['portfolio']) == 2
     assert len(result['components']) == 2
