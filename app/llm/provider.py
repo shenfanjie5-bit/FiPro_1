@@ -70,16 +70,50 @@ def _extract_json_payload(raw: str) -> dict[str, Any]:
         lines = text.splitlines()
         if len(lines) >= 3:
             text = '\n'.join(lines[1:-1]).strip()
-    if not text.startswith('{'):
-        start = text.find('{')
-        end = text.rfind('}')
-        if start == -1 or end == -1 or end <= start:
-            raise ValueError('no JSON object found')
-        text = text[start : end + 1]
-    payload = json.loads(text)
-    if not isinstance(payload, dict):
-        raise ValueError('expected JSON object')
-    return payload
+    if text.startswith('{'):
+        payload = json.loads(text)
+        if not isinstance(payload, dict):
+            raise ValueError('expected JSON object')
+        return payload
+
+    # Some providers prepend chain-of-thought or prose containing braces.
+    # Scan all balanced-object candidates and return the first valid JSON object.
+    starts = [idx for idx, ch in enumerate(text) if ch == '{']
+    if not starts:
+        raise ValueError('no JSON object found')
+    for start in starts:
+        depth = 0
+        in_string = False
+        escaped = False
+        for end in range(start, len(text)):
+            ch = text[end]
+            if escaped:
+                escaped = False
+                continue
+            if ch == '\\':
+                escaped = True
+                continue
+            if ch == '"':
+                in_string = not in_string
+                continue
+            if in_string:
+                continue
+            if ch == '{':
+                depth += 1
+            elif ch == '}':
+                depth -= 1
+                if depth == 0:
+                    candidate = text[start : end + 1]
+                    try:
+                        payload = json.loads(candidate)
+                    except json.JSONDecodeError:
+                        break
+                    if isinstance(payload, dict):
+                        return payload
+                    break
+                if depth < 0:
+                    break
+    raise ValueError('no valid JSON object found in response')
 
 
 class LLMProvider:

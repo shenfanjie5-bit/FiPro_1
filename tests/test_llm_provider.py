@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import pytest
 
-from app.llm.provider import LLMProvider
+from app.llm.provider import LLMProvider, _extract_json_payload
 from app.tools.wrapper import ToolExecutionError
 from app.validation.schema_validator import validate_report_schema
 
@@ -222,3 +222,13 @@ def test_llm_provider_live_ta_hybrid_view_normalizes_ranges(monkeypatch: pytest.
     assert view['conviction'] == 1.0
     assert view['disagreement'] == 0.0
     assert view['horizon_days_hint'] == 120
+
+
+def test_extract_json_payload_handles_prose_with_braces() -> None:
+    raw = (
+        "Some analysis with template {severity, description}.\\n"
+        "More prose before payload.\\n"
+        "{\"ok\": true, \"msg\": \"hello\", \"nested\": {\"a\": 1}}"
+    )
+    payload = _extract_json_payload(raw)
+    assert payload == {'ok': True, 'msg': 'hello', 'nested': {'a': 1}}

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import app.llm.provider as provider_module
+import app.workflows.subgraphs.ta_hybrid as ta_subgraph_module
 from app.workflows.subgraphs.ta_hybrid import run_ta_hybrid_subgraph
 
 
@@ -83,3 +84,46 @@ def test_ta_hybrid_subgraph_degrades_when_view_generation_fails(monkeypatch) -> 
     assert any('research.bull degraded' in reason for reason in reasons)
     assert output['state']['status'] == 'ANALYZED'
     assert output['signal']
+
+
+def test_ta_hybrid_subgraph_provider_uses_runtime_primary_model(monkeypatch) -> None:
+    captured: dict[str, str] = {}
+
+    def fake_runtime_config() -> dict[str, str]:
+        return {
+            'llm_primary_model': 'runtime-primary-model',
+            'llm_reviewer_model': 'runtime-reviewer-model',
+        }
+
+    class FakeProvider:
+        provider = 'openai_compatible'
+
+        def __init__(self, primary_model: str = 'mock-primary', reviewer_model: str = 'NONE') -> None:
+            captured['primary_model'] = primary_model
+            captured['reviewer_model'] = reviewer_model
+
+        def generate_ta_hybrid_view(self, **kwargs):  # noqa: ANN001
+            _ = kwargs
+            return {
+                'summary': 'ok',
+                'stance': 'NEUTRAL',
+                'directional_bias': 0.0,
+                'risk_bias': 0.0,
+                'conviction': 0.5,
+                'disagreement': 0.1,
+                'horizon_days_hint': 7,
+                'rationale_points': ['ok'],
+            }
+
+    monkeypatch.setattr(ta_subgraph_module, 'get_runtime_config', fake_runtime_config)
+    monkeypatch.setattr(ta_subgraph_module, 'LLMProvider', FakeProvider)
+    output = run_ta_hybrid_subgraph(
+        request=_request(),
+        context=_context(),
+        ta_research_rounds=1,
+        ta_risk_rounds=1,
+        ta_llm_call_cap=2,
+    )
+    assert output['state']['llm_calls_used'] == 2
+    assert captured['primary_model'] == 'runtime-primary-model'
+    assert captured['reviewer_model'] == 'runtime-reviewer-model'

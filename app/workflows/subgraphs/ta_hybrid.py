@@ -4,6 +4,7 @@ from datetime import datetime, timezone
 from typing import Any
 import uuid
 
+from app.core.runtime_config import get_runtime_config
 from app.llm.provider import LLMProvider
 
 
@@ -431,7 +432,11 @@ def run_ta_hybrid_subgraph(
     research_rounds = max(1, min(3, int(ta_research_rounds)))
     risk_rounds = max(1, min(3, int(ta_risk_rounds)))
     llm_call_cap = max(0, min(20, int(ta_llm_call_cap)))
-    provider = LLMProvider()
+    runtime_config = get_runtime_config()
+    provider = LLMProvider(
+        primary_model=str(runtime_config.get('llm_primary_model', 'mock-primary-v1')),
+        reviewer_model=str(runtime_config.get('llm_reviewer_model', 'NONE')),
+    )
     provider_mode = str(getattr(provider, 'provider', 'mock') or 'mock').strip().lower() or 'mock'
 
     substate: dict[str, Any] = {
