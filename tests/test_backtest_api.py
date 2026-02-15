@@ -86,6 +86,11 @@ def test_batch_backtest_runs_multiple_points_and_uses_backtest_mode(monkeypatch:
     assert body['summary']['benchmark_final_capital_cny'] > 1_000_000
     assert 'benchmark_total_return_pct' in body['summary']
     assert 'excess_return_pct' in body['summary']
+    assert 'strategy_gross_total_return_pct' in body['summary']
+    assert body['summary']['strategy_gross_final_capital_cny'] >= body['summary']['strategy_final_capital_cny']
+    assert body['summary']['total_trade_cost_cny'] >= 0
+    assert 'transaction_cost_model' in body['request']
+    assert 'transaction_cost_model' in body['equity_curve']
     assert body['request']['skill_pack']['skill_pack_id'] == 'cn_a_core'
     assert body['request']['skill_pack']['version'] == '0.1.0'
     assert body['equity_curve']['base_currency'] == 'CNY'
@@ -97,6 +102,103 @@ def test_batch_backtest_runs_multiple_points_and_uses_backtest_mode(monkeypatch:
     assert body['runs'][0]['benchmark_ticker'] == '000300.SH'
     assert body['runs'][0]['skill_pack_id'] == 'cn_a_core'
     assert body['runs'][0]['skill_pack_version'] == '0.1.0'
+
+
+def test_batch_backtest_prefers_model_defined_horizon_days(monkeypatch: pytest.MonkeyPatch) -> None:
+    call_index = {'value': 0}
+    horizon_days = [1, 7, 30]
+
+    def fake_runner(request_data: dict, thread_id: str) -> dict:
+        _ = request_data
+        _ = thread_id
+        call_index['value'] += 1
+        idx = call_index['value'] - 1
+        return {
+            'final_report': {
+                'report_id': f'report_horizon_{idx:03d}',
+                'decision': {
+                    'action': 'WATCH',
+                    'overall_score': 66,
+                    'confidence': 0.66,
+                    'summary': 'model proposes horizon',
+                    'evaluation_horizon_days': horizon_days[idx],
+                },
+                'data_quality': {'status': 'OK'},
+                'provenance': {'model': {'primary': 'openclaw:main'}, 'tool_call_stats': {}},
+            },
+            'persist_refs': {},
+        }
+
+    monkeypatch.setattr(routes_module, 'run_research_workflow', fake_runner)
+    monkeypatch.setattr(routes_module, 'get_market_snapshot', _fake_snapshot)
+    monkeypatch.setattr(routes_module, 'get_index_market_snapshot', _fake_snapshot)
+
+    payload = {
+        'ticker': '600519.SH',
+        'market': 'CN_A',
+        'strategy_version_id': 'stg_v1',
+        'tier': 'TIER0',
+        'start_date': '2026-02-02',
+        'end_date': '2026-02-04',
+        'step_days': 1,
+        'trading_days_only': True,
+        'max_runs': 10,
+        'evaluation_horizon_days': 5,
+    }
+    resp = client.post('/backtests/run', json=payload)
+    assert resp.status_code == 200
+    body = resp.json()
+
+    assert [item['evaluation_horizon_days_used'] for item in body['runs']] == horizon_days
+    assert all(item['evaluation_horizon_source'] == 'decision.evaluation_horizon_days' for item in body['runs'])
+    assert body['request']['evaluation_horizon_days_default'] == 5
+    assert body['request']['evaluation_horizon_mode'] == 'model_first'
+    assert body['summary']['min_evaluation_horizon_days'] == 1
+    assert body['summary']['max_evaluation_horizon_days'] == 30
+    assert body['summary']['evaluation_horizon_source_counts']['decision.evaluation_horizon_days'] == 3
+
+
+def test_batch_backtest_maps_time_horizon_to_days(monkeypatch: pytest.MonkeyPatch) -> None:
+    def fake_runner(request_data: dict, thread_id: str) -> dict:
+        _ = request_data
+        _ = thread_id
+        return {
+            'final_report': {
+                'report_id': 'report_time_horizon_001',
+                'decision': {
+                    'action': 'WATCH',
+                    'overall_score': 60,
+                    'confidence': 0.5,
+                    'summary': 'use long term horizon',
+                    'time_horizon': 'LONG_TERM',
+                },
+                'data_quality': {'status': 'OK'},
+                'provenance': {'model': {'primary': 'openclaw:main'}, 'tool_call_stats': {}},
+            },
+            'persist_refs': {},
+        }
+
+    monkeypatch.setattr(routes_module, 'run_research_workflow', fake_runner)
+    monkeypatch.setattr(routes_module, 'get_market_snapshot', _fake_snapshot)
+    monkeypatch.setattr(routes_module, 'get_index_market_snapshot', _fake_snapshot)
+
+    payload = {
+        'ticker': '600519.SH',
+        'market': 'CN_A',
+        'strategy_version_id': 'stg_v1',
+        'tier': 'TIER0',
+        'start_date': '2026-02-02',
+        'end_date': '2026-02-02',
+        'step_days': 1,
+        'trading_days_only': True,
+        'max_runs': 10,
+        'evaluation_horizon_days': 5,
+    }
+    resp = client.post('/backtests/run', json=payload)
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body['runs'][0]['evaluation_horizon_days_used'] == 60
+    assert body['runs'][0]['evaluation_horizon_source'] == 'decision.time_horizon'
 
 
 def test_batch_backtest_rejects_when_generated_points_exceed_max_runs(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -143,16 +245,15 @@ def test_batch_backtest_rejects_invalid_skill_pack(monkeypatch: pytest.MonkeyPat
     assert 'invalid skill pack configuration' in str(resp.json().get('detail', '')).lower()
 
 
-def test_batch_backtest_marks_failed_items_when_runner_raises(monkeypatch: pytest.MonkeyPatch) -> None:
-    call_index = {'value': 0}
-
+def test_batch_backtest_interrupts_and_returns_resume_checkpoint_when_main_chain_fails(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     def fake_runner(request_data: dict, thread_id: str) -> dict:
-        call_index['value'] += 1
-        if call_index['value'] == 2:
+        if str(request_data.get('asof', '')).startswith('2026-02-03'):
             raise RuntimeError('boom')
         return {
             'final_report': {
-                'report_id': f'report_{call_index["value"]:03d}',
+                'report_id': f'report_{thread_id[-4:]}',
                 'decision': {'action': 'WATCH', 'overall_score': 55, 'confidence': 0.4, 'summary': 'ok'},
                 'data_quality': {'status': 'PARTIAL'},
                 'provenance': {'model': {'primary': 'openclaw:main'}, 'tool_call_stats': {}},
@@ -179,13 +280,19 @@ def test_batch_backtest_marks_failed_items_when_runner_raises(monkeypatch: pytes
     assert resp.status_code == 200
     body = resp.json()
 
-    assert body['summary']['total_runs'] == 3
-    assert body['summary']['completed_runs'] == 2
+    assert body['summary']['interrupted'] is True
+    assert body['summary']['resumable'] is True
+    assert 'boom' in body['summary']['interruption_reason']
+    assert body['summary']['total_runs'] == 2
+    assert body['summary']['completed_runs'] == 1
     assert body['summary']['failed_runs'] == 1
-    assert len(body['equity_curve']['strategy']) == 2
-    failed = [item for item in body['runs'] if item['status'] == 'FAILED']
-    assert len(failed) == 1
-    assert 'boom' in failed[0]['error']
+    assert body['summary']['processed_points'] == 1
+    assert body['summary']['remaining_points'] == 2
+    assert len(body['equity_curve']['strategy']) == 1
+    assert len(body['runs']) == 1
+    assert body['runs'][0]['status'] == 'COMPLETED'
+    assert isinstance(body['resume_state'], dict)
+    assert body['resume_state']['next_index'] == 1
 
 
 def test_batch_backtest_skips_non_trading_days_when_tushare_rows_empty(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -358,6 +465,50 @@ def test_batch_backtest_resolves_champion_skill_pack_alias(monkeypatch: pytest.M
     assert seen_versions == ['0.9.0', '0.9.0']
 
 
+def test_portfolio_backtest_endpoint(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(
+        routes_module,
+        'run_portfolio_backtest',
+        lambda payload, runner, snapshot_loader, benchmark_loader: {  # noqa: ARG005
+            'portfolio_id': 'portfolio_bt_demo',
+            'request': payload,
+            'summary': {
+                'component_count': 2,
+                'strategy_total_return_pct': 2.5,
+                'benchmark_total_return_pct': 1.1,
+                'excess_return_pct': 1.4,
+            },
+            'equity_curve': {'strategy': [], 'benchmark': [], 'benchmark_ticker': '000300.SH', 'base_currency': 'CNY'},
+            'components': [],
+        },
+    )
+
+    payload = {
+        'market': 'CN_A',
+        'strategy_version_id': 'stg_v1',
+        'tier': 'TIER0',
+        'start_date': '2026-02-10',
+        'end_date': '2026-02-11',
+        'step_days': 1,
+        'trading_days_only': True,
+        'asof_time': '09:30',
+        'timezone_offset': '+08:00',
+        'max_runs': 10,
+        'evaluation_horizon_days': 1,
+        'initial_capital_cny': 1_000_000,
+        'portfolio': [
+            {'ticker': '600519.SH', 'weight': 0.6},
+            {'ticker': '000001.SZ', 'weight': 0.4},
+        ],
+    }
+    resp = client.post('/backtests/portfolio/run', json=payload)
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body['portfolio_id'] == 'portfolio_bt_demo'
+    assert body['summary']['component_count'] == 2
+    assert body['summary']['excess_return_pct'] == 1.4
+
+
 def test_backtest_job_endpoints(monkeypatch: pytest.MonkeyPatch) -> None:
     fake_job = {
         'job_id': 'btjob_demo_001',
@@ -383,6 +534,11 @@ def test_backtest_job_endpoints(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(routes_module, 'submit_backtest_job', lambda payload, runner, snapshot_loader, benchmark_loader: fake_job)
     monkeypatch.setattr(routes_module, 'get_backtest_job', lambda job_id: fake_job if job_id == 'btjob_demo_001' else None)
     monkeypatch.setattr(routes_module, 'cancel_backtest_job', lambda job_id: {**fake_job, 'status': 'CANCELLING', 'cancel_requested': True} if job_id == 'btjob_demo_001' else None)
+    monkeypatch.setattr(
+        routes_module,
+        'resume_backtest_job',
+        lambda job_id, runner, snapshot_loader, benchmark_loader: {**fake_job, 'job_id': 'btjob_demo_002', 'status': 'PENDING'} if job_id == 'btjob_demo_001' else None,
+    )
 
     payload = {
         'ticker': '600519.SH',
@@ -407,6 +563,10 @@ def test_backtest_job_endpoints(monkeypatch: pytest.MonkeyPatch) -> None:
     cancel_resp = client.post('/backtests/jobs/btjob_demo_001/cancel')
     assert cancel_resp.status_code == 200
     assert cancel_resp.json()['status'] == 'CANCELLING'
+
+    resume_resp = client.post('/backtests/jobs/btjob_demo_001/resume')
+    assert resume_resp.status_code == 202
+    assert resume_resp.json()['job_id'] == 'btjob_demo_002'
 
     not_found_resp = client.get('/backtests/jobs/not_found')
     assert not_found_resp.status_code == 404
@@ -452,6 +612,12 @@ def test_skill_pack_promotion_run_endpoint(monkeypatch: pytest.MonkeyPatch) -> N
         'execute': True,
         'dry_run': False,
         'manual_approved': True,
+        'anti_overfit_evidence': {
+            'train_window': {'start_date': '2018-01-01', 'end_date': '2023-12-31'},
+            'validation_window': {'start_date': '2024-01-01', 'end_date': '2025-12-31'},
+            'sensitivity': {'scenario_count': 8, 'pass_rate': 0.8, 'min_pass_rate': 0.7},
+            'param_change_count': 2,
+        },
         'backtest': {
             'ticker': '600519.SH',
             'market': 'CN_A',
@@ -472,6 +638,7 @@ def test_skill_pack_promotion_run_endpoint(monkeypatch: pytest.MonkeyPatch) -> N
     assert body['candidate_version'] == '0.1.0'
     assert body['champion_version'] == '0.0.1'
     assert body['evaluation']['decision'] == 'ALLOW'
+    assert body['evaluation']['anti_overfit_evidence']['param_change_count'] == 2
     assert body['execution']['executed'] is True
     assert body['candidate_backtest']['batch_id'] == 'bt_candidate'
     assert body['champion_backtest']['batch_id'] == 'bt_champion'
@@ -494,3 +661,334 @@ def test_skill_pack_versions_endpoint(monkeypatch: pytest.MonkeyPatch) -> None:
     assert body['skill_pack_id'] == 'cn_a_core'
     assert body['champion_version'] == '0.0.1'
     assert len(body['items']) == 2
+
+
+def test_skill_pack_candidate_generate_endpoint(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(
+        routes_module,
+        'generate_skill_pack_candidates',
+        lambda **kwargs: {  # noqa: ARG005
+            'skill_pack_id': 'cn_a_core',
+            'base_version': '0.1.0',
+            'calibration_version': '0.1.0',
+            'profile_id': 'cn_a_core_calibration_v0_1_0',
+            'generated_count': 2,
+            'items': [
+                {'version': '0.1.1', 'param_id': 'factor.weight.price.momentum_20d'},
+                {'version': '0.1.2', 'param_id': 'factor.weight.flow.moneyflow_5d'},
+            ],
+            'dry_run': False,
+        },
+    )
+
+    payload = {
+        'skill_pack_id': 'cn_a_core',
+        'base_version': '0.1.0',
+        'calibration_version': '0.1.0',
+        'max_candidates': 2,
+        'author': 'qa',
+        'param_ids': [],
+        'dry_run': False,
+    }
+    resp = client.post('/skill-packs/candidates/generate', json=payload)
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body['skill_pack_id'] == 'cn_a_core'
+    assert body['generated_count'] == 2
+    assert body['items'][0]['version'] == '0.1.1'
+
+
+def test_skill_pack_llm_proposal_run_endpoint(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(
+        routes_module,
+        'run_llm_skill_pack_proposal_cycle',
+        lambda **kwargs: {  # noqa: ARG005
+            'run_id': 'run_demo_001',
+            'skill_pack_id': 'cn_a_core',
+            'base_version': '0.1.0',
+            'candidate_generation': {'generated_count': 2},
+            'selected_candidate': {'candidate_version': '0.1.2'},
+            'execution': None,
+        },
+    )
+
+    payload = {
+        'skill_pack_id': 'cn_a_core',
+        'base_version': 'champion',
+        'proposal_count': 2,
+        'author': 'qa',
+        'execute': False,
+        'manual_approved': False,
+        'anti_overfit_evidence': {},
+        'dry_run': False,
+        'backtest': {
+            'ticker': '600519.SH',
+            'market': 'CN_A',
+            'strategy_version_id': 'stg_v1',
+            'tier': 'TIER0',
+            'start_date': '2026-02-10',
+            'end_date': '2026-02-11',
+            'step_days': 1,
+            'trading_days_only': True,
+            'max_runs': 10,
+        },
+    }
+    resp = client.post('/skill-packs/proposals/llm-run', json=payload)
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body['run_id'] == 'run_demo_001'
+    assert body['selected_candidate']['candidate_version'] == '0.1.2'
+
+
+def test_skill_pack_llm_proposal_run_query_endpoints(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(
+        routes_module,
+        'list_llm_proposal_runs',
+        lambda limit, offset: {  # noqa: ARG005
+            'total': 1,
+            'limit': 50,
+            'offset': 0,
+            'items': [
+                {
+                    'run_id': 'run_demo_001',
+                    'generated_at': '2026-02-14T00:00:00+00:00',
+                    'skill_pack_id': 'cn_a_core',
+                    'base_version': '0.1.0',
+                    'proposal_count': 2,
+                    'dry_run': False,
+                    'selected_candidate_version': '0.1.2',
+                    'executed': False,
+                }
+            ],
+        },
+    )
+    monkeypatch.setattr(
+        routes_module,
+        'get_llm_proposal_run',
+        lambda run_id: {'run_id': run_id, 'skill_pack_id': 'cn_a_core'} if run_id == 'run_demo_001' else None,
+    )
+
+    list_resp = client.get('/skill-packs/proposals/runs')
+    assert list_resp.status_code == 200
+    list_body = list_resp.json()
+    assert list_body['total'] == 1
+    assert list_body['items'][0]['run_id'] == 'run_demo_001'
+
+    get_resp = client.get('/skill-packs/proposals/runs/run_demo_001')
+    assert get_resp.status_code == 200
+    assert get_resp.json()['skill_pack_id'] == 'cn_a_core'
+
+    not_found = client.get('/skill-packs/proposals/runs/missing')
+    assert not_found.status_code == 404
+
+
+def test_skill_pack_champion_health_check_endpoints(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(
+        routes_module,
+        'run_champion_health_check',
+        lambda **kwargs: {  # noqa: ARG005
+            'run_id': 'hc_demo_001',
+            'skill_pack_id': 'cn_a_core',
+            'champion_version': '0.1.4',
+            'baseline_version': '0.1.3',
+            'health_status': 'PASS',
+            'evaluation': {'decision': 'ALLOW'},
+            'rollback_execution': None,
+        },
+    )
+    monkeypatch.setattr(
+        routes_module,
+        'list_champion_health_checks',
+        lambda limit, offset: {  # noqa: ARG005
+            'total': 1,
+            'limit': limit,
+            'offset': offset,
+            'items': [
+                {
+                    'run_id': 'hc_demo_001',
+                    'skill_pack_id': 'cn_a_core',
+                    'health_status': 'PASS',
+                }
+            ],
+        },
+    )
+    monkeypatch.setattr(
+        routes_module,
+        'get_champion_health_check',
+        lambda run_id: {'run_id': run_id, 'health_status': 'PASS'} if run_id == 'hc_demo_001' else None,
+    )
+
+    payload = {
+        'skill_pack_id': 'cn_a_core',
+        'champion_version': '0.1.4',
+        'baseline_version': '0.1.3',
+        'auto_rollback': False,
+        'rollback_dry_run': True,
+        'rollback_reason': 'monitoring_gate_block',
+        'operator': 'monitor_engine',
+        'manual_approved': True,
+        'anti_overfit_evidence': {},
+        'backtest': {
+            'ticker': '600519.SH',
+            'market': 'CN_A',
+            'strategy_version_id': 'stg_v1',
+            'tier': 'TIER0',
+            'start_date': '2026-02-10',
+            'end_date': '2026-02-11',
+            'step_days': 1,
+            'trading_days_only': True,
+            'max_runs': 10,
+        },
+    }
+
+    run_resp = client.post('/skill-packs/champion/health-check', json=payload)
+    assert run_resp.status_code == 200
+    run_body = run_resp.json()
+    assert run_body['run_id'] == 'hc_demo_001'
+    assert run_body['health_status'] == 'PASS'
+
+    list_resp = client.get('/skill-packs/champion/health-checks')
+    assert list_resp.status_code == 200
+    list_body = list_resp.json()
+    assert list_body['total'] == 1
+    assert list_body['items'][0]['run_id'] == 'hc_demo_001'
+
+    get_resp = client.get('/skill-packs/champion/health-checks/hc_demo_001')
+    assert get_resp.status_code == 200
+    assert get_resp.json()['health_status'] == 'PASS'
+
+    not_found = client.get('/skill-packs/champion/health-checks/missing')
+    assert not_found.status_code == 404
+
+
+def test_skill_pack_release_event_query_endpoints(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(
+        routes_module,
+        'list_release_events',
+        lambda limit, offset: {  # noqa: ARG005
+            'total': 1,
+            'limit': limit,
+            'offset': offset,
+            'items': [
+                {
+                    'event_id': 'release_demo_001',
+                    'skill_pack_id': 'cn_a_core',
+                    'target_version': '0.1.4',
+                    'switch_mode': 'promotion',
+                    'executed': True,
+                }
+            ],
+        },
+    )
+    monkeypatch.setattr(
+        routes_module,
+        'get_release_event',
+        lambda event_id: {'event_id': event_id, 'executed': True} if event_id == 'release_demo_001' else None,
+    )
+
+    list_resp = client.get('/skill-packs/releases')
+    assert list_resp.status_code == 200
+    list_body = list_resp.json()
+    assert list_body['total'] == 1
+    assert list_body['items'][0]['event_id'] == 'release_demo_001'
+
+    get_resp = client.get('/skill-packs/releases/release_demo_001')
+    assert get_resp.status_code == 200
+    assert get_resp.json()['executed'] is True
+
+    not_found = client.get('/skill-packs/releases/missing')
+    assert not_found.status_code == 404
+
+
+def test_skill_pack_champion_watchdog_endpoints(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(
+        routes_module,
+        'run_champion_watchdog',
+        lambda **kwargs: {  # noqa: ARG005
+            'run_id': 'wd_demo_001',
+            'overall_status': 'WARN',
+            'alert_count': 1,
+            'summary': {'latest_health_status': 'FAIL'},
+            'rollback_recommendation': {'should_rollback': True, 'target_version': '0.1.3'},
+        },
+    )
+    monkeypatch.setattr(
+        routes_module,
+        'list_champion_watchdog_runs',
+        lambda limit, offset: {  # noqa: ARG005
+            'total': 1,
+            'limit': limit,
+            'offset': offset,
+            'items': [
+                {
+                    'run_id': 'wd_demo_001',
+                    'overall_status': 'WARN',
+                    'alert_count': 1,
+                    'should_rollback': True,
+                    'rollback_target_version': '0.1.3',
+                }
+            ],
+        },
+    )
+    monkeypatch.setattr(
+        routes_module,
+        'get_champion_watchdog_run',
+        lambda run_id: {'run_id': run_id, 'overall_status': 'WARN'} if run_id == 'wd_demo_001' else None,
+    )
+
+    payload = {
+        'run_health_check': False,
+        'health_check': {},
+        'lookback_runs': 20,
+        'consecutive_fail_critical': 2,
+        'fail_rate_warn': 0.25,
+        'fail_rate_critical': 0.5,
+        'rollback_storm_critical': 2,
+    }
+
+    run_resp = client.post('/skill-packs/champion/watchdog/run', json=payload)
+    assert run_resp.status_code == 200
+    assert run_resp.json()['run_id'] == 'wd_demo_001'
+
+    list_resp = client.get('/skill-packs/champion/watchdog/runs')
+    assert list_resp.status_code == 200
+    assert list_resp.json()['items'][0]['run_id'] == 'wd_demo_001'
+
+    get_resp = client.get('/skill-packs/champion/watchdog/runs/wd_demo_001')
+    assert get_resp.status_code == 200
+    assert get_resp.json()['overall_status'] == 'WARN'
+
+    not_found = client.get('/skill-packs/champion/watchdog/runs/missing')
+    assert not_found.status_code == 404
+
+
+def test_skill_pack_champion_switch_endpoint(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(
+        routes_module,
+        'switch_skill_pack_champion',
+        lambda **kwargs: {  # noqa: ARG005
+            'executed': True,
+            'dry_run': False,
+            'skill_pack_id': 'cn_a_core',
+            'target_version': '0.0.1',
+            'champion_version_before': '0.1.0',
+            'champion_version_after': '0.0.1',
+            'archived_previous_champion': True,
+            'reason': 'rollback_after_regression',
+            'operator': 'qa_user',
+            'switch_mode': 'manual',
+        },
+    )
+
+    payload = {
+        'target_version': '0.0.1',
+        'reason': 'rollback_after_regression',
+        'operator': 'qa_user',
+        'dry_run': False,
+    }
+    resp = client.post('/skill-packs/cn_a_core/champion/switch', json=payload)
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body['executed'] is True
+    assert body['champion_version_before'] == '0.1.0'
+    assert body['champion_version_after'] == '0.0.1'

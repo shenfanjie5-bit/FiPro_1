@@ -101,3 +101,45 @@ def test_llm_provider_live_analysis_merges_when_available(monkeypatch: pytest.Mo
     assert report['decision']['summary'] == 'Live model summary from upstream.'
     assert report['thesis']['base_case'] == 'Cash flow stability supports a watch stance.'
     assert report['provenance']['model']['primary'] == 'gpt-test'
+
+
+def test_openclaw_mode_injects_isolation_headers(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv('LLM_PROVIDER', 'openai_compatible')
+    monkeypatch.setenv('LLM_BASE_URL', 'http://127.0.0.1:18789/v1')
+    monkeypatch.setenv('LLM_API_KEY', 'gateway-token')
+    monkeypatch.setenv('OPENCLAW_SESSION_NAMESPACE', 'fipro1-isolated')
+    captured_headers: dict[str, str] = {}
+
+    class _FakeResponse:
+        status_code = 200
+
+        def raise_for_status(self) -> None:
+            return None
+
+        def json(self) -> dict:
+            return {
+                'choices': [
+                    {
+                        'message': {
+                            'content': '{"decision_summary":"isolated","base_case":"b","bull_case":"u","bear_case":"d","next_steps":["n"],"driver_focus":"f","risk_flags":[],"invalidations":[],"memory_summary":"m"}'
+                        }
+                    }
+                ]
+            }
+
+    def fake_post(url: str, *, headers: dict, json: dict, timeout: float):  # noqa: ANN001
+        _ = url
+        _ = json
+        _ = timeout
+        captured_headers.update(headers)
+        return _FakeResponse()
+
+    monkeypatch.setattr('app.llm.provider.httpx.post', fake_post)
+    provider = LLMProvider(primary_model='openclaw:main')
+    context = _context()
+    context['thread_id'] = 'thread_isolation_001'
+    report = provider.generate_report_draft(context)
+
+    assert report['decision']['summary'] == 'isolated'
+    assert captured_headers.get('x-openclaw-agent-id') == 'main'
+    assert str(captured_headers.get('x-openclaw-session-key', '')).startswith('fipro1-isolated:')

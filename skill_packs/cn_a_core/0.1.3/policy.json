@@ -1,0 +1,74 @@
+{
+  "version": "0.1.0",
+  "actions": [
+    "BUY",
+    "ADD",
+    "HOLD",
+    "REDUCE",
+    "SELL",
+    "AVOID"
+  ],
+  "positioning": {
+    "max_position": 1.0,
+    "target_position_formula": "clamp(((final_score - 50) / 50) * confidence, 0, max_position)"
+  },
+  "thresholds": {
+    "buy_score_min": 72,
+    "buy_confidence_min": 0.62,
+    "add_gap_min": 0.15,
+    "hold_gap_max": 0.1,
+    "reduce_gap_min": 0.15,
+    "sell_score_max": 35,
+    "flat_non_buy_action": "AVOID"
+  },
+  "rules": [
+    {
+      "rule_id": "open_buy",
+      "scope": "flat_position",
+      "when": "current_pos == 0 && final_score >= 72 && confidence >= 0.62",
+      "action": "BUY",
+      "priority": 90
+    },
+    {
+      "rule_id": "open_avoid",
+      "scope": "flat_position",
+      "when": "current_pos == 0 && !(final_score >= 72 && confidence >= 0.62)",
+      "action": "AVOID",
+      "priority": 80
+    },
+    {
+      "rule_id": "add_position",
+      "scope": "has_position",
+      "when": "target_pos - current_pos >= 0.15",
+      "action": "ADD",
+      "priority": 70
+    },
+    {
+      "rule_id": "reduce_position",
+      "scope": "has_position",
+      "when": "current_pos - target_pos >= 0.15",
+      "action": "REDUCE",
+      "priority": 70
+    },
+    {
+      "rule_id": "hold_position",
+      "scope": "has_position",
+      "when": "abs(target_pos - current_pos) < 0.10",
+      "action": "HOLD",
+      "priority": 60
+    },
+    {
+      "rule_id": "force_sell",
+      "scope": "has_position",
+      "when": "final_score < 35 || hard_risk_triggered",
+      "action": "SELL",
+      "priority": 100
+    }
+  ],
+  "degradation_policy": {
+    "on_data_quality_status": "DEGRADED",
+    "allow_new_position": false,
+    "allow_add_position": false,
+    "allow_reduce_or_sell": true
+  }
+}

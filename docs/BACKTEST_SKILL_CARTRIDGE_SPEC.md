@@ -210,6 +210,7 @@ skill_packs/
       risk.json
       llm_mapping.json
       gate.json
+      calibration.json   # 可选：参数定标模板
 ```
 
 关键字段：
@@ -306,7 +307,7 @@ skill_packs/
 1. champion skill 在线加载。
 2. 与 `LIVE/SHADOW` 统一决策引擎。
 
-### 10.1 当前执行进度（2026-02-12）
+### 10.1 当前执行进度（2026-02-14）
 
 1. 已完成：`skill_pack` 模板目录与文件结构落地。
 2. 已完成：回测与工作流在运行时加载 `skill_pack`，并回传模板摘要。
@@ -314,14 +315,68 @@ skill_packs/
 4. 已完成：事件因子在 RAG/公告链路后的实时回填（`event.policy_signal`/`event.governance_signal`），并在进入 LLM 前刷新评分。
 5. 已完成：`candidate -> champion` 自动评估与晋级执行器（支持 `dry_run` 与 `manual_approval`）。
 6. 已完成：工作流与回测支持 `champion/auto` 版本别名，优先在线加载 champion skill。
+7. 已完成：晋级门禁改为“相对 champion 增量”口径（`excess_return_delta_pct`）并引入真实分段窗口胜率计算（`segment_win_rate`）。
+8. 已完成：落地参数定标模板 `calibration.json` 及校验加载器/脚本，支持后续批量调参与候选版本治理。
+9. 已完成：`anti_overfit` 从配置约束升级为强门禁校验（训练/验证窗口、灵敏度、参数变更上限）。
+10. 已完成：提供基于 `calibration.json` 的 candidate 自动生成功能（API + 脚本）。
+11. 已完成：新增 Tushare 全量接口因子注册表（默认 `weight=0`）与查询 API（`GET /factors/registry`），并在 BACKTEST 上下文注入注册表供模型使用。
+12. 已完成：新增本地数据统一读取网关（`POST /local-data/batch-query`），支持 `endpoint+ticker+时间窗` 切片，并将读取摘要写入报告 `provenance.local_data_access`。
+13. 已完成：candidate 生成支持“参数扰动 + endpoint 组合搜索”混合模式，可按 endpoint 生成 `weight=0` 影子候选（支持 allowlist 与组合阶数）。
+14. 已完成：LIVE 模式强制绑定 champion skill（忽略显式版本）；新增 champion 手动切换/回滚能力（`POST /skill-packs/{skill_pack_id}/champion/switch`），并写入 manifest 审计字段 `champion_switch`。
+15. 已完成：LLM 提案闭环（`POST /skill-packs/proposals/llm-run`）：支持 LLM 生成规则/公式候选（含 `append` 新增规则）、批量回测评估、LLM 在候选结果中选优；默认仍由 gate 决定是否可晋级。
+16. 已完成：回测成本模型升级（手续费/滑点/卖出税），新增 gross/net 双口径收益、交易成本与换手统计。
+17. 已完成：LLM 提案运行审计落库（`.run/llm_proposal_runs`）与查询 API（`GET /skill-packs/proposals/runs*`）。
+18. 已完成：组合级回测接口（`POST /backtests/portfolio/run`），支持多标的权重分配、组合资金曲线聚合与组件回测摘要输出。
+19. 已完成：promotion anti-overfit 增加稳健性门禁（`walk_forward_stability` + `bootstrap_significance`），默认纳入 gate 决策。
+20. 已完成：前端提案评审页（`/proposals`），支持 run 列表、详情评估和审计 JSON 复盘。
+21. 已完成：champion 健康检查与审计接口（`POST /skill-packs/champion/health-check` + `GET /skill-packs/champion/health-checks*`）。
+22. 已完成：gate 失败时可触发自动回滚（支持 dry-run），并在监控页回看回滚执行结果。
+23. 已完成：发布事件审计时间线（`GET /skill-packs/releases*`），统一回看晋级/切换/回滚事件。
+24. 已完成：Champion Watchdog（`POST /skill-packs/champion/watchdog/run`），输出告警清单与回滚建议。
+25. 已完成：Watchdog 定时脚本与调度模板（`scripts/champion_watchdog.py` + `docs/CHAMPION_WATCHDOG_SCHEDULE.md`）。
 
-## 11. 当前需要确认的参数（细化清单）
+### 10.2 偏离评估与取舍（2026-02-12）
 
-1. MVP 第一批因子清单（建议 8-12 个）。
-2. 行业差异化权重是否在 MVP 就引入。
-3. 风控阈值具体数值（回撤/止损/仓位）。
-4. 门禁阈值是否按市场阶段动态调整。
-5. `candidate -> champion` 是否必须人工确认。
+1. 当前主流程与规范已对齐，未发现阻断级偏离项。
+2. 仍建议后续补充：anti-overfit 证据从“请求侧上报”升级为“系统内自动计算并落库”，减少人工填报成本。
+
+## 11. 参数定标基线（MVP v0.1.0）
+
+### 11.1 已定版参数
+
+1. 因子清单：MVP 固定 10 个（`price/fundamental/flow/event/risk` 五大域），其中允许 `weight=0` 因子作为影子观测位（当前为 `flow.block_trade_net`、`event.governance_signal`）。
+2. 行业差异化权重：MVP 不引入行业分桶，先统一权重；行业化放到 `v0.2+`。
+3. 动作阈值：`buy_score_min=72`、`buy_confidence_min=0.62`、`add_gap_min=0.15`、`hold_gap_max=0.10`、`reduce_gap_min=0.15`、`sell_score_max=35`。
+4. 风控阈值：`max_single_position=0.6`、`max_drawdown_pct=12`，`DEGRADED` 状态禁止开新仓。
+5. 门禁阈值：`excess_return_delta_pct>=1.0`、`max_drawdown_delta_pct<=2.0`、`turnover_delta_pct<=20.0`、`data_quality_degraded_rate_delta_pct<=0`、`segment_win_rate>=0.7`。
+6. 人工确认：`candidate -> champion` 默认必须人工确认（`manual_approval_required=true`）。
+
+### 11.2 调参范围（执行模板）
+
+1. 调参模板文件：`skill_packs/cn_a_core/0.1.0/calibration.json`。
+2. 主要搜索空间：核心权重、买入/卖出阈值、置信度系数，保持风控硬约束冻结。
+3. 单轮修改上限：最多 8 个参数（防止不可解释的大幅漂移）。
+4. 数据切分：固定 `train` 与 `validation` 窗口，禁止同窗调参与评估。
+
+## 12. 产品化细化标准
+
+### 12.1 版本与发布
+
+1. Skill 包状态仅允许 `draft/candidate/champion/archived`。
+2. 线上默认优先加载 `champion`，无 champion 才回退到默认基线版本。
+3. 晋级执行必须记录：候选版本、对比基线、门禁明细、执行人/审批状态。
+
+### 12.2 可运维性
+
+1. 回测任务必须支持异步运行、进度查询、取消中断、结果留存。
+2. 回测输出必须包含：收益曲线、基准曲线、超额收益、动作分布、数据质量分布。
+3. 所有降级路径必须进入 `degradation_matrix`，且不能绕过硬风控。
+
+### 12.3 可扩展性
+
+1. 新 Tushare 接口先 `weight=0` 接入影子运行，通过稳定性门禁后再上调权重。
+2. 新模型接入不得改变 `LLM -> 结构化事件 -> 规则引擎动作` 的接口契约。
+3. 允许通过新增 skill pack 版本引入新公式，但必须保持向后可审计、可回滚。
 
 ---
 

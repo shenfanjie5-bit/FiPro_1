@@ -2,29 +2,108 @@ import { FormEvent, useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 
 import { getRuntimeConfig, updateRuntimeConfig } from '../api/client';
-import type { LlmProvider, RunMode, RuntimeConfig, RuntimeConfigUpdatePayload } from '../types/report';
+import { DataSourceStatusWidget } from '../components/DataSourceStatusWidget';
+import type { RuntimeConfig, RuntimeConfigUpdatePayload, RuntimeLlmProfile } from '../types/report';
 
 interface StartupFormState {
-  defaultRunMode: RunMode;
-  llmProvider: LlmProvider;
-  llmBaseUrl: string;
+  llmProfileId: string;
   llmPrimaryModel: string;
-  llmReviewerModel: string;
   llmShadowModel: string;
-  llmShadowReviewerModel: string;
-  llmApiKey: string;
 }
 
-function buildFormState(config: RuntimeConfig): StartupFormState {
+function normalizeModels(values: Array<string | undefined>): string[] {
+  const merged: string[] = [];
+  for (const raw of values) {
+    const value = String(raw || '').trim();
+    if (!value || value.toUpperCase() === 'NONE') {
+      continue;
+    }
+    if (!merged.includes(value)) {
+      merged.push(value);
+    }
+    if (merged.length >= 3) {
+      break;
+    }
+  }
+  return merged;
+}
+
+function normalizeProfiles(config: RuntimeConfig): RuntimeLlmProfile[] {
+  const source = Array.isArray(config.llm_profiles) ? config.llm_profiles : [];
+  const profiles: RuntimeLlmProfile[] = [];
+  for (const item of source) {
+    const id = String(item?.id || '').trim();
+    if (!id || profiles.some((existing) => existing.id === id)) {
+      continue;
+    }
+    const available = normalizeModels([
+      ...(Array.isArray(item.llm_available_models) ? item.llm_available_models : []),
+      item.llm_primary_model,
+      item.llm_shadow_model
+    ]);
+    profiles.push({
+      id,
+      label: String(item.label || id),
+      llm_provider: item.llm_provider,
+      llm_primary_model: String(item.llm_primary_model || ''),
+      llm_shadow_model: String(item.llm_shadow_model || ''),
+      llm_available_models: available,
+      llm_api_key_set: Boolean(item.llm_api_key_set)
+    });
+  }
+  if (profiles.length > 0) {
+    return profiles;
+  }
+  const fallbackId = String(config.llm_profile_id || config.llm_provider || 'default').trim() || 'default';
+  return [
+    {
+      id: fallbackId,
+      label: fallbackId,
+      llm_provider: config.llm_provider,
+      llm_primary_model: config.llm_primary_model,
+      llm_shadow_model: config.llm_shadow_model,
+      llm_available_models: normalizeModels([
+        ...(Array.isArray(config.llm_available_models) ? config.llm_available_models : []),
+        config.llm_primary_model,
+        config.llm_shadow_model
+      ]),
+      llm_api_key_set: config.llm_api_key_set
+    }
+  ];
+}
+
+function findProfile(profiles: RuntimeLlmProfile[], profileId: string): RuntimeLlmProfile | null {
+  const normalized = profileId.trim();
+  if (!normalized) {
+    return profiles[0] || null;
+  }
+  return profiles.find((item) => item.id === normalized) || profiles[0] || null;
+}
+
+function profileModels(profile: RuntimeLlmProfile | null): string[] {
+  if (!profile) {
+    return [];
+  }
+  return normalizeModels([
+    ...(Array.isArray(profile.llm_available_models) ? profile.llm_available_models : []),
+    profile.llm_primary_model,
+    profile.llm_shadow_model
+  ]);
+}
+
+function buildFormState(config: RuntimeConfig, profiles: RuntimeLlmProfile[]): StartupFormState {
+  const activeProfile = findProfile(profiles, config.llm_profile_id) || profiles[0] || null;
+  const models = profileModels(activeProfile);
+  const fallbackPrimary = models[0] || activeProfile?.llm_primary_model || '';
+  const fallbackShadow = models[1] || models[0] || activeProfile?.llm_shadow_model || '';
   return {
-    defaultRunMode: config.default_run_mode,
-    llmProvider: config.llm_provider,
-    llmBaseUrl: config.llm_base_url,
-    llmPrimaryModel: config.llm_primary_model,
-    llmReviewerModel: config.llm_reviewer_model,
-    llmShadowModel: config.llm_shadow_model,
-    llmShadowReviewerModel: config.llm_shadow_reviewer_model,
-    llmApiKey: ''
+    llmProfileId: activeProfile?.id || '',
+    llmPrimaryModel: config.llm_primary_model && models.includes(config.llm_primary_model)
+      ? config.llm_primary_model
+      : fallbackPrimary,
+    llmShadowModel: config.llm_shadow_model && models.includes(config.llm_shadow_model)
+      ? config.llm_shadow_model
+      : fallbackShadow,
   };
 }
 
@@ -32,18 +111,12 @@ export function StartupPage() {
   const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [apiKeyTouched, setApiKeyTouched] = useState(false);
-  const [apiKeyStatus, setApiKeyStatus] = useState('Loading API key status...');
   const [error, setError] = useState('');
+  const [profiles, setProfiles] = useState<RuntimeLlmProfile[]>([]);
   const [form, setForm] = useState<StartupFormState>({
-    defaultRunMode: 'LIVE',
-    llmProvider: 'mock',
-    llmBaseUrl: 'https://api.openai.com/v1',
-    llmPrimaryModel: 'mock-primary-v1',
-    llmReviewerModel: 'NONE',
-    llmShadowModel: 'mock-challenger-v1',
-    llmShadowReviewerModel: 'NONE',
-    llmApiKey: ''
+    llmProfileId: '',
+    llmPrimaryModel: '',
+    llmShadowModel: '',
   });
 
   useEffect(() => {
@@ -55,16 +128,13 @@ export function StartupPage() {
         if (cancelled) {
           return;
         }
-        setForm(buildFormState(config));
-        setApiKeyStatus(
-          config.llm_api_key_set
-            ? `API Key is configured (${config.llm_api_key_masked || 'hidden'}).`
-            : 'API Key is not configured.'
-        );
+        const allProfiles = normalizeProfiles(config);
+        setProfiles(allProfiles);
+        setForm(buildFormState(config, allProfiles));
         setError('');
       } catch (loadError) {
         if (!cancelled) {
-          const message = loadError instanceof Error ? loadError.message : 'Unknown load error';
+          const message = loadError instanceof Error ? loadError.message : '加载失败（未知错误）';
           setError(message);
         }
       } finally {
@@ -74,21 +144,27 @@ export function StartupPage() {
       }
     }
 
-    loadRuntimeConfig();
+    void loadRuntimeConfig();
     return () => {
       cancelled = true;
     };
   }, []);
 
   const canSubmit = useMemo(() => {
+    const activeProfile = findProfile(profiles, form.llmProfileId);
+    const models = profileModels(activeProfile);
     return Boolean(
-      form.llmBaseUrl.trim() &&
+      profiles.length > 0 &&
+      form.llmProfileId.trim() &&
+      models.length > 0 &&
       form.llmPrimaryModel.trim() &&
-      form.llmReviewerModel.trim() &&
-      form.llmShadowModel.trim() &&
-      form.llmShadowReviewerModel.trim()
+      form.llmShadowModel.trim()
     );
-  }, [form]);
+  }, [profiles, form.llmProfileId, form.llmPrimaryModel, form.llmShadowModel]);
+
+  const activeProfile = useMemo(() => findProfile(profiles, form.llmProfileId), [profiles, form.llmProfileId]);
+  const activeModels = useMemo(() => profileModels(activeProfile), [activeProfile]);
+  const activeProfileNeedsKey = Boolean(activeProfile && activeProfile.llm_provider !== 'mock' && !activeProfile.llm_api_key_set);
 
   async function persist(redirectToGenerate: boolean) {
     if (!canSubmit || saving) {
@@ -99,32 +175,19 @@ export function StartupPage() {
     setError('');
     try {
       const payload: RuntimeConfigUpdatePayload = {
-        default_run_mode: form.defaultRunMode,
-        llm_provider: form.llmProvider,
-        llm_base_url: form.llmBaseUrl.trim(),
+        llm_profile_id: form.llmProfileId.trim(),
         llm_primary_model: form.llmPrimaryModel.trim(),
-        llm_reviewer_model: form.llmReviewerModel.trim(),
         llm_shadow_model: form.llmShadowModel.trim(),
-        llm_shadow_reviewer_model: form.llmShadowReviewerModel.trim()
       };
-
-      if (apiKeyTouched) {
-        payload.llm_api_key = form.llmApiKey.trim();
-      }
-
       const saved = await updateRuntimeConfig(payload);
-      setForm(buildFormState(saved));
-      setApiKeyStatus(
-        saved.llm_api_key_set
-          ? `API Key is configured (${saved.llm_api_key_masked || 'hidden'}).`
-          : 'API Key is not configured.'
-      );
-      setApiKeyTouched(false);
+      const allProfiles = normalizeProfiles(saved);
+      setProfiles(allProfiles);
+      setForm(buildFormState(saved, allProfiles));
       if (redirectToGenerate) {
         navigate('/generate', { replace: true });
       }
     } catch (saveError) {
-      const message = saveError instanceof Error ? saveError.message : 'Unknown save error';
+      const message = saveError instanceof Error ? saveError.message : '保存失败（未知错误）';
       setError(message);
     } finally {
       setSaving(false);
@@ -140,106 +203,91 @@ export function StartupPage() {
     <main className="page-root">
       <div className="mesh" aria-hidden="true" />
       <section className="panel panel-intro">
-        <p className="eyebrow">FiPro_1 GUI</p>
-        <h1>Startup Configuration</h1>
-        <p>Select default run mode and configure LLM provider/API settings before generating reports.</p>
+        <p className="eyebrow">FiPro_1 图形界面</p>
+        <h1>启动配置</h1>
+        <p>按项目预置方案选择 LLM 提供方与模型，连接参数自动随方案切换。</p>
+        <div className="actions-row">
+          <DataSourceStatusWidget />
+        </div>
       </section>
 
       <section className="panel panel-form">
         <form className="form-grid" onSubmit={handleSubmit}>
           <label>
-            <span>Default Run Mode</span>
+            <span>LLM 提供方</span>
             <select
-              value={form.defaultRunMode}
-              onChange={(event) => setForm((prev) => ({ ...prev, defaultRunMode: event.target.value as RunMode }))}
+              value={form.llmProfileId}
+              onChange={(event) => {
+                const nextProfile = findProfile(profiles, event.target.value);
+                const nextModels = profileModels(nextProfile);
+                setForm((prev) => ({
+                  ...prev,
+                  llmProfileId: event.target.value,
+                  llmPrimaryModel: nextModels[0] || nextProfile?.llm_primary_model || '',
+                  llmShadowModel: nextModels[1] || nextModels[0] || nextProfile?.llm_shadow_model || '',
+                }));
+              }}
             >
-              <option value="LIVE">LIVE</option>
-              <option value="SHADOW">SHADOW</option>
-              <option value="BACKTEST">BACKTEST</option>
+              {profiles.length === 0 ? (
+                <option value="">未发现预置方案</option>
+              ) : (
+                profiles.map((profile) => (
+                  <option key={profile.id} value={profile.id}>
+                    {profile.label}
+                  </option>
+                ))
+              )}
             </select>
           </label>
 
           <label>
-            <span>LLM Provider</span>
+            <span>主模型（LIVE）</span>
             <select
-              value={form.llmProvider}
-              onChange={(event) => setForm((prev) => ({ ...prev, llmProvider: event.target.value as LlmProvider }))}
-            >
-              <option value="mock">mock</option>
-              <option value="openai">openai</option>
-              <option value="openai_compatible">openai_compatible</option>
-            </select>
-          </label>
-
-          <label className="wide">
-            <span>LLM Base URL</span>
-            <input
-              value={form.llmBaseUrl}
-              onChange={(event) => setForm((prev) => ({ ...prev, llmBaseUrl: event.target.value }))}
-              placeholder="https://api.openai.com/v1"
-              required
-            />
-          </label>
-
-          <label>
-            <span>Primary Model</span>
-            <input
               value={form.llmPrimaryModel}
               onChange={(event) => setForm((prev) => ({ ...prev, llmPrimaryModel: event.target.value }))}
-              placeholder="gpt-4o-mini"
-              required
-            />
+              disabled={activeModels.length === 0}
+            >
+              {activeModels.length === 0 ? (
+                <option value="">未发现已配置模型</option>
+              ) : (
+                activeModels.map((model) => (
+                  <option key={`primary-${model}`} value={model}>
+                    {model}
+                  </option>
+                ))
+              )}
+            </select>
           </label>
 
           <label>
-            <span>Reviewer Model</span>
-            <input
-              value={form.llmReviewerModel}
-              onChange={(event) => setForm((prev) => ({ ...prev, llmReviewerModel: event.target.value }))}
-              placeholder="NONE"
-              required
-            />
-          </label>
-
-          <label>
-            <span>Shadow Model</span>
-            <input
+            <span>影子模型（SHADOW）</span>
+            <select
               value={form.llmShadowModel}
               onChange={(event) => setForm((prev) => ({ ...prev, llmShadowModel: event.target.value }))}
-              placeholder="gpt-4o-mini"
-              required
-            />
+              disabled={activeModels.length === 0}
+            >
+              {activeModels.length === 0 ? (
+                <option value="">未发现已配置模型</option>
+              ) : (
+                activeModels.map((model) => (
+                  <option key={`shadow-${model}`} value={model}>
+                    {model}
+                  </option>
+                ))
+              )}
+            </select>
           </label>
 
-          <label>
-            <span>Shadow Reviewer Model</span>
-            <input
-              value={form.llmShadowReviewerModel}
-              onChange={(event) => setForm((prev) => ({ ...prev, llmShadowReviewerModel: event.target.value }))}
-              placeholder="NONE"
-              required
-            />
-          </label>
-
-          <label className="wide">
-            <span>LLM API Key</span>
-            <input
-              type="password"
-              value={form.llmApiKey}
-              onChange={(event) => {
-                setApiKeyTouched(true);
-                setForm((prev) => ({ ...prev, llmApiKey: event.target.value }));
-              }}
-              placeholder={apiKeyTouched ? '' : 'Leave blank to keep current key'}
-              autoComplete="off"
-            />
-            <p className="helper-text">{apiKeyStatus}</p>
-          </label>
+          {!loading && profiles.length === 0 ? (
+            <p className="wide error-text">未检测到预置 LLM 方案，请先在 .env 中配置。</p>
+          ) : null}
+          {activeProfileNeedsKey ? <p className="wide error-text">当前方案 API Key 未配置，调用将失败。</p> : null}
+          <p className="wide helper-text">方案列表与模型列表均来自项目环境变量预置；连接参数不会在 GUI 中直接编辑。</p>
 
           <div className="wide actions">
             <div className="actions-inline">
               <button type="submit" disabled={loading || saving || !canSubmit}>
-                {saving ? 'Saving...' : 'Save Configuration'}
+                {saving ? '保存中...' : '保存配置'}
               </button>
               <button
                 type="button"
@@ -248,10 +296,19 @@ export function StartupPage() {
                   void persist(true);
                 }}
               >
-                Save and Go to Generate
+                保存并前往生成页
               </button>
               <Link className="ghost-link" to="/generate">
-                Skip to Generate
+                跳过并前往生成页
+              </Link>
+              <Link className="ghost-link" to="/backtest">
+                前往回测页
+              </Link>
+              <Link className="ghost-link" to="/proposals">
+                提案评审
+              </Link>
+              <Link className="ghost-link" to="/champion-health">
+                Champion 监控
               </Link>
             </div>
             {error ? <p className="error-text">{error}</p> : null}

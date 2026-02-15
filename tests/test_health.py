@@ -28,5 +28,5 @@ def test_gui_page() -> None:
     resp = client.get('/gui')
     assert resp.status_code == 200
     assert 'text/html' in resp.headers.get('content-type', '')
-    assert 'FiPro_1 Minimal GUI' in resp.text
+    assert ('FiPro_1 图形界面' in resp.text) or ('FiPro_1 Minimal GUI' in resp.text)
     assert '/reports/generate' in resp.text

@@ -1,23 +1,47 @@
 from datetime import date, datetime, timezone
 import uuid
 
-from fastapi import APIRouter, Header, HTTPException
+from fastapi import APIRouter, Header, HTTPException, Query
 from fastapi.responses import HTMLResponse, RedirectResponse
 from pydantic import BaseModel, Field
 
 from app.backtest import (
+    acknowledge_champion_watchdog_alert,
     cancel_backtest_job,
+    close_champion_watchdog_alert,
     evaluate_skill_pack_promotion,
     execute_skill_pack_promotion,
+    get_champion_watchdog_alert,
+    get_champion_health_check,
+    get_champion_watchdog_run,
+    get_champion_watchdog_ticket,
+    generate_skill_pack_candidates,
+    get_llm_proposal_run,
     get_backtest_job,
+    list_champion_watchdog_alerts,
+    list_champion_health_checks,
+    list_champion_watchdog_runs,
+    list_champion_watchdog_tickets,
+    list_llm_proposal_runs,
+    list_release_events,
     list_skill_pack_versions,
     load_promotion_gate,
     resolve_champion_version,
+    run_llm_skill_pack_proposal_cycle,
     run_batch_backtest,
+    run_champion_health_check,
+    run_champion_watchdog,
+    run_portfolio_backtest,
+    resume_backtest_job,
+    get_release_event,
+    switch_skill_pack_champion,
     submit_backtest_job,
 )
 from app.core.runtime_config import get_runtime_config, get_runtime_config_public, update_runtime_config
 from app.tools.facts import get_index_market_snapshot, get_market_snapshot
+from app.tools.datasource_status import get_data_sources_status_snapshot
+from app.tools.factor_registry import get_tushare_factor_registry
+from app.tools.local_data_gateway import query_local_datasets
 from app.tools.graph import compute_exposure_score, find_impact_paths, query_supply_chain_subtree
 from app.tools.memory import retrieve_memory_notes, write_memory_note
 from app.workflows.graph import run_research_workflow
@@ -407,7 +431,38 @@ class BatchBacktestRequest(BaseModel):
     evaluation_horizon_days: int = Field(default=5, ge=1, le=120)
     benchmark_ticker: str | None = None
     initial_capital_cny: float = Field(default=1000000, gt=0)
+    transaction_fee_bps: float | None = Field(default=None, ge=0, le=500)
+    slippage_bps: float | None = Field(default=None, ge=0, le=500)
+    sell_tax_bps: float | None = Field(default=None, ge=0, le=500)
     thread_prefix: str | None = None
+
+
+class PortfolioBacktestTickerItem(BaseModel):
+    ticker: str = Field(min_length=1, max_length=24)
+    weight: float | None = Field(default=None, gt=0, le=1)
+
+
+class PortfolioBacktestRequest(BaseModel):
+    market: str = Field(default='OTHER', pattern='^(CN_A|US|HK|CRYPTO|OTHER)$')
+    strategy_version_id: str
+    tier: str = Field(pattern='^(TIER0|TIER1|TIER2)$')
+    skill_pack_id: str = Field(default='cn_a_core', min_length=1, max_length=64)
+    skill_pack_version: str = Field(default='champion', min_length=1, max_length=32)
+    start_date: date
+    end_date: date
+    step_days: int = Field(default=1, ge=1, le=30)
+    trading_days_only: bool = True
+    asof_time: str = Field(default='09:30', pattern=r'^\d{2}:\d{2}(:\d{2})?$')
+    timezone_offset: str = Field(default='+08:00', pattern=r'^[+-]\d{2}:\d{2}$')
+    max_runs: int = Field(default=60, ge=1, le=500)
+    evaluation_horizon_days: int = Field(default=5, ge=1, le=120)
+    benchmark_ticker: str | None = None
+    initial_capital_cny: float = Field(default=1000000, gt=0)
+    transaction_fee_bps: float | None = Field(default=None, ge=0, le=500)
+    slippage_bps: float | None = Field(default=None, ge=0, le=500)
+    sell_tax_bps: float | None = Field(default=None, ge=0, le=500)
+    thread_prefix: str | None = None
+    portfolio: list[PortfolioBacktestTickerItem] = Field(min_length=1, max_length=50)
 
 
 class SkillPackPromotionRunRequest(BaseModel):
@@ -417,11 +472,76 @@ class SkillPackPromotionRunRequest(BaseModel):
     execute: bool = False
     dry_run: bool = True
     manual_approved: bool = False
+    anti_overfit_evidence: dict = Field(default_factory=dict)
     backtest: BatchBacktestRequest
+
+
+class SkillPackCandidateGenerateRequest(BaseModel):
+    skill_pack_id: str = Field(default='cn_a_core', min_length=1, max_length=64)
+    base_version: str = Field(default='champion', min_length=1, max_length=32)
+    calibration_version: str | None = Field(default=None, min_length=1, max_length=32)
+    max_candidates: int = Field(default=4, ge=1, le=32)
+    author: str = Field(default='auto_calibration', min_length=1, max_length=128)
+    param_ids: list[str] = Field(default_factory=list)
+    include_param_search: bool = True
+    enable_data_combo_search: bool = False
+    max_endpoint_toggles: int = Field(default=1, ge=1, le=3)
+    endpoint_allowlist: list[str] = Field(default_factory=list)
+    dry_run: bool = False
+
+
+class SkillPackLLMProposalRunRequest(BaseModel):
+    skill_pack_id: str = Field(default='cn_a_core', min_length=1, max_length=64)
+    base_version: str = Field(default='champion', min_length=1, max_length=32)
+    calibration_version: str | None = Field(default=None, min_length=1, max_length=32)
+    proposal_count: int = Field(default=2, ge=1, le=8)
+    author: str = Field(default='llm_proposer', min_length=1, max_length=128)
+    execute: bool = False
+    manual_approved: bool = False
+    anti_overfit_evidence: dict = Field(default_factory=dict)
+    dry_run: bool = False
+    backtest: BatchBacktestRequest
+
+
+class SkillPackChampionSwitchRequest(BaseModel):
+    target_version: str = Field(min_length=1, max_length=32)
+    reason: str = Field(default='manual_switch', min_length=1, max_length=256)
+    operator: str = Field(default='manual_operator', min_length=1, max_length=128)
+    dry_run: bool = False
+
+
+class ChampionHealthCheckRequest(BaseModel):
+    skill_pack_id: str = Field(default='cn_a_core', min_length=1, max_length=64)
+    champion_version: str | None = Field(default=None, min_length=1, max_length=32)
+    baseline_version: str | None = Field(default=None, min_length=1, max_length=32)
+    auto_rollback: bool = False
+    rollback_dry_run: bool = True
+    rollback_reason: str = Field(default='monitoring_gate_block', min_length=1, max_length=256)
+    operator: str = Field(default='monitor_engine', min_length=1, max_length=128)
+    manual_approved: bool = True
+    anti_overfit_evidence: dict = Field(default_factory=dict)
+    backtest: BatchBacktestRequest
+
+
+class ChampionWatchdogRunRequest(BaseModel):
+    run_health_check: bool = False
+    health_check: dict = Field(default_factory=dict)
+    lookback_runs: int = Field(default=20, ge=1, le=500)
+    consecutive_fail_critical: int = Field(default=2, ge=1, le=20)
+    fail_rate_warn: float = Field(default=0.25, ge=0.0, le=1.0)
+    fail_rate_critical: float = Field(default=0.50, ge=0.0, le=1.0)
+    rollback_storm_critical: int = Field(default=2, ge=1, le=20)
+    auto_create_ticket: bool = True
+
+
+class ChampionWatchdogAlertActionRequest(BaseModel):
+    operator: str = Field(default='monitor_engine', min_length=1, max_length=128)
+    note: str = Field(default='', max_length=512)
 
 
 class RuntimeConfigUpdateRequest(BaseModel):
     default_run_mode: str | None = Field(default=None, pattern='^(LIVE|SHADOW|BACKTEST)$')
+    llm_profile_id: str | None = None
     llm_provider: str | None = None
     llm_base_url: str | None = None
     llm_primary_model: str | None = None
@@ -429,6 +549,17 @@ class RuntimeConfigUpdateRequest(BaseModel):
     llm_shadow_model: str | None = None
     llm_shadow_reviewer_model: str | None = None
     llm_api_key: str | None = None
+
+
+class LocalDataBatchQueryRequest(BaseModel):
+    endpoints: list[str] = Field(default_factory=list)
+    ticker: str = ''
+    start_date: str = ''
+    end_date: str = ''
+    limit_per_endpoint: int = Field(default=10, ge=1, le=200)
+    max_endpoints: int = Field(default=16, ge=1, le=256)
+    order: str = Field(default='desc', pattern='^(asc|desc)$')
+    include_rows: bool = True
 
 
 class CreateStrategyRequest(BaseModel):
@@ -449,6 +580,33 @@ class ReportFeedbackRequest(BaseModel):
 @router.get('/health')
 def health() -> dict:
     return {'status': 'ok'}
+
+
+@router.get('/datasources/status')
+def get_datasources_status_api() -> dict:
+    return get_data_sources_status_snapshot()
+
+
+@router.get('/factors/registry')
+def get_factors_registry_api(
+    limit: int = Query(default=200, ge=0, le=1000),
+    offset: int = Query(default=0, ge=0),
+) -> dict:
+    return get_tushare_factor_registry(limit=limit, offset=offset, include_entries=True)
+
+
+@router.post('/local-data/batch-query')
+def local_data_batch_query_api(payload: LocalDataBatchQueryRequest) -> dict:
+    return query_local_datasets(
+        endpoints=payload.endpoints,
+        ticker=payload.ticker,
+        start_date=payload.start_date,
+        end_date=payload.end_date,
+        limit_per_endpoint=payload.limit_per_endpoint,
+        max_endpoints=payload.max_endpoints,
+        order=payload.order,
+        include_rows=payload.include_rows,
+    )
 
 
 @router.get('/', include_in_schema=False)
@@ -473,7 +631,10 @@ def get_runtime_config_api() -> dict:
 
 @router.put('/runtime/config')
 def update_runtime_config_api(payload: RuntimeConfigUpdateRequest) -> dict:
-    return update_runtime_config(payload.model_dump(exclude_none=True))
+    try:
+        return update_runtime_config(payload.model_dump(exclude_none=True))
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
 
 
 @router.post('/reports/generate')
@@ -494,6 +655,19 @@ def generate_report(payload: GenerateReportRequest, x_thread_id: str | None = He
 def batch_backtest(payload: BatchBacktestRequest) -> dict:
     try:
         return run_batch_backtest(
+            payload.model_dump(mode='json', exclude_none=True),
+            runner=run_research_workflow,
+            snapshot_loader=get_market_snapshot,
+            benchmark_loader=get_index_market_snapshot,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+
+@router.post('/backtests/portfolio/run')
+def portfolio_backtest(payload: PortfolioBacktestRequest) -> dict:
+    try:
+        return run_portfolio_backtest(
             payload.model_dump(mode='json', exclude_none=True),
             runner=run_research_workflow,
             snapshot_loader=get_market_snapshot,
@@ -524,6 +698,22 @@ def fetch_backtest_job(job_id: str) -> dict:
 @router.post('/backtests/jobs/{job_id}/cancel')
 def cancel_backtest_job_api(job_id: str) -> dict:
     job = cancel_backtest_job(job_id)
+    if job is None:
+        raise HTTPException(status_code=404, detail='backtest job not found')
+    return job
+
+
+@router.post('/backtests/jobs/{job_id}/resume', status_code=202)
+def resume_backtest_job_api(job_id: str) -> dict:
+    try:
+        job = resume_backtest_job(
+            job_id,
+            runner=run_research_workflow,
+            snapshot_loader=get_market_snapshot,
+            benchmark_loader=get_index_market_snapshot,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
     if job is None:
         raise HTTPException(status_code=404, detail='backtest job not found')
     return job
@@ -592,6 +782,7 @@ def run_skill_pack_promotion(payload: SkillPackPromotionRunRequest) -> dict:
         candidate_version=candidate_version,
         champion_version=champion_version,
         manual_approved=payload.manual_approved,
+        anti_overfit_evidence=payload.anti_overfit_evidence,
     )
 
     execution = None
@@ -628,6 +819,234 @@ def run_skill_pack_promotion(payload: SkillPackPromotionRunRequest) -> dict:
             else None
         ),
     }
+
+
+@router.post('/skill-packs/candidates/generate')
+def generate_skill_pack_candidate_versions(payload: SkillPackCandidateGenerateRequest) -> dict:
+    try:
+        result = generate_skill_pack_candidates(
+            skill_pack_id=payload.skill_pack_id.strip(),
+            base_version=payload.base_version.strip(),
+            calibration_version=(payload.calibration_version.strip() if payload.calibration_version else None),
+            max_candidates=payload.max_candidates,
+            author=payload.author.strip(),
+            param_ids=[str(item).strip() for item in payload.param_ids if str(item).strip()],
+            include_param_search=payload.include_param_search,
+            enable_data_combo_search=payload.enable_data_combo_search,
+            max_endpoint_toggles=payload.max_endpoint_toggles,
+            endpoint_allowlist=[str(item).strip() for item in payload.endpoint_allowlist if str(item).strip()],
+            dry_run=payload.dry_run,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    return result
+
+
+@router.post('/skill-packs/proposals/llm-run')
+def run_skill_pack_llm_proposal(payload: SkillPackLLMProposalRunRequest) -> dict:
+    try:
+        return run_llm_skill_pack_proposal_cycle(
+            backtest_payload=payload.backtest.model_dump(mode='json', exclude_none=True),
+            runner=run_research_workflow,
+            snapshot_loader=get_market_snapshot,
+            benchmark_loader=get_index_market_snapshot,
+            skill_pack_id=payload.skill_pack_id.strip(),
+            base_version=payload.base_version.strip(),
+            calibration_version=(payload.calibration_version.strip() if payload.calibration_version else None),
+            proposal_count=payload.proposal_count,
+            author=payload.author.strip(),
+            manual_approved=payload.manual_approved,
+            anti_overfit_evidence=payload.anti_overfit_evidence,
+            execute=payload.execute,
+            dry_run=payload.dry_run,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+
+@router.get('/skill-packs/proposals/runs')
+def list_skill_pack_llm_proposal_runs(
+    limit: int = Query(default=50, ge=1, le=500),
+    offset: int = Query(default=0, ge=0),
+) -> dict:
+    return list_llm_proposal_runs(limit=limit, offset=offset)
+
+
+@router.get('/skill-packs/proposals/runs/{run_id}')
+def get_skill_pack_llm_proposal_run(run_id: str) -> dict:
+    payload = get_llm_proposal_run(run_id)
+    if payload is None:
+        raise HTTPException(status_code=404, detail='llm proposal run not found')
+    return payload
+
+
+@router.post('/skill-packs/champion/health-check')
+def run_skill_pack_champion_health_check(payload: ChampionHealthCheckRequest) -> dict:
+    try:
+        return run_champion_health_check(
+            backtest_payload=payload.backtest.model_dump(mode='json', exclude_none=True),
+            runner=run_research_workflow,
+            snapshot_loader=get_market_snapshot,
+            benchmark_loader=get_index_market_snapshot,
+            skill_pack_id=payload.skill_pack_id.strip(),
+            champion_version=(payload.champion_version.strip() if payload.champion_version else None),
+            baseline_version=(payload.baseline_version.strip() if payload.baseline_version else None),
+            auto_rollback=payload.auto_rollback,
+            rollback_dry_run=payload.rollback_dry_run,
+            rollback_reason=payload.rollback_reason.strip(),
+            operator=payload.operator.strip(),
+            manual_approved=payload.manual_approved,
+            anti_overfit_evidence=payload.anti_overfit_evidence,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+
+@router.get('/skill-packs/champion/health-checks')
+def list_skill_pack_champion_health_checks(
+    limit: int = Query(default=50, ge=1, le=500),
+    offset: int = Query(default=0, ge=0),
+) -> dict:
+    return list_champion_health_checks(limit=limit, offset=offset)
+
+
+@router.get('/skill-packs/champion/health-checks/{run_id}')
+def get_skill_pack_champion_health_check(run_id: str) -> dict:
+    payload = get_champion_health_check(run_id)
+    if payload is None:
+        raise HTTPException(status_code=404, detail='champion health check not found')
+    return payload
+
+
+@router.post('/skill-packs/champion/watchdog/run')
+def run_skill_pack_champion_watchdog(payload: ChampionWatchdogRunRequest) -> dict:
+    try:
+        return run_champion_watchdog(
+            run_health_check=payload.run_health_check,
+            health_check_request=payload.health_check,
+            runner=run_research_workflow,
+            snapshot_loader=get_market_snapshot,
+            benchmark_loader=get_index_market_snapshot,
+            lookback_runs=payload.lookback_runs,
+            consecutive_fail_critical=payload.consecutive_fail_critical,
+            fail_rate_warn=payload.fail_rate_warn,
+            fail_rate_critical=payload.fail_rate_critical,
+            rollback_storm_critical=payload.rollback_storm_critical,
+            auto_create_ticket=payload.auto_create_ticket,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+
+@router.get('/skill-packs/champion/watchdog/runs')
+def list_skill_pack_champion_watchdog_runs(
+    limit: int = Query(default=50, ge=1, le=500),
+    offset: int = Query(default=0, ge=0),
+) -> dict:
+    return list_champion_watchdog_runs(limit=limit, offset=offset)
+
+
+@router.get('/skill-packs/champion/watchdog/runs/{run_id}')
+def get_skill_pack_champion_watchdog_run(run_id: str) -> dict:
+    payload = get_champion_watchdog_run(run_id)
+    if payload is None:
+        raise HTTPException(status_code=404, detail='champion watchdog run not found')
+    return payload
+
+
+@router.get('/skill-packs/champion/watchdog/alerts')
+def list_skill_pack_champion_watchdog_alerts(
+    limit: int = Query(default=50, ge=1, le=1000),
+    offset: int = Query(default=0, ge=0),
+    status: str = Query(default=''),
+) -> dict:
+    return list_champion_watchdog_alerts(limit=limit, offset=offset, status=status)
+
+
+@router.get('/skill-packs/champion/watchdog/alerts/{alert_id}')
+def get_skill_pack_champion_watchdog_alert(alert_id: str) -> dict:
+    payload = get_champion_watchdog_alert(alert_id)
+    if payload is None:
+        raise HTTPException(status_code=404, detail='champion watchdog alert not found')
+    return payload
+
+
+@router.post('/skill-packs/champion/watchdog/alerts/{alert_id}/ack')
+def acknowledge_skill_pack_champion_watchdog_alert(
+    alert_id: str,
+    payload: ChampionWatchdogAlertActionRequest,
+) -> dict:
+    try:
+        return acknowledge_champion_watchdog_alert(
+            alert_id=alert_id,
+            operator=payload.operator.strip(),
+            note=payload.note.strip(),
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+
+
+@router.post('/skill-packs/champion/watchdog/alerts/{alert_id}/close')
+def close_skill_pack_champion_watchdog_alert(
+    alert_id: str,
+    payload: ChampionWatchdogAlertActionRequest,
+) -> dict:
+    try:
+        return close_champion_watchdog_alert(
+            alert_id=alert_id,
+            operator=payload.operator.strip(),
+            note=payload.note.strip(),
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+
+
+@router.get('/skill-packs/champion/watchdog/tickets')
+def list_skill_pack_champion_watchdog_tickets(
+    limit: int = Query(default=50, ge=1, le=500),
+    offset: int = Query(default=0, ge=0),
+) -> dict:
+    return list_champion_watchdog_tickets(limit=limit, offset=offset)
+
+
+@router.get('/skill-packs/champion/watchdog/tickets/{ticket_id}')
+def get_skill_pack_champion_watchdog_ticket(ticket_id: str) -> dict:
+    payload = get_champion_watchdog_ticket(ticket_id)
+    if payload is None:
+        raise HTTPException(status_code=404, detail='champion watchdog ticket not found')
+    return payload
+
+
+@router.get('/skill-packs/releases')
+def list_skill_pack_release_events(
+    limit: int = Query(default=50, ge=1, le=500),
+    offset: int = Query(default=0, ge=0),
+) -> dict:
+    return list_release_events(limit=limit, offset=offset)
+
+
+@router.get('/skill-packs/releases/{event_id}')
+def get_skill_pack_release_event(event_id: str) -> dict:
+    payload = get_release_event(event_id)
+    if payload is None:
+        raise HTTPException(status_code=404, detail='release event not found')
+    return payload
+
+
+@router.post('/skill-packs/{skill_pack_id}/champion/switch')
+def switch_skill_pack_champion_api(skill_pack_id: str, payload: SkillPackChampionSwitchRequest) -> dict:
+    try:
+        result = switch_skill_pack_champion(
+            skill_pack_id=skill_pack_id.strip(),
+            target_version=payload.target_version.strip(),
+            reason=payload.reason.strip(),
+            operator=payload.operator.strip(),
+            switch_mode='manual',
+            dry_run=payload.dry_run,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    return result
 
 
 @router.get('/reports/{report_id}')

@@ -30,6 +30,7 @@ class ResearchState(TypedDict, total=False):
     impact_paths: list[dict[str, Any]]
     exposure_scores: list[dict[str, Any]]
     graph_refs: list[str]
+    local_data: dict[str, Any]
     evidence_coverage: dict[str, Any]
     reviewer_notes: list[str]
     context: dict[str, Any]

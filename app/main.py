@@ -1,8 +1,10 @@
 from contextlib import asynccontextmanager
 import logging
+import os
 from uuid import uuid4
 
 from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.requests import Request
 from starlette.responses import Response
@@ -36,6 +38,24 @@ def create_app() -> FastAPI:
     configure_logging()
     get_settings()
     app = FastAPI(title='FiPro_1 API', version='0.1.0', lifespan=app_lifespan)
+    origins_raw = str(os.getenv('CORS_ALLOW_ORIGINS', '')).strip()
+    if origins_raw:
+        allow_origins = [item.strip() for item in origins_raw.split(',') if item.strip()]
+    else:
+        allow_origins = [
+            'http://127.0.0.1:5173',
+            'http://localhost:5173',
+            'http://127.0.0.1:8000',
+            'http://localhost:8000',
+        ]
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=allow_origins,
+        allow_credentials=True,
+        allow_methods=['*'],
+        allow_headers=['*'],
+        expose_headers=['x-request-id'],
+    )
     app.add_middleware(RequestIDMiddleware)
 
     app.include_router(router)

@@ -3,6 +3,7 @@ from __future__ import annotations
 from datetime import datetime, timedelta, timezone
 import hashlib
 import json
+import os
 import uuid
 from typing import Any
 
@@ -11,12 +12,14 @@ from app.backtest.skill_pack import load_skill_pack
 from app.core.runtime_config import get_runtime_config
 from app.llm.provider import LLMProvider
 from app.tools.deterministic import generate_price_bands, risk_gate, score_signal, score_signal_skill_pack
+from app.tools.factor_registry import get_tushare_registry_for_context
 from app.tools.facts import (
     get_flow_sentiment_snapshot,
     get_fundamentals_snapshot,
     get_macro_commodity_logistics_snapshot,
     get_market_snapshot,
 )
+from app.tools.local_data_gateway import default_backtest_window, query_local_datasets
 from app.tools.graph import compute_exposure_score, find_impact_paths, query_supply_chain_subtree
 from app.tools.memory import retrieve_memory_notes, write_memory_note
 from app.tools.qa import consistency_check, validate_report_schema_tool
@@ -31,6 +34,16 @@ DEGRADATION_DEPENDENCIES = ('budget', 'data_source', 'rag', 'graph', 'llm')
 
 DEFAULT_SKILL_PACK_ID = 'cn_a_core'
 DEFAULT_SKILL_PACK_VERSION = '0.1.0'
+
+
+def _env_int(name: str, default: int, *, minimum: int = 1, maximum: int = 1000) -> int:
+    try:
+        value = int(os.getenv(name, str(default)))
+    except ValueError:
+        value = default
+    value = max(minimum, value)
+    value = min(maximum, value)
+    return value
 
 
 def _merge_status(a: str, b: str) -> str:
@@ -210,28 +223,52 @@ def _budget_guardrail(
     return True
 
 
-def _resolve_skill_pack_version(skill_pack_id: str, requested_version: Any) -> tuple[str, str]:
+def _resolve_skill_pack_version(skill_pack_id: str, requested_version: Any, *, run_mode: str) -> tuple[str, str, str]:
     normalized = str(requested_version or '').strip()
+    normalized_mode = str(run_mode or 'LIVE').strip().upper() or 'LIVE'
+    if normalized_mode == 'LIVE' and normalized and normalized.lower() not in {'champion', 'auto'}:
+        champion_version = resolve_champion_version(skill_pack_id)
+        if champion_version:
+            return (
+                champion_version,
+                'forced_champion',
+                f'LIVE mode ignores explicit skill_pack_version={normalized}; forced champion',
+            )
+        return (
+            DEFAULT_SKILL_PACK_VERSION,
+            'forced_default',
+            (
+                f'LIVE mode ignores explicit skill_pack_version={normalized}; '
+                f'champion missing, fallback to default {DEFAULT_SKILL_PACK_VERSION}'
+            ),
+        )
     if normalized and normalized.lower() not in {'champion', 'auto'}:
-        return normalized, 'explicit'
+        return normalized, 'explicit', ''
     champion_version = resolve_champion_version(skill_pack_id)
     if champion_version:
-        return champion_version, 'champion'
-    return DEFAULT_SKILL_PACK_VERSION, 'default'
+        return champion_version, 'champion', ''
+    return DEFAULT_SKILL_PACK_VERSION, 'default', ''
 
 
 def load_strategy_config(state: dict) -> dict:
     tier_policy = _default_tier_policy()
     req = state.get('request', {})
     req_tier = str(req.get('tier', 'TIER0'))
+    run_mode = str(req.get('run_mode', 'LIVE')).strip().upper() or 'LIVE'
     selected_tier = tier_policy.get(req_tier, tier_policy['TIER0'])
     skill_pack_id = str(req.get('skill_pack_id', DEFAULT_SKILL_PACK_ID) or DEFAULT_SKILL_PACK_ID).strip() or DEFAULT_SKILL_PACK_ID
-    skill_pack_version, skill_pack_version_source = _resolve_skill_pack_version(skill_pack_id, req.get('skill_pack_version'))
+    skill_pack_version, skill_pack_version_source, version_note = _resolve_skill_pack_version(
+        skill_pack_id,
+        req.get('skill_pack_version'),
+        run_mode=run_mode,
+    )
     skill_pack_warning = ''
+    if version_note:
+        skill_pack_warning = version_note
     try:
         resolved_skill_pack = load_skill_pack(skill_pack_id=skill_pack_id, version=skill_pack_version)
     except ValueError as exc:
-        skill_pack_warning = str(exc)
+        skill_pack_warning = f'{skill_pack_warning} | {exc}'.strip(' |')
         resolved_skill_pack = load_skill_pack(skill_pack_id=DEFAULT_SKILL_PACK_ID, version=DEFAULT_SKILL_PACK_VERSION)
         skill_pack_id = DEFAULT_SKILL_PACK_ID
         skill_pack_version = DEFAULT_SKILL_PACK_VERSION
@@ -261,6 +298,7 @@ def load_strategy_config(state: dict) -> dict:
     }
     raw = json.dumps(weight_digest_payload, sort_keys=True, ensure_ascii=True, separators=(',', ':'))
     weights_hash = f"w_skill_{hashlib.sha256(raw.encode('utf-8')).hexdigest()[:12]}"
+    factor_registry = get_tushare_registry_for_context(max_endpoints=260)
 
     state['config'] = {
         'weights': {
@@ -276,6 +314,7 @@ def load_strategy_config(state: dict) -> dict:
         'skill_pack': summary,
         'skill_pack_warning': skill_pack_warning,
         'skill_pack_version_source': skill_pack_version_source,
+        'factor_registry': factor_registry,
     }
     state['weights_hash'] = weights_hash
     state['budget'] = {
@@ -1419,7 +1458,24 @@ def build_context(state: dict) -> dict:
     _sync_data_quality_from_matrix(state)
     _refresh_tool_stats(state)
     req = state['request']
+    run_mode = str(req.get('run_mode', 'LIVE')).strip().upper() or 'LIVE'
+    state['local_data'] = _load_local_data_for_context(state, run_mode=run_mode)
+    factor_registry = dict(state.get('config', {}).get('factor_registry', {}))
+    if run_mode == 'BACKTEST':
+        factor_registry_context = factor_registry
+    else:
+        factor_registry_context = {
+            'source_id': factor_registry.get('source_id', 'TUSHARE'),
+            'source_name': factor_registry.get('source_name', 'TUSHARE数据'),
+            'total_endpoints': factor_registry.get('total_endpoints', 0),
+            'group_counts': factor_registry.get('group_counts', {}),
+            'domain_counts': factor_registry.get('domain_counts', {}),
+            'truncated': True,
+            'entries': [],
+            'endpoints': list(factor_registry.get('endpoints', []))[:32],
+        }
     state['context'] = {
+        'thread_id': state.get('thread_id', ''),
         'request': req,
         'features': state['features'],
         'score_id': state.get('score_id'),
@@ -1436,6 +1492,7 @@ def build_context(state: dict) -> dict:
         'impact_paths': state.get('impact_paths', []),
         'exposure_scores': state.get('exposure_scores', []),
         'graph_refs': state.get('graph_refs', []),
+        'local_data': state.get('local_data', {}),
         'evidence_refs': evidence_refs,
         'evidence_coverage': state.get('evidence_coverage', {}),
         'data_quality': state['data_quality'],
@@ -1447,9 +1504,100 @@ def build_context(state: dict) -> dict:
         'skill_pack': state.get('config', {}).get('skill_pack', {}),
         'skill_pack_version_source': state.get('config', {}).get('skill_pack_version_source', ''),
         'skill_pack_warning': state.get('config', {}).get('skill_pack_warning', ''),
+        'factor_registry': factor_registry_context,
         'degradation_matrix': state.get('degradation_matrix', {}),
     }
     return state
+
+
+def _extract_tushare_endpoints_from_skill_pack(state: dict) -> list[str]:
+    skill_pack = state.get('skill_pack', {})
+    factors_payload = skill_pack.get('factors', {}) if isinstance(skill_pack, dict) else {}
+    factors = factors_payload.get('factors', []) if isinstance(factors_payload, dict) else []
+    endpoints: list[str] = []
+    for item in factors:
+        if not isinstance(item, dict):
+            continue
+        if not bool(item.get('enabled', True)):
+            continue
+        source_refs = item.get('source_refs', [])
+        if not isinstance(source_refs, list):
+            continue
+        for ref in source_refs:
+            if not isinstance(ref, dict):
+                continue
+            source = str(ref.get('source', '')).strip().lower()
+            endpoint = str(ref.get('endpoint', '')).strip()
+            if source != 'tushare' or not endpoint:
+                continue
+            if endpoint not in endpoints:
+                endpoints.append(endpoint)
+    return endpoints
+
+
+def _load_local_data_for_context(state: dict, *, run_mode: str) -> dict[str, Any]:
+    if run_mode != 'BACKTEST':
+        return {
+            'status': 'SKIPPED',
+            'message': 'local data slices are only preloaded in BACKTEST mode',
+            'requested_endpoints': [],
+            'resolved_endpoints': [],
+            'slices': [],
+            'audit': {'requested_count': 0, 'resolved_count': 0, 'ok_slices': 0, 'partial_slices': 0, 'error_slices': 0},
+        }
+
+    endpoints = _extract_tushare_endpoints_from_skill_pack(state)
+    if not endpoints:
+        return {
+            'status': 'EMPTY',
+            'message': 'no tushare endpoints found in skill pack factors',
+            'requested_endpoints': [],
+            'resolved_endpoints': [],
+            'slices': [],
+            'audit': {'requested_count': 0, 'resolved_count': 0, 'ok_slices': 0, 'partial_slices': 0, 'error_slices': 0},
+        }
+
+    req = state.get('request', {})
+    ticker = str(req.get('ticker', '')).strip()
+    asof = str(req.get('asof', '')).strip()
+    lookback_days = _env_int('BACKTEST_LOCAL_DATA_LOOKBACK_DAYS', 180, minimum=10, maximum=3650)
+    start_date, end_date = default_backtest_window(asof, lookback_days=lookback_days)
+
+    payload = {
+        'endpoints': endpoints,
+        'ticker': ticker,
+        'start_date': start_date,
+        'end_date': end_date,
+        'limit_per_endpoint': _env_int('BACKTEST_LOCAL_DATA_ROWS_PER_ENDPOINT', 12, minimum=1, maximum=200),
+        'max_endpoints': _env_int('BACKTEST_LOCAL_DATA_MAX_ENDPOINTS', 24, minimum=1, maximum=256),
+        'order': 'desc',
+        'include_rows': True,
+    }
+    result = execute_tool('local_data_query', payload, query_local_datasets)
+    state['tool_traces'].append(result['trace'])
+    if not result['ok']:
+        err = result['output'].get('error', {}) if isinstance(result['output'], dict) else {}
+        reason = f"local_data_query failed ({err.get('code', 'INTERNAL_ERROR')}): {err.get('message', 'unknown error')}"
+        _note_degradation(state, 'data_source', status='DEGRADED', reason=reason, mode='FALLBACK')
+        return {
+            'status': 'ERROR',
+            'message': reason,
+            'requested_endpoints': endpoints,
+            'resolved_endpoints': [],
+            'slices': [],
+            'audit': {'requested_count': len(endpoints), 'resolved_count': 0, 'ok_slices': 0, 'partial_slices': 0, 'error_slices': len(endpoints)},
+        }
+
+    output = result['output'] if isinstance(result['output'], dict) else {}
+    audit = output.get('audit', {}) if isinstance(output.get('audit', {}), dict) else {}
+    error_slices = int(audit.get('error_slices', 0))
+    partial_slices = int(audit.get('partial_slices', 0))
+    ok_slices = int(audit.get('ok_slices', 0))
+    if error_slices > 0:
+        _note_degradation(state, 'data_source', status='PARTIAL', reason=f'local_data_query error_slices={error_slices}', mode='FALLBACK')
+    if ok_slices == 0 and (error_slices > 0 or partial_slices > 0):
+        _note_degradation(state, 'data_source', status='DEGRADED', reason='local_data_query returned no healthy slices', mode='FALLBACK')
+    return output
 
 
 def _fallback_report_from_context(state: dict, reason: str) -> dict[str, Any]:
@@ -1575,6 +1723,7 @@ def _fallback_report_from_context(state: dict, reason: str) -> dict[str, Any]:
 def draft_report_node(state: dict) -> dict:
     run_mode = str(state.get('request', {}).get('run_mode', 'LIVE')).strip().upper() or 'LIVE'
     runtime_config = get_runtime_config()
+    strict_llm_required = run_mode == 'BACKTEST' and runtime_config.get('llm_provider', 'mock') != 'mock'
     if run_mode == 'SHADOW':
         primary_model = runtime_config['llm_shadow_model']
         reviewer_model = runtime_config['llm_shadow_reviewer_model']
@@ -1584,6 +1733,8 @@ def draft_report_node(state: dict) -> dict:
     provider = LLMProvider(primary_model=primary_model, reviewer_model=reviewer_model)
     if not _budget_guardrail(state, stage='llm.draft', reserve_tool_calls=1):
         reason = 'LLM draft skipped by budget guardrail'
+        if strict_llm_required:
+            raise RuntimeError(reason)
         _note_degradation(state, 'llm', status='DEGRADED', reason=reason, mode='DISABLED')
         state['report_draft'] = _fallback_report_from_context(state, reason)
         _sync_data_quality_from_matrix(state)
@@ -1598,6 +1749,8 @@ def draft_report_node(state: dict) -> dict:
     else:
         err = draft_result['output'].get('error', {})
         reason = f"LLM draft failed ({err.get('code', 'INTERNAL_ERROR')}): {err.get('message', 'unknown error')}"
+        if strict_llm_required:
+            raise RuntimeError(reason)
         _note_degradation(state, 'llm', status='DEGRADED', reason=reason, mode='FALLBACK')
         state['report_draft'] = _fallback_report_from_context(state, reason)
     _sync_data_quality_from_matrix(state)
@@ -1895,6 +2048,33 @@ def persist_node(state: dict) -> dict:
     report['provenance']['skill_pack'] = state.get('config', {}).get('skill_pack', {})
     report['provenance']['skill_pack_version_source'] = state.get('config', {}).get('skill_pack_version_source', '')
     report['provenance']['degradation_matrix'] = state.get('degradation_matrix', {})
+    local_data = state.get('context', {}).get('local_data', {}) if isinstance(state.get('context', {}), dict) else {}
+    if isinstance(local_data, dict):
+        audit = local_data.get('audit', {}) if isinstance(local_data.get('audit', {}), dict) else {}
+        slices = local_data.get('slices', []) if isinstance(local_data.get('slices', []), list) else []
+        report['provenance']['local_data_access'] = {
+            'status': local_data.get('status', ''),
+            'message': local_data.get('message', ''),
+            'requested_endpoints': list(local_data.get('requested_endpoints', []))[:128],
+            'resolved_endpoints': list(local_data.get('resolved_endpoints', []))[:128],
+            'ok_slices': int(audit.get('ok_slices', 0)),
+            'partial_slices': int(audit.get('partial_slices', 0)),
+            'error_slices': int(audit.get('error_slices', 0)),
+        }
+        report['provenance']['local_data_slices'] = [
+            {
+                'endpoint': str(item.get('endpoint', '')),
+                'status': str(item.get('status', '')),
+                'message': str(item.get('message', '')),
+                'file': str(item.get('file', '')),
+                'date_field': str(item.get('date_field', '')),
+                'latest_date': str(item.get('latest_date', '')),
+                'returned_rows': int(item.get('returned_rows', 0)),
+                'stale': bool(item.get('stale', False)),
+            }
+            for item in slices[:40]
+            if isinstance(item, dict)
+        ]
     persist_refs = persist_workflow_state(state, thread_id=state['thread_id'])
     persist_refs['memory_note_id'] = write_memory['output'].get('note_id', persist_refs.get('memory_note_id', ''))
     persist_refs.update(skill_refs)

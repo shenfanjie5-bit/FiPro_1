@@ -21,9 +21,9 @@
     "blacklist": []
   },
   "tier_budget": {
-    "TIER0": {"max_tool_calls": 20, "max_cost_usd": 0.6},
-    "TIER1": {"max_tool_calls": 40, "max_cost_usd": 1.2},
-    "TIER2": {"max_tool_calls": 80, "max_cost_usd": 2.5}
+    "TIER0": {"max_tool_calls": 20, "max_cost_usd": 0.2},
+    "TIER1": {"max_tool_calls": 45, "max_cost_usd": 0.8},
+    "TIER2": {"max_tool_calls": 90, "max_cost_usd": 2.5}
   }
 }
 ```

@@ -1,0 +1,136 @@
+{
+  "profile_id": "cn_a_core_calibration_v0_1_0",
+  "skill_pack_id": "cn_a_core",
+  "skill_pack_version": "0.1.0",
+  "market": "CN_A",
+  "updated_at": "2026-02-12T00:00:00Z",
+  "objective": {
+    "primary": "excess_return_delta_pct",
+    "direction": "maximize",
+    "constraints": [
+      {
+        "metric": "max_drawdown_delta_pct",
+        "op": "<=",
+        "value": 2.0
+      },
+      {
+        "metric": "turnover_delta_pct",
+        "op": "<=",
+        "value": 20.0
+      },
+      {
+        "metric": "data_quality_degraded_rate_delta_pct",
+        "op": "<=",
+        "value": 0.0
+      },
+      {
+        "metric": "segment_win_rate",
+        "op": ">=",
+        "value": 0.7
+      }
+    ]
+  },
+  "search_space": [
+    {
+      "param_id": "factor.weight.price.momentum_20d",
+      "path": "factors.factors[price.momentum_20d].weight",
+      "type": "float",
+      "current": 0.18,
+      "min": 0.08,
+      "max": 0.28,
+      "step": 0.02
+    },
+    {
+      "param_id": "factor.weight.flow.moneyflow_5d",
+      "path": "factors.factors[flow.moneyflow_5d].weight",
+      "type": "float",
+      "current": 0.14,
+      "min": 0.04,
+      "max": 0.24,
+      "step": 0.02
+    },
+    {
+      "param_id": "factor.weight.fundamental.roe_quality",
+      "path": "factors.factors[fundamental.roe_quality].weight",
+      "type": "float",
+      "current": 0.15,
+      "min": 0.05,
+      "max": 0.25,
+      "step": 0.02
+    },
+    {
+      "param_id": "factor.weight.event.policy_signal",
+      "path": "factors.factors[event.policy_signal].weight",
+      "type": "float",
+      "current": 0.08,
+      "min": 0.0,
+      "max": 0.16,
+      "step": 0.02
+    },
+    {
+      "param_id": "policy.threshold.buy_score_min",
+      "path": "policy.thresholds.buy_score_min",
+      "type": "float",
+      "current": 72.0,
+      "min": 68.0,
+      "max": 78.0,
+      "step": 1.0
+    },
+    {
+      "param_id": "policy.threshold.buy_confidence_min",
+      "path": "policy.thresholds.buy_confidence_min",
+      "type": "float",
+      "current": 0.62,
+      "min": 0.55,
+      "max": 0.72,
+      "step": 0.01
+    },
+    {
+      "param_id": "policy.threshold.sell_score_max",
+      "path": "policy.thresholds.sell_score_max",
+      "type": "float",
+      "current": 35.0,
+      "min": 30.0,
+      "max": 42.0,
+      "step": 1.0
+    },
+    {
+      "param_id": "formula.coeff.c2_evidence_coverage",
+      "path": "formula.confidence_formula.coefficients.c2_evidence_coverage",
+      "type": "float",
+      "current": 0.3,
+      "min": 0.2,
+      "max": 0.45,
+      "step": 0.05
+    }
+  ],
+  "frozen": [
+    "policy.positioning.max_position",
+    "risk.constraints.max_single_position",
+    "risk.constraints.max_drawdown_pct"
+  ],
+  "execution": {
+    "tier": "TIER0",
+    "step_days": 1,
+    "evaluation_horizon_days": 5,
+    "max_candidates_per_round": 8,
+    "segment_window_points": 20,
+    "windows": [
+      {
+        "name": "train",
+        "start_date": "2018-01-01",
+        "end_date": "2023-12-31"
+      },
+      {
+        "name": "validation",
+        "start_date": "2024-01-01",
+        "end_date": "2025-12-31"
+      }
+    ]
+  },
+  "release_policy": {
+    "manual_approval_required": true,
+    "dry_run_first": true,
+    "max_param_changes_per_iteration": 8
+  }
+}
