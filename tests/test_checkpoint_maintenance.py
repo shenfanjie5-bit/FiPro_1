@@ -41,3 +41,20 @@ def test_checkpoint_auto_maintenance_triggers_on_large_db(tmp_path: Path, monkey
         module._CONN.close()
         module._CONN = None
         module._CHECKPOINTER = None
+
+
+def test_get_checkpointer_rebuilds_when_connection_is_closed(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    db_path = tmp_path / 'checkpoint.db'
+    module = _reload_checkpoint_module(monkeypatch, db_path)
+    first = module.get_checkpointer()
+    assert module._CONN is not None
+    module._CONN.close()
+
+    second = module.get_checkpointer()
+    assert second is not first
+    assert module.get_latest_checkpoint('thread_missing') is None
+
+    if module._CONN is not None:
+        module._CONN.close()
+        module._CONN = None
+        module._CHECKPOINTER = None

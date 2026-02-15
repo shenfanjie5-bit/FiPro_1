@@ -18,6 +18,13 @@
   - `strategy_version_id`
   - `tier`
   - `run_mode`（可选）
+- 请求体（可选高级分析参数）：
+  - `analysis_mode`: `BASELINE` | `TA_HYBRID` | `AUTO`
+  - `ta_hybrid_mode`: `OFF` | `ANALYZE_ONLY` | `BLEND`
+  - `ta_research_rounds`: `1~3`
+  - `ta_risk_rounds`: `1~3`
+  - `ta_llm_call_cap`: `0~20`
+  - `ta_require_evidence_refs`: `bool`
 - 返回（200）：
   - `report_id`
   - `final_report`（完整 Report 结构）
@@ -47,6 +54,13 @@
   - `transaction_fee_bps`
   - `slippage_bps`
   - `sell_tax_bps`
+- 可选高级分析参数（同 `/reports/generate`）：
+  - `analysis_mode`
+  - `ta_hybrid_mode`
+  - `ta_research_rounds`
+  - `ta_risk_rounds`
+  - `ta_llm_call_cap`
+  - `ta_require_evidence_refs`
 - 组合回测补充：
   - `portfolio: [{ticker, weight?}]`（最多 50 个标的，权重自动归一化）
 

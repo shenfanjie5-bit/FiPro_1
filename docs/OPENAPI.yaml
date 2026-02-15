@@ -31,6 +31,29 @@ components:
         tier:
           type: string
           enum: [TIER0, TIER1, TIER2]
+        run_mode:
+          type: string
+          enum: [LIVE, SHADOW, BACKTEST]
+        analysis_mode:
+          type: string
+          enum: [BASELINE, TA_HYBRID, AUTO]
+        ta_hybrid_mode:
+          type: string
+          enum: [OFF, ANALYZE_ONLY, BLEND]
+        ta_research_rounds:
+          type: integer
+          minimum: 1
+          maximum: 3
+        ta_risk_rounds:
+          type: integer
+          minimum: 1
+          maximum: 3
+        ta_llm_call_cap:
+          type: integer
+          minimum: 0
+          maximum: 20
+        ta_require_evidence_refs:
+          type: boolean
     GenerateReportResponse:
       type: object
       required: [report_id, final_report]
@@ -87,7 +110,7 @@ components:
             required: [evidence_id, type, title, source, captured_at]
             properties:
               evidence_id: { type: string }
-              type: { type: string, enum: [SNAPSHOT_FIELD, NEWS_DOC, FILINGS, MACRO_SERIES, GRAPH_QUERY, MANUAL_NOTE] }
+              type: { type: string, enum: [SNAPSHOT_FIELD, NEWS_DOC, FILINGS, MACRO_SERIES, GRAPH_QUERY, MANUAL_NOTE, AGENT_REASONING] }
               title: { type: string }
               source: { type: string }
               captured_at: { type: string, format: date-time }

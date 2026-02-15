@@ -412,6 +412,12 @@ class GenerateReportRequest(BaseModel):
     strategy_version_id: str
     tier: str = Field(pattern='^(TIER0|TIER1|TIER2)$')
     run_mode: str | None = Field(default=None, pattern='^(LIVE|SHADOW|BACKTEST)$')
+    analysis_mode: str = Field(default='BASELINE', pattern='^(BASELINE|TA_HYBRID|AUTO)$')
+    ta_hybrid_mode: str = Field(default='OFF', pattern='^(OFF|ANALYZE_ONLY|BLEND)$')
+    ta_research_rounds: int = Field(default=1, ge=1, le=3)
+    ta_risk_rounds: int = Field(default=1, ge=1, le=3)
+    ta_llm_call_cap: int = Field(default=6, ge=0, le=20)
+    ta_require_evidence_refs: bool = True
 
 
 class BatchBacktestRequest(BaseModel):
@@ -419,6 +425,12 @@ class BatchBacktestRequest(BaseModel):
     market: str = Field(default='OTHER', pattern='^(CN_A|US|HK|CRYPTO|OTHER)$')
     strategy_version_id: str
     tier: str = Field(pattern='^(TIER0|TIER1|TIER2)$')
+    analysis_mode: str = Field(default='BASELINE', pattern='^(BASELINE|TA_HYBRID|AUTO)$')
+    ta_hybrid_mode: str = Field(default='OFF', pattern='^(OFF|ANALYZE_ONLY|BLEND)$')
+    ta_research_rounds: int = Field(default=1, ge=1, le=3)
+    ta_risk_rounds: int = Field(default=1, ge=1, le=3)
+    ta_llm_call_cap: int = Field(default=6, ge=0, le=20)
+    ta_require_evidence_refs: bool = True
     skill_pack_id: str = Field(default='cn_a_core', min_length=1, max_length=64)
     skill_pack_version: str = Field(default='champion', min_length=1, max_length=32)
     start_date: date
@@ -446,6 +458,12 @@ class PortfolioBacktestRequest(BaseModel):
     market: str = Field(default='OTHER', pattern='^(CN_A|US|HK|CRYPTO|OTHER)$')
     strategy_version_id: str
     tier: str = Field(pattern='^(TIER0|TIER1|TIER2)$')
+    analysis_mode: str = Field(default='BASELINE', pattern='^(BASELINE|TA_HYBRID|AUTO)$')
+    ta_hybrid_mode: str = Field(default='OFF', pattern='^(OFF|ANALYZE_ONLY|BLEND)$')
+    ta_research_rounds: int = Field(default=1, ge=1, le=3)
+    ta_risk_rounds: int = Field(default=1, ge=1, le=3)
+    ta_llm_call_cap: int = Field(default=6, ge=0, le=20)
+    ta_require_evidence_refs: bool = True
     skill_pack_id: str = Field(default='cn_a_core', min_length=1, max_length=64)
     skill_pack_version: str = Field(default='champion', min_length=1, max_length=32)
     start_date: date

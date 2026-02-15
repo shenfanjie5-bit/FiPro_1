@@ -129,6 +129,30 @@ def _factor_value(
             return default_value, True
         return _clamp(_safe_float(event_value, default_value), -1.0, 1.0), False
 
+    if factor_id == 'ta.research_bias':
+        value = features.get('ta_research_bias')
+        if value is None:
+            return default_value, True
+        return _clamp(_safe_float(value, default_value), -1.0, 1.0), False
+
+    if factor_id == 'ta.risk_bias':
+        value = features.get('ta_risk_bias')
+        if value is None:
+            return default_value, True
+        return _clamp(_safe_float(value, default_value), -1.0, 1.0), False
+
+    if factor_id == 'ta.disagreement_penalty':
+        value = features.get('ta_disagreement_penalty')
+        if value is None:
+            return default_value, True
+        return _map_to_unit(value, 0.0, 1.0, default=default_value), False
+
+    if factor_id == 'ta.conviction_support':
+        value = features.get('ta_conviction_support')
+        if value is None:
+            return default_value, True
+        return _map_to_unit(value, 0.0, 1.0, default=default_value), False
+
     return default_value, True
 
 
@@ -219,6 +243,8 @@ def score_signal_skill_pack(
                 dq_penalty += penalty
             elif rule_id == 'penalty_data_quality_degraded' and str(data_quality_status).upper() == 'DEGRADED':
                 dq_penalty += penalty
+            elif rule_id == 'penalty_ta_high_disagreement' and factor_values.get('ta.disagreement_penalty', -1.0) > 0.5:
+                risk_penalty += penalty
 
     trend_regime = _nested(snapshots.get('get_market_snapshot', {}), 'trend.regime')
     regime_bonus = 0.0

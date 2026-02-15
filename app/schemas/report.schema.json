@@ -108,7 +108,7 @@
           "evidence_id": { "type": "string" },
           "type": {
             "type": "string",
-            "enum": ["SNAPSHOT_FIELD", "NEWS_DOC", "FILINGS", "MACRO_SERIES", "GRAPH_QUERY", "MANUAL_NOTE"]
+            "enum": ["SNAPSHOT_FIELD", "NEWS_DOC", "FILINGS", "MACRO_SERIES", "GRAPH_QUERY", "MANUAL_NOTE", "AGENT_REASONING"]
           },
           "title": { "type": "string" },
           "source": { "type": "string" },
@@ -144,7 +144,27 @@
         "snapshot_ids": { "type": "array", "items": { "type": "string" } },
         "weights_hash": { "type": "string" },
         "run_mode": { "type": "string", "enum": ["LIVE", "SHADOW", "BACKTEST"] },
-        "tool_call_stats": { "type": "object" }
+        "tool_call_stats": { "type": "object" },
+        "ta_hybrid": {
+          "type": "object",
+          "properties": {
+            "mode": { "type": "string", "enum": ["OFF", "ANALYZE_ONLY", "BLEND"] },
+            "status": { "type": "string" },
+            "applied": { "type": "boolean" },
+            "version": { "type": "string" },
+            "require_evidence_refs": { "type": "boolean" },
+            "research_rounds_used": { "type": "integer", "minimum": 0, "maximum": 3 },
+            "risk_rounds_used": { "type": "integer", "minimum": 0, "maximum": 3 },
+            "llm_calls_used": { "type": "integer", "minimum": 0, "maximum": 20 },
+            "llm_call_cap": { "type": "integer", "minimum": 0, "maximum": 20 },
+            "directional_bias": { "type": "number", "minimum": -1, "maximum": 1 },
+            "risk_bias": { "type": "number", "minimum": -1, "maximum": 1 },
+            "conviction": { "type": "number", "minimum": 0, "maximum": 1 },
+            "disagreement": { "type": "number", "minimum": 0, "maximum": 1 },
+            "horizon_days_hint": { "type": ["integer", "null"], "minimum": 1, "maximum": 120 },
+            "degraded_reasons": { "type": "array", "items": { "type": "string" } }
+          }
+        }
       }
     },
     "memory_update": {

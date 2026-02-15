@@ -992,3 +992,133 @@ def test_skill_pack_champion_switch_endpoint(monkeypatch: pytest.MonkeyPatch) ->
     assert body['executed'] is True
     assert body['champion_version_before'] == '0.1.0'
     assert body['champion_version_after'] == '0.0.1'
+
+
+def test_batch_backtest_propagates_ta_hybrid_params_and_metrics(monkeypatch: pytest.MonkeyPatch) -> None:
+    captured_request: dict = {}
+
+    def fake_runner(request_data: dict, thread_id: str) -> dict:
+        _ = thread_id
+        captured_request.update(request_data)
+        return {
+            'final_report': {
+                'report_id': 'report_ta_001',
+                'decision': {
+                    'action': 'WATCH',
+                    'overall_score': 64,
+                    'confidence': 0.61,
+                    'summary': 'ta_hybrid analyzed',
+                },
+                'data_quality': {'status': 'OK'},
+                'provenance': {
+                    'model': {'primary': 'openclaw:main'},
+                    'tool_call_stats': {'tool_calls': 11, 'cost_usd_est': 0.02, 'latency_ms': 220},
+                    'ta_hybrid': {
+                        'mode': 'ANALYZE_ONLY',
+                        'status': 'ANALYZED',
+                        'applied': False,
+                        'directional_bias': 0.25,
+                        'conviction': 0.58,
+                        'disagreement': 0.12,
+                        'llm_calls_used': 0,
+                    },
+                },
+            },
+            'persist_refs': {},
+        }
+
+    monkeypatch.setattr(routes_module, 'run_research_workflow', fake_runner)
+    monkeypatch.setattr(routes_module, 'get_market_snapshot', _fake_snapshot)
+    monkeypatch.setattr(routes_module, 'get_index_market_snapshot', _fake_snapshot)
+
+    payload = {
+        'ticker': '600519.SH',
+        'market': 'CN_A',
+        'strategy_version_id': 'stg_v1',
+        'tier': 'TIER0',
+        'analysis_mode': 'TA_HYBRID',
+        'ta_hybrid_mode': 'ANALYZE_ONLY',
+        'ta_research_rounds': 1,
+        'ta_risk_rounds': 1,
+        'ta_llm_call_cap': 6,
+        'ta_require_evidence_refs': True,
+        'start_date': '2026-02-02',
+        'end_date': '2026-02-02',
+        'step_days': 1,
+        'trading_days_only': True,
+        'max_runs': 10,
+    }
+    resp = client.post('/backtests/run', json=payload)
+    assert resp.status_code == 200
+    body = resp.json()
+
+    assert captured_request['analysis_mode'] == 'TA_HYBRID'
+    assert captured_request['ta_hybrid_mode'] == 'ANALYZE_ONLY'
+    assert captured_request['ta_research_rounds'] == 1
+    assert captured_request['ta_risk_rounds'] == 1
+    assert captured_request['ta_llm_call_cap'] == 6
+    assert captured_request['ta_require_evidence_refs'] is True
+    assert body['runs'][0]['ta_hybrid_mode'] == 'ANALYZE_ONLY'
+    assert body['runs'][0]['ta_hybrid_status'] == 'ANALYZED'
+    assert body['runs'][0]['ta_hybrid_applied'] is False
+    assert body['summary']['ta_hybrid_applied_runs'] == 0
+    assert 'avg_ta_directional_bias' in body['summary']
+
+
+def test_batch_backtest_counts_ta_hybrid_applied_runs(monkeypatch: pytest.MonkeyPatch) -> None:
+    def fake_runner(request_data: dict, thread_id: str) -> dict:
+        _ = request_data
+        _ = thread_id
+        return {
+            'final_report': {
+                'report_id': 'report_ta_blend_001',
+                'decision': {
+                    'action': 'WATCH',
+                    'overall_score': 67,
+                    'confidence': 0.6,
+                    'summary': 'ta_hybrid blended',
+                },
+                'data_quality': {'status': 'OK'},
+                'provenance': {
+                    'model': {'primary': 'openclaw:main'},
+                    'tool_call_stats': {'tool_calls': 12, 'cost_usd_est': 0.02, 'latency_ms': 210},
+                    'ta_hybrid': {
+                        'mode': 'BLEND',
+                        'status': 'BLENDED',
+                        'applied': True,
+                        'directional_bias': 0.31,
+                        'conviction': 0.66,
+                        'disagreement': 0.09,
+                        'llm_calls_used': 0,
+                    },
+                },
+            },
+            'persist_refs': {},
+        }
+
+    monkeypatch.setattr(routes_module, 'run_research_workflow', fake_runner)
+    monkeypatch.setattr(routes_module, 'get_market_snapshot', _fake_snapshot)
+    monkeypatch.setattr(routes_module, 'get_index_market_snapshot', _fake_snapshot)
+
+    payload = {
+        'ticker': '600519.SH',
+        'market': 'CN_A',
+        'strategy_version_id': 'stg_v1',
+        'tier': 'TIER0',
+        'analysis_mode': 'TA_HYBRID',
+        'ta_hybrid_mode': 'BLEND',
+        'start_date': '2026-02-02',
+        'end_date': '2026-02-02',
+        'step_days': 1,
+        'trading_days_only': True,
+        'max_runs': 10,
+    }
+    resp = client.post('/backtests/run', json=payload)
+    assert resp.status_code == 200
+    body = resp.json()
+
+    assert body['runs'][0]['ta_hybrid_mode'] == 'BLEND'
+    assert body['runs'][0]['ta_hybrid_status'] == 'BLENDED'
+    assert body['runs'][0]['ta_hybrid_applied'] is True
+    assert body['summary']['ta_hybrid_applied_runs'] == 1
+    assert body['summary']['ta_hybrid_applied_rate'] == 1.0

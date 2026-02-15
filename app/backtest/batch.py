@@ -659,6 +659,16 @@ def run_batch_backtest(
             'skill_pack_version': skill_pack_summary.get('version', skill_pack_version),
             'skill_pack_version_source': skill_pack_version_source,
         }
+        for key in (
+            'analysis_mode',
+            'ta_hybrid_mode',
+            'ta_research_rounds',
+            'ta_risk_rounds',
+            'ta_llm_call_cap',
+            'ta_require_evidence_refs',
+        ):
+            if key in payload:
+                request_data[key] = payload.get(key)
         wall_started = time.perf_counter()
         try:
             result = None
@@ -700,6 +710,7 @@ def run_batch_backtest(
             data_quality = report.get('data_quality', {}) if isinstance(report.get('data_quality', {}), dict) else {}
             provenance = report.get('provenance', {}) if isinstance(report.get('provenance', {}), dict) else {}
             tool_stats = provenance.get('tool_call_stats', {}) if isinstance(provenance.get('tool_call_stats', {}), dict) else {}
+            ta_hybrid = provenance.get('ta_hybrid', {}) if isinstance(provenance.get('ta_hybrid', {}), dict) else {}
             wall_time_ms = int((time.perf_counter() - wall_started) * 1000)
             evaluation_horizon_days_used, evaluation_horizon_source = _resolve_evaluation_horizon_days(
                 decision,
@@ -746,6 +757,13 @@ def run_batch_backtest(
                     'skill_pack_id': skill_pack_summary.get('skill_pack_id', skill_pack_id),
                     'skill_pack_version': skill_pack_summary.get('version', skill_pack_version),
                     'skill_pack_version_source': skill_pack_version_source,
+                    'ta_hybrid_mode': _safe_text(ta_hybrid.get('mode')).upper() or _safe_text(payload.get('ta_hybrid_mode')).upper() or 'OFF',
+                    'ta_hybrid_status': _safe_text(ta_hybrid.get('status')).upper() or 'OFF',
+                    'ta_hybrid_applied': bool(ta_hybrid.get('applied', False)),
+                    'ta_directional_bias': round(_safe_float(ta_hybrid.get('directional_bias'), default=0.0), 6),
+                    'ta_conviction': round(_safe_float(ta_hybrid.get('conviction'), default=0.0), 6),
+                    'ta_disagreement': round(_safe_float(ta_hybrid.get('disagreement'), default=0.0), 6),
+                    'ta_llm_calls_used': _safe_int(ta_hybrid.get('llm_calls_used'), default=0, minimum=0, maximum=1000),
                 }
             )
             processed_points += 1
@@ -816,6 +834,10 @@ def run_batch_backtest(
     buy_hits = 0
     avoid_signals = 0
     avoid_hits = 0
+    ta_hybrid_applied_runs = 0
+    ta_directional_bias_values: list[float] = []
+    ta_conviction_values: list[float] = []
+    ta_disagreement_values: list[float] = []
 
     for item in completed:
         action = _safe_text(item.get('action')).upper()
@@ -853,6 +875,11 @@ def run_batch_backtest(
                 avoid_signals += 1
                 if forward_return <= 0:
                     avoid_hits += 1
+        if bool(item.get('ta_hybrid_applied', False)):
+            ta_hybrid_applied_runs += 1
+        ta_directional_bias_values.append(_safe_float(item.get('ta_directional_bias'), default=0.0))
+        ta_conviction_values.append(_safe_float(item.get('ta_conviction'), default=0.0))
+        ta_disagreement_values.append(_safe_float(item.get('ta_disagreement'), default=0.0))
 
     directional_total = buy_signals + avoid_signals
     directional_hits = buy_hits + avoid_hits
@@ -896,6 +923,12 @@ def run_batch_backtest(
             'market': market,
             'strategy_version_id': strategy_version_id,
             'tier': tier,
+            'analysis_mode': _safe_text(payload.get('analysis_mode')).upper() or 'BASELINE',
+            'ta_hybrid_mode': _safe_text(payload.get('ta_hybrid_mode')).upper() or 'OFF',
+            'ta_research_rounds': _safe_int(payload.get('ta_research_rounds'), default=1, minimum=1, maximum=3),
+            'ta_risk_rounds': _safe_int(payload.get('ta_risk_rounds'), default=1, minimum=1, maximum=3),
+            'ta_llm_call_cap': _safe_int(payload.get('ta_llm_call_cap'), default=6, minimum=0, maximum=20),
+            'ta_require_evidence_refs': bool(payload.get('ta_require_evidence_refs', True)),
             'run_mode': 'BACKTEST',
             'start_date': start_date.isoformat(),
             'end_date': end_date.isoformat(),
@@ -955,6 +988,11 @@ def run_batch_backtest(
             'avoid_hit_rate': round((avoid_hits / avoid_signals), 6) if avoid_signals else 0.0,
             'directional_signal_count': directional_total,
             'directional_hit_rate': round((directional_hits / directional_total), 6) if directional_total else 0.0,
+            'ta_hybrid_applied_runs': ta_hybrid_applied_runs,
+            'ta_hybrid_applied_rate': round((ta_hybrid_applied_runs / len(completed)), 6) if completed else 0.0,
+            'avg_ta_directional_bias': _mean_or_zero(ta_directional_bias_values),
+            'avg_ta_conviction': _mean_or_zero(ta_conviction_values),
+            'avg_ta_disagreement': _mean_or_zero(ta_disagreement_values),
             'initial_capital_cny': round(initial_capital_cny, 2),
             'strategy_final_capital_cny': round(strategy_final_capital, 2),
             'strategy_total_return_pct': round(strategy_total_return_pct, 6),

@@ -47,6 +47,16 @@ def _db_total_bytes(path: Path) -> int:
     return total
 
 
+def _connection_is_healthy(conn: sqlite3.Connection) -> bool:
+    try:
+        conn.execute('SELECT 1')
+    except sqlite3.ProgrammingError:
+        return False
+    except sqlite3.DatabaseError:
+        return False
+    return True
+
+
 def checkpoint_db_stats() -> dict[str, Any]:
     return {
         'path': str(DB_PATH),
@@ -88,7 +98,18 @@ def _maintain_checkpoint_db_if_needed(path: Path) -> None:
 
 def get_checkpointer() -> SqliteSaver:
     global _CONN, _CHECKPOINTER
-    if _CHECKPOINTER is None:
+    needs_rebuild = _CHECKPOINTER is None or _CONN is None
+    if not needs_rebuild and _CONN is not None:
+        needs_rebuild = not _connection_is_healthy(_CONN)
+
+    if needs_rebuild:
+        if _CONN is not None:
+            try:
+                _CONN.close()
+            except sqlite3.DatabaseError:
+                pass
+        _CONN = None
+        _CHECKPOINTER = None
         _ensure_db_parent(DB_PATH)
         _maintain_checkpoint_db_if_needed(DB_PATH)
         _CONN = sqlite3.connect(DB_PATH, check_same_thread=False, timeout=30)
@@ -96,6 +117,17 @@ def get_checkpointer() -> SqliteSaver:
         _CONN.execute('PRAGMA synchronous=NORMAL')
         _CHECKPOINTER = SqliteSaver(_CONN)
     return _CHECKPOINTER
+
+
+def reset_checkpointer() -> None:
+    global _CONN, _CHECKPOINTER
+    if _CONN is not None:
+        try:
+            _CONN.close()
+        except sqlite3.DatabaseError:
+            pass
+    _CONN = None
+    _CHECKPOINTER = None
 
 
 def get_latest_checkpoint(thread_id: str) -> dict[str, Any] | None:

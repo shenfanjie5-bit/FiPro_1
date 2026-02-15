@@ -769,3 +769,49 @@
   - `tests/test_m7_monthly_review.py`
   - `tests/test_m7_feedback_api.py`
   - `tests/test_m7_shadow_routing.py`
+
+## 2026-02-16 - Batch 25 (TA Hybrid Workflow Closure + Checkpoint Resilience Fix)
+
+### Completed Operations
+- Completed TA Hybrid end-to-end integration in workflow and contracts:
+  - Added request controls in API/backtest payloads:
+    - `analysis_mode` (`BASELINE|TA_HYBRID|AUTO`)
+    - `ta_hybrid_mode` (`OFF|ANALYZE_ONLY|BLEND`)
+    - `ta_research_rounds`, `ta_risk_rounds`, `ta_llm_call_cap`, `ta_require_evidence_refs`
+  - Added workflow route after context build:
+    - `build_context -> ta_hybrid_node -> draft_report` when mode and budget allow.
+  - Added TA Hybrid subgraph module (`app/workflows/subgraphs/ta_hybrid.py`) to produce:
+    - research/risk views,
+    - normalized signal (`directional_bias/risk_bias/conviction/disagreement/horizon_days_hint`),
+    - `AGENT_REASONING` evidence references.
+  - Added BLEND application path in node layer:
+    - writes TA factors into `features`,
+    - re-runs deterministic `score_signal` and `generate_price_bands`,
+    - records applied/degraded status and reasons.
+- Completed persistence/consistency/report alignment:
+  - Extended report provenance with `ta_hybrid` state + signal fields.
+  - Extended report/request JSON schema with TA Hybrid fields and `AGENT_REASONING` evidence type.
+  - Extended consistency checks:
+    - require `AGENT_REASONING` evidence when `ta_hybrid.applied` and evidence is required,
+    - disallow `BUY` when TA disagreement is too high.
+- Completed backtest observability extension:
+  - Batch backtest now propagates TA Hybrid request params and records per-run TA metrics.
+  - Summary now reports TA Hybrid usage and signal aggregates (`applied_runs/rate`, avg bias/conviction/disagreement).
+  - Portfolio backtest now aggregates TA Hybrid summary statistics across components.
+- Fixed a cross-suite stability regression in checkpoint runtime:
+  - Root cause: test-side checkpoint connection close could leave graph-bound checkpointer stale (`closed database`).
+  - Added connection health probe and automatic checkpointer rebuild in `app/workflows/checkpoint.py`.
+  - Added workflow-level retry-once with graph/checkpointer rebuild in `app/workflows/graph.py`.
+  - Added regression test `test_get_checkpointer_rebuilds_when_connection_is_closed`.
+
+### Test Coverage Added/Updated
+- Added TA Hybrid coverage:
+  - `tests/test_ta_hybrid_mode.py` (route behavior, ANALYZE_ONLY payload, BLEND rescore application).
+  - `tests/test_backtest_api.py` TA Hybrid parameter propagation and summary metrics assertions.
+- Added checkpoint resilience coverage:
+  - `tests/test_checkpoint_maintenance.py::test_get_checkpointer_rebuilds_when_connection_is_closed`.
+
+### Validation Evidence
+- `.venv/bin/python -m pytest -q tests/test_ta_hybrid_mode.py tests/test_backtest_api.py` passed.
+- `.venv/bin/python -m pytest -q tests/test_checkpoint_maintenance.py tests/test_e2e_tier0.py tests/test_m3_data_layer.py tests/test_m4_tier1_enhancement.py tests/test_m5_tier2_graph_reviewer.py tests/test_m6_risk_and_resilience.py tests/test_m7_feedback_api.py tests/test_m7_shadow_routing.py` passed.
+- `.venv/bin/python -m pytest -q` passed (full suite green).

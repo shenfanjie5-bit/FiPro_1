@@ -216,6 +216,11 @@ def run_portfolio_backtest(
     total_trade_cost_cny = 0.0
     total_turnover = 0.0
     benchmark_ticker = ''
+    ta_hybrid_applied_runs = 0
+    ta_directional_bias_sum = 0.0
+    ta_conviction_sum = 0.0
+    ta_disagreement_sum = 0.0
+    ta_stat_samples = 0
     component_items: list[dict[str, Any]] = []
 
     for item, result in zip(items, component_results):
@@ -233,6 +238,11 @@ def run_portfolio_backtest(
         skipped_non_trading_runs += _safe_int(summary.get('skipped_non_trading_runs'), 0)
         total_trade_cost_cny += _safe_float(summary.get('total_trade_cost_cny'), 0.0)
         total_turnover += _safe_float(summary.get('total_turnover'), 0.0)
+        ta_hybrid_applied_runs += _safe_int(summary.get('ta_hybrid_applied_runs'), 0)
+        ta_directional_bias_sum += _safe_float(summary.get('avg_ta_directional_bias'), 0.0)
+        ta_conviction_sum += _safe_float(summary.get('avg_ta_conviction'), 0.0)
+        ta_disagreement_sum += _safe_float(summary.get('avg_ta_disagreement'), 0.0)
+        ta_stat_samples += 1
         benchmark_ticker = benchmark_ticker or _safe_text(summary.get('benchmark_ticker')) or _safe_text(request.get('benchmark_ticker'))
         component_items.append(
             {
@@ -249,6 +259,12 @@ def run_portfolio_backtest(
             'market': _safe_text(payload.get('market')).upper() or 'OTHER',
             'strategy_version_id': _safe_text(payload.get('strategy_version_id')),
             'tier': _safe_text(payload.get('tier')).upper() or 'TIER0',
+            'analysis_mode': _safe_text(payload.get('analysis_mode')).upper() or 'BASELINE',
+            'ta_hybrid_mode': _safe_text(payload.get('ta_hybrid_mode')).upper() or 'OFF',
+            'ta_research_rounds': _safe_int(payload.get('ta_research_rounds'), 1),
+            'ta_risk_rounds': _safe_int(payload.get('ta_risk_rounds'), 1),
+            'ta_llm_call_cap': _safe_int(payload.get('ta_llm_call_cap'), 6),
+            'ta_require_evidence_refs': bool(payload.get('ta_require_evidence_refs', True)),
             'start_date': _safe_text(payload.get('start_date')),
             'end_date': _safe_text(payload.get('end_date')),
             'step_days': _safe_int(payload.get('step_days'), 1),
@@ -274,6 +290,10 @@ def run_portfolio_backtest(
             'total_trade_cost_cny': round(total_trade_cost_cny, 6),
             'total_turnover': round(total_turnover, 6),
             'avg_turnover': round(total_turnover / max(1, len(strategy_curve) - 1), 6),
+            'ta_hybrid_applied_runs': ta_hybrid_applied_runs,
+            'avg_ta_directional_bias': round(ta_directional_bias_sum / ta_stat_samples, 6) if ta_stat_samples else 0.0,
+            'avg_ta_conviction': round(ta_conviction_sum / ta_stat_samples, 6) if ta_stat_samples else 0.0,
+            'avg_ta_disagreement': round(ta_disagreement_sum / ta_stat_samples, 6) if ta_stat_samples else 0.0,
         },
         'equity_curve': {
             'base_currency': 'CNY',

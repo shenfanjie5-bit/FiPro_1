@@ -1,0 +1,283 @@
+{
+  "version": "0.1.0",
+  "normalization": {
+    "target_range": [
+      -1.0,
+      1.0
+    ],
+    "winsorize_quantile": [
+      0.01,
+      0.99
+    ],
+    "missing_policy_default": "use_default_and_penalty",
+    "default_missing_penalty": 3.0
+  },
+  "factors": [
+    {
+      "factor_id": "price.momentum_20d",
+      "domain": "price",
+      "enabled": true,
+      "weight": 0.18,
+      "value_range": [
+        -1.0,
+        1.0
+      ],
+      "default_value": 0.0,
+      "source_refs": [
+        {
+          "source": "tushare",
+          "endpoint": "daily"
+        }
+      ],
+      "transform": "zscore_then_clip",
+      "missing_policy": "use_default_and_penalty"
+    },
+    {
+      "factor_id": "price.momentum_60d",
+      "domain": "price",
+      "enabled": true,
+      "weight": 0.1,
+      "value_range": [
+        -1.0,
+        1.0
+      ],
+      "default_value": 0.0,
+      "source_refs": [
+        {
+          "source": "tushare",
+          "endpoint": "daily"
+        }
+      ],
+      "transform": "zscore_then_clip",
+      "missing_policy": "use_default_and_penalty"
+    },
+    {
+      "factor_id": "price.volatility_20d",
+      "domain": "risk",
+      "enabled": true,
+      "weight": -0.08,
+      "value_range": [
+        -1.0,
+        1.0
+      ],
+      "default_value": 0.0,
+      "source_refs": [
+        {
+          "source": "tushare",
+          "endpoint": "daily"
+        }
+      ],
+      "transform": "zscore_then_clip",
+      "missing_policy": "use_default_and_penalty"
+    },
+    {
+      "factor_id": "valuation.pe_percentile",
+      "domain": "fundamental",
+      "enabled": true,
+      "weight": -0.12,
+      "value_range": [
+        -1.0,
+        1.0
+      ],
+      "default_value": 0.0,
+      "source_refs": [
+        {
+          "source": "tushare",
+          "endpoint": "daily_basic"
+        }
+      ],
+      "transform": "rank_then_center",
+      "missing_policy": "use_default_and_penalty"
+    },
+    {
+      "factor_id": "flow.moneyflow_5d",
+      "domain": "flow",
+      "enabled": true,
+      "weight": 0.12,
+      "value_range": [
+        -1.0,
+        1.0
+      ],
+      "default_value": 0.0,
+      "source_refs": [
+        {
+          "source": "tushare",
+          "endpoint": "moneyflow"
+        }
+      ],
+      "transform": "zscore_then_clip",
+      "missing_policy": "use_default_and_penalty"
+    },
+    {
+      "factor_id": "flow.block_trade_net",
+      "domain": "flow",
+      "enabled": true,
+      "weight": 0.0,
+      "value_range": [
+        -1.0,
+        1.0
+      ],
+      "default_value": 0.0,
+      "source_refs": [
+        {
+          "source": "tushare",
+          "endpoint": "block_trade"
+        }
+      ],
+      "transform": "zscore_then_clip",
+      "missing_policy": "use_default_and_penalty"
+    },
+    {
+      "factor_id": "fundamental.roe_quality",
+      "domain": "fundamental",
+      "enabled": true,
+      "weight": 0.15,
+      "value_range": [
+        -1.0,
+        1.0
+      ],
+      "default_value": 0.0,
+      "source_refs": [
+        {
+          "source": "tushare",
+          "endpoint": "fina_indicator"
+        }
+      ],
+      "transform": "zscore_then_clip",
+      "missing_policy": "use_default_and_penalty"
+    },
+    {
+      "factor_id": "risk.leverage_pressure",
+      "domain": "risk",
+      "enabled": true,
+      "weight": -0.09,
+      "value_range": [
+        -1.0,
+        1.0
+      ],
+      "default_value": 0.0,
+      "source_refs": [
+        {
+          "source": "tushare",
+          "endpoint": "margin"
+        }
+      ],
+      "transform": "zscore_then_clip",
+      "missing_policy": "use_default_and_penalty"
+    },
+    {
+      "factor_id": "event.policy_signal",
+      "domain": "event",
+      "enabled": true,
+      "weight": 0.08,
+      "value_range": [
+        -1.0,
+        1.0
+      ],
+      "default_value": 0.0,
+      "source_refs": [
+        {
+          "source": "llm",
+          "endpoint": "policy_event_extract"
+        }
+      ],
+      "transform": "already_normalized",
+      "missing_policy": "use_default_and_penalty"
+    },
+    {
+      "factor_id": "event.governance_signal",
+      "domain": "event",
+      "enabled": true,
+      "weight": 0.0,
+      "value_range": [
+        -1.0,
+        1.0
+      ],
+      "default_value": 0.0,
+      "source_refs": [
+        {
+          "source": "llm",
+          "endpoint": "governance_event_extract"
+        }
+      ],
+      "transform": "already_normalized",
+      "missing_policy": "use_default_and_penalty"
+    },
+    {
+      "factor_id": "ta.research_bias",
+      "domain": "event",
+      "enabled": true,
+      "weight": 0.06,
+      "value_range": [
+        -1.0,
+        1.0
+      ],
+      "default_value": 0.0,
+      "source_refs": [
+        {
+          "source": "llm",
+          "endpoint": "ta_hybrid.research"
+        }
+      ],
+      "transform": "already_normalized",
+      "missing_policy": "use_default_and_penalty"
+    },
+    {
+      "factor_id": "ta.risk_bias",
+      "domain": "risk",
+      "enabled": true,
+      "weight": -0.05,
+      "value_range": [
+        -1.0,
+        1.0
+      ],
+      "default_value": 0.0,
+      "source_refs": [
+        {
+          "source": "llm",
+          "endpoint": "ta_hybrid.risk"
+        }
+      ],
+      "transform": "already_normalized",
+      "missing_policy": "use_default_and_penalty"
+    },
+    {
+      "factor_id": "ta.disagreement_penalty",
+      "domain": "risk",
+      "enabled": true,
+      "weight": -0.04,
+      "value_range": [
+        -1.0,
+        1.0
+      ],
+      "default_value": 0.0,
+      "source_refs": [
+        {
+          "source": "llm",
+          "endpoint": "ta_hybrid.risk_judge"
+        }
+      ],
+      "transform": "already_normalized",
+      "missing_policy": "use_default_and_penalty"
+    },
+    {
+      "factor_id": "ta.conviction_support",
+      "domain": "event",
+      "enabled": true,
+      "weight": 0.03,
+      "value_range": [
+        -1.0,
+        1.0
+      ],
+      "default_value": 0.0,
+      "source_refs": [
+        {
+          "source": "llm",
+          "endpoint": "ta_hybrid.research_judge"
+        }
+      ],
+      "transform": "already_normalized",
+      "missing_policy": "use_default_and_penalty"
+    }
+  ]
+}
