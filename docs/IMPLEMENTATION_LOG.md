@@ -841,3 +841,25 @@
 ### Validation Evidence
 - `.venv/bin/python -m pytest -q tests/test_ta_hybrid_mode.py tests/test_live_skill_pack_binding.py tests/test_backtest_api.py tests/test_consistency.py` passed.
 - `.venv/bin/python -m pytest -q` passed (full suite green).
+
+## 2026-02-16 - Batch 27 (Skill Pack Component Version Governance)
+
+### Completed Operations
+- Added strict component-version governance in skill pack loader:
+  - `load_skill_pack` now validates that each component file
+    (`factors/formula/policy/risk/llm_mapping/gate`) has a `version` field
+    and it must match `manifest.version`.
+  - Validation fails fast with explicit mismatch error.
+- Prevented future candidate drift at generation source:
+  - Updated candidate materialization logic to stamp generated component files
+    with the candidate semantic version (same as manifest).
+- Backfilled historical candidate package metadata for consistency:
+  - Updated `cn_a_core` versions `0.1.1` ~ `0.1.4` component file versions to match their manifest version.
+- Added regression test:
+  - `tests/test_skill_pack.py::test_skill_pack_validation_rejects_component_version_mismatch`
+  - Locks behavior so mismatched component version is rejected.
+
+### Validation Evidence
+- `.venv/bin/python -m pytest -q tests/test_skill_pack.py tests/test_skill_pack_candidates.py tests/test_skill_pack_promotion.py tests/test_live_skill_pack_binding.py tests/test_ta_hybrid_mode.py` passed.
+- `.venv/bin/ruff check app/backtest/skill_pack.py app/backtest/candidates.py tests/test_skill_pack.py` passed.
+- `.venv/bin/python -m pytest -q` passed (full suite green).

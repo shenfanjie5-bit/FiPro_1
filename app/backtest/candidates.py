@@ -550,6 +550,10 @@ def _materialize_candidate_versions(
                 str(item).strip() for item in (plan.get('affected_factor_ids') or []) if str(item).strip()
             ],
         }
+        for component_key in ('factors', 'formula', 'policy', 'risk', 'llm_mapping', 'gate'):
+            component_payload = documents.get(component_key)
+            if isinstance(component_payload, dict):
+                component_payload['version'] = version
 
         item = {
             'version': version,

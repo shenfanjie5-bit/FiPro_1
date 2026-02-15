@@ -19,6 +19,7 @@ _REQUIRED_FILES = (
 
 _ALLOWED_STATUSES = {'draft', 'candidate', 'champion', 'archived'}
 _ALLOWED_ACTIONS = {'BUY', 'ADD', 'HOLD', 'REDUCE', 'SELL', 'AVOID'}
+_COMPONENT_FILES = tuple(name for name in _REQUIRED_FILES if name != 'manifest.json')
 
 
 def _repo_root() -> Path:
@@ -77,6 +78,19 @@ def _validate_manifest(manifest: dict[str, Any], *, skill_pack_id: str, version:
         actual = inputs.get(name.replace('.json', '_file'))
         if actual != expected:
             raise ValueError(f'manifest.inputs.{name.replace(".json", "_file")} must be "{expected}"')
+
+
+def _validate_component_versions(files: dict[str, dict[str, Any]], *, expected_version: str) -> None:
+    for filename in _COMPONENT_FILES:
+        payload = files.get(filename)
+        if not isinstance(payload, dict):
+            raise ValueError(f'{filename} payload is invalid')
+        label = filename.replace('.json', '')
+        component_version = _require_text(payload, 'version', label=label)
+        if component_version != expected_version:
+            raise ValueError(
+                f'{filename}.version={component_version} does not match manifest.version={expected_version}'
+            )
 
 
 def _validate_factors(factors_payload: dict[str, Any]) -> tuple[int, int, int]:
@@ -197,6 +211,7 @@ def _load_skill_pack_cached(root_dir: str, skill_pack_id: str, version: str) -> 
     gate_payload = files['gate.json']
 
     _validate_manifest(manifest, skill_pack_id=skill_pack_id, version=version)
+    _validate_component_versions(files, expected_version=manifest['version'])
     factor_count, enabled_factor_count, zero_weight_factor_count = _validate_factors(factors_payload)
     _validate_formula(formula_payload)
     _validate_policy(policy_payload)
