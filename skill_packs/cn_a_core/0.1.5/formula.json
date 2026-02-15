@@ -1,5 +1,5 @@
 {
-  "version": "0.1.0",
+  "version": "0.1.5",
   "score_formula": {
     "type": "tanh_linear",
     "description": "z = b + sum(weight_i * factor_i), then map to [0, 100].",

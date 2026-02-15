@@ -105,3 +105,53 @@ def test_ta_hybrid_node_blend_applies_deterministic_rescore() -> None:
     assert 'ta_conviction_support' in output['features']
     assert output['score_id'] != 'score_before_blend'
     assert output['price_bands']
+
+
+def test_ta_hybrid_node_blend_requires_ta_factors_in_skill_pack() -> None:
+    state = {
+        'request': {
+            'ticker': '600519.SH',
+            'asof': '2026-02-10T09:30:00+08:00',
+            'tier': 'TIER1',
+            'analysis_mode': 'TA_HYBRID',
+            'ta_hybrid_mode': 'BLEND',
+            'ta_research_rounds': 1,
+            'ta_risk_rounds': 1,
+            'ta_llm_call_cap': 6,
+            'ta_require_evidence_refs': True,
+        },
+        'skill_pack': load_skill_pack(skill_pack_id='cn_a_core', version='0.1.0'),
+        'snapshots': {
+            'get_market_snapshot': {'close': 100.0},
+            'get_fundamentals_snapshot': {'roe': 0.12},
+            'get_flow_sentiment_snapshot': {'sentiment': {'polarity': 0.1}},
+        },
+        'features': {
+            'event_policy_signal': 0.4,
+            'event_governance_signal': -0.2,
+            'evidence_coverage': 0.85,
+            'staleness': 0.1,
+            'event_feature_meta': {'used_event_count': 2},
+        },
+        'score': {'overall_score': 58, 'confidence': 0.55},
+        'score_id': 'score_before_blend',
+        'price_bands': [],
+        'context': {
+            'features': {'event_policy_signal': 0.4, 'event_governance_signal': -0.2, 'event_feature_meta': {'used_event_count': 2}},
+            'score': {'overall_score': 58, 'confidence': 0.55},
+            'evidence_coverage': {'ok': True, 'actual_total_refs': 6},
+            'data_quality': {'status': 'OK'},
+            'evidence_refs': [],
+        },
+        'data_quality': {'status': 'OK'},
+        'tool_traces': [],
+    }
+
+    output = ta_hybrid_node(state)
+
+    ta_state = output['ta_hybrid_state']
+    assert ta_state['mode'] == 'BLEND'
+    assert ta_state['status'] == 'ANALYZED_NO_BLEND'
+    assert ta_state['applied'] is False
+    assert ta_state.get('missing_ta_factor_ids')
+    assert output['score_id'] == 'score_before_blend'

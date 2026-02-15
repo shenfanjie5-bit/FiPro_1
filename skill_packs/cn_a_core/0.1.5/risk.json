@@ -1,5 +1,5 @@
 {
-  "version": "0.1.0",
+  "version": "0.1.5",
   "constraints": {
     "max_single_position": 0.6,
     "max_drawdown_pct": 12.0,

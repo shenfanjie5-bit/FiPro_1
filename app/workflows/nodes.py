@@ -37,6 +37,12 @@ DEFAULT_SKILL_PACK_ID = 'cn_a_core'
 DEFAULT_SKILL_PACK_VERSION = '0.1.0'
 
 TA_HYBRID_VERSION = 'ta_hybrid_m2_v1'
+TA_BLEND_REQUIRED_FACTOR_IDS = (
+    'ta.research_bias',
+    'ta.risk_bias',
+    'ta.disagreement_penalty',
+    'ta.conviction_support',
+)
 
 
 def _env_int(name: str, default: int, *, minimum: int = 1, maximum: int = 1000) -> int:
@@ -164,6 +170,25 @@ def _should_run_ta_hybrid(request: dict[str, Any] | None) -> bool:
     analysis_mode = str(req.get('analysis_mode', 'BASELINE')).strip().upper() or 'BASELINE'
     mode = str(req.get('ta_hybrid_mode', 'OFF')).strip().upper() or 'OFF'
     return analysis_mode in {'TA_HYBRID', 'AUTO'} and mode in {'ANALYZE_ONLY', 'BLEND'}
+
+
+def _enabled_skill_pack_factor_ids(skill_pack: dict[str, Any] | None) -> set[str]:
+    pack = skill_pack if isinstance(skill_pack, dict) else {}
+    factors_payload = pack.get('factors', {})
+    factors = factors_payload.get('factors', []) if isinstance(factors_payload, dict) else []
+    enabled: set[str] = set()
+    if not isinstance(factors, list):
+        return enabled
+    for item in factors:
+        if not isinstance(item, dict):
+            continue
+        factor_id = str(item.get('factor_id', '')).strip()
+        if not factor_id:
+            continue
+        if not bool(item.get('enabled', True)):
+            continue
+        enabled.add(factor_id)
+    return enabled
 
 
 def _note_degradation(state: dict, dependency: str, *, status: str, reason: str, mode: str = 'DEGRADED') -> None:
@@ -1647,62 +1672,92 @@ def ta_hybrid_node(state: dict) -> dict:
     ta_state.setdefault('require_evidence_refs', bool(req.get('ta_require_evidence_refs', True)))
 
     if requested_mode == 'BLEND':
-        features = dict(state.get('features', {}))
-        directional_bias = max(-1.0, min(1.0, _safe_float(ta_signal.get('directional_bias'), 0.0)))
-        risk_bias = max(-1.0, min(1.0, _safe_float(ta_signal.get('risk_bias'), 0.0)))
-        conviction = max(0.0, min(1.0, _safe_float(ta_signal.get('conviction'), 0.0)))
-        disagreement = max(0.0, min(1.0, _safe_float(ta_signal.get('disagreement'), 0.0)))
-        features['ta_research_bias'] = round(directional_bias, 6)
-        features['ta_risk_bias'] = round(risk_bias, 6)
-        features['ta_disagreement_penalty'] = round(disagreement, 6)
-        features['ta_conviction_support'] = round(conviction, 6)
-        state['features'] = features
-
-        score_res = execute_tool(
-            'score_signal',
-            {
-                'features': state['features'],
-                'snapshots': state.get('snapshots', {}),
-                'skill_pack': state.get('skill_pack', {}),
-                'data_quality_status': state.get('data_quality', {}).get('status', 'OK'),
-                'current_pos': 0.0,
-                'hard_risk_triggered': False,
-            },
-            score_signal_skill_pack,
-        )
-        state['tool_traces'].append(score_res['trace'])
-        if score_res['ok'] and isinstance(score_res.get('output', {}), dict):
-            score_payload = dict(score_res['output'])
-            state['score'] = score_payload
-            state['score_id'] = str(score_payload.get('score_id', state.get('score_id', '')))
-            market = state.get('snapshots', {}).get('get_market_snapshot', {})
-            base_price = market.get('close', market.get('last_price', 100.0))
-            bands_res = execute_tool(
-                'generate_price_bands',
-                {'base_price': base_price, 'score': int(score_payload.get('overall_score', 50))},
-                generate_price_bands,
+        required_ta_factors = list(TA_BLEND_REQUIRED_FACTOR_IDS)
+        enabled_factor_ids = _enabled_skill_pack_factor_ids(state.get('skill_pack', {}))
+        missing_required_factors = [factor_id for factor_id in required_ta_factors if factor_id not in enabled_factor_ids]
+        ta_state['required_factor_ids'] = required_ta_factors
+        ta_state['effective_ta_factor_ids'] = [factor_id for factor_id in required_ta_factors if factor_id in enabled_factor_ids]
+        if missing_required_factors:
+            ta_state['applied'] = False
+            ta_state['status'] = 'ANALYZED_NO_BLEND'
+            ta_state['missing_ta_factor_ids'] = missing_required_factors
+            degraded_reasons = [str(item) for item in ta_state.get('degraded_reasons', []) if str(item).strip()]
+            degraded_reasons.append(
+                'BLEND skipped: skill pack missing enabled TA factors '
+                f"({', '.join(missing_required_factors)})"
             )
-            state['tool_traces'].append(bands_res['trace'])
-            if bands_res['ok'] and isinstance(bands_res.get('output', {}), dict):
-                state['price_band_set_id'] = bands_res['output'].get('price_band_set_id', state.get('price_band_set_id'))
-                state['price_bands'] = bands_res['output'].get('price_bands', state.get('price_bands', []))
-                ta_state['applied'] = True
-                ta_state['status'] = 'BLENDED'
+            ta_state['degraded_reasons'] = degraded_reasons[:8]
+        else:
+            features = dict(state.get('features', {}))
+            directional_bias = max(-1.0, min(1.0, _safe_float(ta_signal.get('directional_bias'), 0.0)))
+            risk_bias = max(-1.0, min(1.0, _safe_float(ta_signal.get('risk_bias'), 0.0)))
+            conviction = max(0.0, min(1.0, _safe_float(ta_signal.get('conviction'), 0.0)))
+            disagreement = max(0.0, min(1.0, _safe_float(ta_signal.get('disagreement'), 0.0)))
+            features['ta_research_bias'] = round(directional_bias, 6)
+            features['ta_risk_bias'] = round(risk_bias, 6)
+            features['ta_disagreement_penalty'] = round(disagreement, 6)
+            features['ta_conviction_support'] = round(conviction, 6)
+            state['features'] = features
+
+            score_res = execute_tool(
+                'score_signal',
+                {
+                    'features': state['features'],
+                    'snapshots': state.get('snapshots', {}),
+                    'skill_pack': state.get('skill_pack', {}),
+                    'data_quality_status': state.get('data_quality', {}).get('status', 'OK'),
+                    'current_pos': 0.0,
+                    'hard_risk_triggered': False,
+                },
+                score_signal_skill_pack,
+            )
+            state['tool_traces'].append(score_res['trace'])
+            if score_res['ok'] and isinstance(score_res.get('output', {}), dict):
+                score_payload = dict(score_res['output'])
+                factor_values_payload = score_payload.get('factor_values', {})
+                factor_values = factor_values_payload if isinstance(factor_values_payload, dict) else {}
+                missing_scored_factors = [factor_id for factor_id in required_ta_factors if factor_id not in factor_values]
+                if missing_scored_factors:
+                    ta_state['applied'] = False
+                    ta_state['status'] = 'ANALYZED_NO_BLEND'
+                    ta_state['missing_ta_factor_ids'] = missing_scored_factors
+                    degraded_reasons = [str(item) for item in ta_state.get('degraded_reasons', []) if str(item).strip()]
+                    degraded_reasons.append(
+                        'BLEND skipped: score output missing TA factor_values '
+                        f"({', '.join(missing_scored_factors)})"
+                    )
+                    ta_state['degraded_reasons'] = degraded_reasons[:8]
+                else:
+                    state['score'] = score_payload
+                    state['score_id'] = str(score_payload.get('score_id', state.get('score_id', '')))
+                    market = state.get('snapshots', {}).get('get_market_snapshot', {})
+                    base_price = market.get('close', market.get('last_price', 100.0))
+                    bands_res = execute_tool(
+                        'generate_price_bands',
+                        {'base_price': base_price, 'score': int(score_payload.get('overall_score', 50))},
+                        generate_price_bands,
+                    )
+                    state['tool_traces'].append(bands_res['trace'])
+                    if bands_res['ok'] and isinstance(bands_res.get('output', {}), dict):
+                        state['price_band_set_id'] = bands_res['output'].get('price_band_set_id', state.get('price_band_set_id'))
+                        state['price_bands'] = bands_res['output'].get('price_bands', state.get('price_bands', []))
+                        ta_state['applied'] = True
+                        ta_state['status'] = 'BLENDED'
+                    else:
+                        ta_state['applied'] = False
+                        ta_state['status'] = 'ANALYZED_NO_BLEND'
+                        degraded_reasons = [str(item) for item in ta_state.get('degraded_reasons', []) if str(item).strip()]
+                        degraded_reasons.append('BLEND score ok but price bands generation failed')
+                        ta_state['degraded_reasons'] = degraded_reasons[:8]
+                        _note_degradation(state, 'llm', status='PARTIAL', reason='ta_hybrid blend failed at price bands', mode='FALLBACK')
             else:
                 ta_state['applied'] = False
                 ta_state['status'] = 'ANALYZED_NO_BLEND'
                 degraded_reasons = [str(item) for item in ta_state.get('degraded_reasons', []) if str(item).strip()]
-                degraded_reasons.append('BLEND score ok but price bands generation failed')
+                degraded_reasons.append('BLEND score refresh failed')
                 ta_state['degraded_reasons'] = degraded_reasons[:8]
-                _note_degradation(state, 'llm', status='PARTIAL', reason='ta_hybrid blend failed at price bands', mode='FALLBACK')
-        else:
-            ta_state['applied'] = False
-            ta_state['status'] = 'ANALYZED_NO_BLEND'
-            degraded_reasons = [str(item) for item in ta_state.get('degraded_reasons', []) if str(item).strip()]
-            degraded_reasons.append('BLEND score refresh failed')
-            ta_state['degraded_reasons'] = degraded_reasons[:8]
-            _note_degradation(state, 'llm', status='PARTIAL', reason='ta_hybrid blend failed at score refresh', mode='FALLBACK')
-        _refresh_tool_stats(state)
+                _note_degradation(state, 'llm', status='PARTIAL', reason='ta_hybrid blend failed at score refresh', mode='FALLBACK')
+            _refresh_tool_stats(state)
 
     state['ta_hybrid_state'] = ta_state
     state['ta_hybrid_views'] = ta_views

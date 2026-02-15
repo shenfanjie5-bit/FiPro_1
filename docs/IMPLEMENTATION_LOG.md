@@ -815,3 +815,29 @@
 - `.venv/bin/python -m pytest -q tests/test_ta_hybrid_mode.py tests/test_backtest_api.py` passed.
 - `.venv/bin/python -m pytest -q tests/test_checkpoint_maintenance.py tests/test_e2e_tier0.py tests/test_m3_data_layer.py tests/test_m4_tier1_enhancement.py tests/test_m5_tier2_graph_reviewer.py tests/test_m6_risk_and_resilience.py tests/test_m7_feedback_api.py tests/test_m7_shadow_routing.py` passed.
 - `.venv/bin/python -m pytest -q` passed (full suite green).
+
+## 2026-02-16 - Batch 26 (TA Hybrid BLEND Integrity Fix + LIVE Binding Gap Tests)
+
+### Completed Operations
+- Closed BLEND false-positive gap in `ta_hybrid_node`:
+  - BLEND now requires TA factors to be enabled in active skill pack (`ta.research_bias`, `ta.risk_bias`, `ta.disagreement_penalty`, `ta.conviction_support`).
+  - Added second-stage guard: even after re-score, BLEND is considered effective only when those TA factors are present in `score.factor_values`.
+  - When guards fail, status is forced to `ANALYZED_NO_BLEND`, `applied=false`, and explicit `degraded_reasons`/missing factor ids are recorded in provenance.
+- Closed test coverage gap for LIVE+BLEND fallback path:
+  - Added test to cover `LIVE + no champion + explicit non-champion version + BLEND` path:
+    - verifies `forced_default` to `0.1.0`,
+    - verifies TA BLEND is skipped (no false `BLENDED` state).
+  - Added node-level test that BLEND is skipped when skill pack lacks required TA factors.
+- Closed skill pack metadata consistency gap for `0.1.5`:
+  - Updated embedded `version` field from `0.1.0` to `0.1.5` in:
+    - `factors.json`, `formula.json`, `policy.json`, `risk.json`, `llm_mapping.json`, `gate.json`.
+
+### Test Coverage Added/Updated
+- `tests/test_ta_hybrid_mode.py`
+  - `test_ta_hybrid_node_blend_requires_ta_factors_in_skill_pack`
+- `tests/test_live_skill_pack_binding.py`
+  - `test_live_blend_without_champion_falls_back_and_skips_blend`
+
+### Validation Evidence
+- `.venv/bin/python -m pytest -q tests/test_ta_hybrid_mode.py tests/test_live_skill_pack_binding.py tests/test_backtest_api.py tests/test_consistency.py` passed.
+- `.venv/bin/python -m pytest -q` passed (full suite green).
