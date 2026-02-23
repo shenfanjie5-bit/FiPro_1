@@ -195,3 +195,71 @@ def test_llm_proposal_run_persistence_and_query(tmp_path) -> None:
     fetched = proposal_module.get_llm_proposal_run('run_demo_009', root_dir=tmp_path)
     assert fetched is not None
     assert fetched['run_id'] == 'run_demo_009'
+
+
+def test_list_llm_proposal_runs_filters_and_summary(tmp_path) -> None:
+    proposal_module._persist_llm_proposal_run(  # noqa: SLF001
+        {
+            'run_id': 'run_allow_001',
+            'generated_at': '2026-02-14T10:00:00+00:00',
+            'skill_pack_id': 'cn_a_core',
+            'base_version': '0.1.0',
+            'proposal_count': 2,
+            'dry_run': False,
+            'selected_candidate': {
+                'candidate_version': '0.1.2',
+                'evaluation': {
+                    'decision': 'ALLOW',
+                    'candidate_metrics': {
+                        'excess_return_delta_pct': 1.5,
+                        'segment_win_rate': 0.75,
+                    },
+                },
+            },
+            'execution': {'executed': True},
+        },
+        root_dir=tmp_path,
+    )
+    proposal_module._persist_llm_proposal_run(  # noqa: SLF001
+        {
+            'run_id': 'run_block_001',
+            'generated_at': '2026-02-14T08:00:00+00:00',
+            'skill_pack_id': 'cn_a_core',
+            'base_version': '0.1.0',
+            'proposal_count': 2,
+            'dry_run': False,
+            'selected_candidate': {
+                'candidate_version': '0.1.3',
+                'evaluation': {
+                    'decision': 'BLOCK',
+                    'candidate_metrics': {
+                        'excess_return_delta_pct': -0.6,
+                        'segment_win_rate': 0.4,
+                    },
+                },
+            },
+            'execution': {'executed': False},
+        },
+        root_dir=tmp_path,
+    )
+
+    filtered = proposal_module.list_llm_proposal_runs(
+        limit=20,
+        offset=0,
+        skill_pack_id='cn_a_core',
+        selected_decision='ALLOW',
+        generated_after='2026-02-14T09:00:00+00:00',
+        root_dir=tmp_path,
+    )
+    assert filtered['total'] == 1
+    assert filtered['items'][0]['run_id'] == 'run_allow_001'
+    assert filtered['summary']['executed_runs'] == 1
+    assert filtered['summary']['selected_decision_counts']['ALLOW'] == 1
+    assert filtered['summary']['avg_selected_excess_return_delta_pct'] == 1.5
+
+    invalid = None
+    try:
+        proposal_module.list_llm_proposal_runs(generated_before='bad-time', root_dir=tmp_path)
+    except ValueError as exc:  # pragma: no cover - sanity branch asserted below
+        invalid = str(exc)
+    assert invalid == 'generated_before must be valid ISO datetime'

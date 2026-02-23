@@ -237,13 +237,32 @@ export interface LlmProposalRunListItem {
   proposal_count: number;
   dry_run: boolean;
   selected_candidate_version: string;
+  selected_decision?: string;
+  selected_excess_return_delta_pct?: number;
+  selected_segment_win_rate?: number;
   executed: boolean;
+}
+
+export interface LlmProposalRunListFilters {
+  skill_pack_id?: string;
+  executed?: boolean;
+  dry_run?: boolean;
+  selected_decision?: string;
+  generated_after?: string;
+  generated_before?: string;
 }
 
 export interface LlmProposalRunListResponse {
   total: number;
   limit: number;
   offset: number;
+  summary?: {
+    executed_runs?: number;
+    dry_run_runs?: number;
+    selected_decision_counts?: Record<string, number>;
+    avg_selected_excess_return_delta_pct?: number;
+    avg_selected_segment_win_rate?: number;
+  };
   items: LlmProposalRunListItem[];
 }
 
@@ -327,6 +346,10 @@ export interface ChampionWatchdogRunPayload {
   fail_rate_warn: number;
   fail_rate_critical: number;
   rollback_storm_critical: number;
+  execute_rollback_on_recommendation: boolean;
+  rollback_dry_run: boolean;
+  rollback_reason: string;
+  rollback_operator: string;
   auto_create_ticket: boolean;
 }
 
@@ -342,6 +365,8 @@ export interface ChampionWatchdogRunListItem {
   latest_decision: string;
   should_rollback: boolean;
   rollback_target_version: string;
+  rollback_executed?: boolean;
+  rollback_release_event_id?: string;
   ticket_id?: string;
 }
 
@@ -364,6 +389,7 @@ export interface ChampionWatchdogRunDetail {
   summary: Record<string, unknown>;
   alerts: ChampionWatchdogAlertItem[];
   rollback_recommendation: Record<string, unknown>;
+  rollback_execution?: Record<string, unknown> | null;
   executed_health_check: Record<string, unknown> | null;
   ticket?: ChampionWatchdogTicketItem | null;
   alert_state_summary?: Record<string, number>;

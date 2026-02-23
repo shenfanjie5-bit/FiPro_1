@@ -863,3 +863,65 @@
 - `.venv/bin/python -m pytest -q tests/test_skill_pack.py tests/test_skill_pack_candidates.py tests/test_skill_pack_promotion.py tests/test_live_skill_pack_binding.py tests/test_ta_hybrid_mode.py` passed.
 - `.venv/bin/ruff check app/backtest/skill_pack.py app/backtest/candidates.py tests/test_skill_pack.py` passed.
 - `.venv/bin/python -m pytest -q` passed (full suite green).
+
+## 2026-02-23 - Batch 28 (Institutional Plan M3/M4 Closure Hardening)
+
+### Completed Operations
+- M3 提案审计可观测性补强：
+  - `GET /skill-packs/proposals/runs` 新增筛选参数：
+    - `skill_pack_id`
+    - `executed`
+    - `dry_run`
+    - `selected_decision`
+    - `generated_after`
+    - `generated_before`
+  - 提案 runs 列表新增 `summary` 聚合输出：
+    - `executed_runs`
+    - `dry_run_runs`
+    - `selected_decision_counts`
+    - `avg_selected_excess_return_delta_pct`
+    - `avg_selected_segment_win_rate`
+  - 明细项补充：
+    - `selected_decision`
+    - `selected_excess_return_delta_pct`
+    - `selected_segment_win_rate`
+- M3 前端评审页补强（`/proposals`）：
+  - 新增筛选控件（skill pack / decision / executed / dry-run）。
+  - 新增审计摘要卡（总运行数、执行数、dry-run 数、平均增量、决策分布）。
+  - 列表新增“选中决策”列，支持快速审阅 gate 结果。
+- M4 监控告警与自动回滚联动补强：
+  - `POST /skill-packs/champion/watchdog/run` 新增参数：
+    - `execute_rollback_on_recommendation`
+    - `rollback_dry_run`
+    - `rollback_reason`
+    - `rollback_operator`
+  - Watchdog 在建议回滚时可自动触发 `switch_skill_pack_champion`（支持 dry-run），并把执行结果写入 run 审计字段 `rollback_execution`。
+  - Watchdog runs 列表新增回滚联动字段：
+    - `rollback_executed`
+    - `rollback_release_event_id`
+  - Champion 监控页新增“命中建议后自动回滚”开关，并展示 watchdog 回滚执行/发布事件状态。
+
+### Test Coverage Added/Updated
+- `tests/test_llm_proposals.py`
+  - 新增提案 runs 筛选与 summary 聚合测试。
+- `tests/test_backtest_api.py`
+  - 覆盖 proposals/runs 筛选参数透传与非法时间 422 行为。
+  - 覆盖 watchdog 新增回滚联动参数透传。
+- `tests/test_champion_watchdog.py`
+  - 新增 watchdog 建议触发自动回滚执行链路测试。
+
+### Validation Evidence
+- `.venv/bin/python -m pytest -q tests/test_llm_proposals.py tests/test_champion_watchdog.py tests/test_backtest_api.py tests/test_champion_watchdog_api.py` passed.
+- `npm --prefix frontend run build` passed (`tsc --noEmit` + `vite build`).
+
+### Documentation Sync
+- 更新 `docs/INSTITUTIONAL_TRANSFORMATION_PLAN.md`：
+  - M3 状态调整为“已完成”
+  - M4 状态调整为“已完成”
+- 更新 `docs/API_SPEC.md`：
+  - 补充 proposals/runs 筛选与 summary
+  - 补充 watchdog 自动回滚联动参数与返回字段
+- 更新 `docs/OPENAPI.yaml`：
+  - 补齐 skill-pack proposals/champion watchdog/health-check/releases 的契约路径
+  - `ChampionWatchdogRunRequest` 新增自动回滚联动参数定义
+  - `LlmProposalRunListResponse` 新增 audit summary 结构定义

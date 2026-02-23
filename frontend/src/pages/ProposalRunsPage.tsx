@@ -5,6 +5,23 @@ import { getLlmProposalRun, listLlmProposalRuns } from '../api/client';
 import { DataSourceStatusWidget } from '../components/DataSourceStatusWidget';
 import type { LlmProposalRunDetail, LlmProposalRunListItem } from '../types/report';
 
+type BoolFilter = 'ALL' | 'YES' | 'NO';
+
+interface ListFilters {
+  skillPackId: string;
+  selectedDecision: string;
+  executed: BoolFilter;
+  dryRun: BoolFilter;
+}
+
+interface ListSummary {
+  executedRuns: number;
+  dryRunRuns: number;
+  avgExcessDelta: number;
+  avgSegmentWinRate: number;
+  decisionCounts: Record<string, number>;
+}
+
 function asRecord(value: unknown): Record<string, unknown> | null {
   return typeof value === 'object' && value !== null ? (value as Record<string, unknown>) : null;
 }
@@ -57,9 +74,33 @@ function boolLabel(value: boolean): string {
   return value ? '是' : '否';
 }
 
+function boolFilterToOptional(value: BoolFilter): boolean | undefined {
+  if (value === 'YES') {
+    return true;
+  }
+  if (value === 'NO') {
+    return false;
+  }
+  return undefined;
+}
+
 export function ProposalRunsPage() {
+  const [filters, setFilters] = useState<ListFilters>({
+    skillPackId: '',
+    selectedDecision: '',
+    executed: 'ALL',
+    dryRun: 'ALL',
+  });
   const [loadingList, setLoadingList] = useState(true);
   const [listError, setListError] = useState('');
+  const [total, setTotal] = useState(0);
+  const [summary, setSummary] = useState<ListSummary>({
+    executedRuns: 0,
+    dryRunRuns: 0,
+    avgExcessDelta: 0,
+    avgSegmentWinRate: 0,
+    decisionCounts: {},
+  });
   const [items, setItems] = useState<LlmProposalRunListItem[]>([]);
   const [selectedRunId, setSelectedRunId] = useState('');
   const [detailLoading, setDetailLoading] = useState(false);
@@ -69,10 +110,31 @@ export function ProposalRunsPage() {
   async function refreshList() {
     setLoadingList(true);
     try {
-      const response = await listLlmProposalRuns(100, 0);
+      const response = await listLlmProposalRuns(100, 0, {
+        skill_pack_id: filters.skillPackId.trim(),
+        executed: boolFilterToOptional(filters.executed),
+        dry_run: boolFilterToOptional(filters.dryRun),
+        selected_decision: filters.selectedDecision.trim(),
+      });
       const rows = Array.isArray(response.items) ? response.items : [];
       setItems(rows);
+      setTotal(Number(response.total || 0));
       setListError('');
+      const summaryPayload = asRecord(response.summary);
+      const decisionCountsRaw = asRecord(summaryPayload?.selected_decision_counts);
+      const decisionCounts: Record<string, number> = {};
+      if (decisionCountsRaw) {
+        for (const [key, value] of Object.entries(decisionCountsRaw)) {
+          decisionCounts[key] = numeric(value);
+        }
+      }
+      setSummary({
+        executedRuns: numeric(summaryPayload?.executed_runs),
+        dryRunRuns: numeric(summaryPayload?.dry_run_runs),
+        avgExcessDelta: numeric(summaryPayload?.avg_selected_excess_return_delta_pct),
+        avgSegmentWinRate: numeric(summaryPayload?.avg_selected_segment_win_rate),
+        decisionCounts,
+      });
       if (!selectedRunId && rows.length > 0) {
         setSelectedRunId(rows[0].run_id);
       }
@@ -180,9 +242,53 @@ export function ProposalRunsPage() {
 
       <section className="panel">
         <h2 className="table-title">提案运行列表</h2>
+        <div className="form-grid">
+          <label>
+            <span>Skill Pack</span>
+            <input
+              value={filters.skillPackId}
+              onChange={(event) => setFilters((prev) => ({ ...prev, skillPackId: event.target.value }))}
+              placeholder="留空表示全部"
+            />
+          </label>
+          <label>
+            <span>选中决策</span>
+            <select
+              value={filters.selectedDecision}
+              onChange={(event) => setFilters((prev) => ({ ...prev, selectedDecision: event.target.value }))}
+            >
+              <option value="">全部</option>
+              <option value="ALLOW">ALLOW</option>
+              <option value="PENDING_MANUAL_APPROVAL">PENDING_MANUAL_APPROVAL</option>
+              <option value="BLOCK">BLOCK</option>
+            </select>
+          </label>
+          <label>
+            <span>已执行晋级</span>
+            <select
+              value={filters.executed}
+              onChange={(event) => setFilters((prev) => ({ ...prev, executed: event.target.value as BoolFilter }))}
+            >
+              <option value="ALL">全部</option>
+              <option value="YES">是</option>
+              <option value="NO">否</option>
+            </select>
+          </label>
+          <label>
+            <span>Dry Run</span>
+            <select
+              value={filters.dryRun}
+              onChange={(event) => setFilters((prev) => ({ ...prev, dryRun: event.target.value as BoolFilter }))}
+            >
+              <option value="ALL">全部</option>
+              <option value="YES">是</option>
+              <option value="NO">否</option>
+            </select>
+          </label>
+        </div>
         <div className="actions-inline">
           <button type="button" className="secondary-button" onClick={() => void refreshList()}>
-            刷新列表
+            应用筛选并刷新
           </button>
         </div>
         {loadingList ? <p className="helper-text">加载中...</p> : null}
@@ -197,6 +303,7 @@ export function ProposalRunsPage() {
                 <th>基线版本</th>
                 <th>提案数</th>
                 <th>选中版本</th>
+                <th>选中决策</th>
                 <th>已执行晋级</th>
                 <th>Dry Run</th>
               </tr>
@@ -220,18 +327,48 @@ export function ProposalRunsPage() {
                   <td>{item.base_version}</td>
                   <td>{item.proposal_count}</td>
                   <td>{item.selected_candidate_version || '-'}</td>
+                  <td>{decisionLabel(String(item.selected_decision || ''))}</td>
                   <td>{boolLabel(item.executed)}</td>
                   <td>{boolLabel(item.dry_run)}</td>
                 </tr>
               ))}
               {!loadingList && !listError && items.length === 0 ? (
                 <tr>
-                  <td colSpan={8} className="helper-text">暂无提案运行记录。</td>
+                  <td colSpan={9} className="helper-text">暂无提案运行记录。</td>
                 </tr>
               ) : null}
             </tbody>
           </table>
         </div>
+      </section>
+
+      <section className="panel panel-metrics">
+        <article>
+          <h2>总运行数</h2>
+          <p>{total}</p>
+        </article>
+        <article>
+          <h2>已执行晋级</h2>
+          <p>{summary.executedRuns}</p>
+        </article>
+        <article>
+          <h2>Dry Run 数</h2>
+          <p>{summary.dryRunRuns}</p>
+        </article>
+        <article>
+          <h2>平均超额收益 Δ</h2>
+          <p>{summary.avgExcessDelta.toFixed(2)}%</p>
+        </article>
+        <article>
+          <h2>平均分段胜率</h2>
+          <p>{(summary.avgSegmentWinRate * 100).toFixed(2)}%</p>
+        </article>
+        <article>
+          <h2>决策分布</h2>
+          <p>
+            ALLOW {Number(summary.decisionCounts.ALLOW || 0)} / PENDING {Number(summary.decisionCounts.PENDING_MANUAL_APPROVAL || 0)} / BLOCK {Number(summary.decisionCounts.BLOCK || 0)}
+          </p>
+        </article>
       </section>
 
       <section className="panel panel-metrics">

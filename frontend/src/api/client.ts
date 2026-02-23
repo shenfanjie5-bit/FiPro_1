@@ -17,6 +17,7 @@ import type {
   GenerateReportPayload,
   GenerateReportResponse,
   LlmProposalRunDetail,
+  LlmProposalRunListFilters,
   LlmProposalRunListResponse,
   ReportResponse,
   RuntimeConfig,
@@ -153,10 +154,32 @@ export async function getDataSourceStatus(): Promise<DataSourceStatusResponse> {
   return payload as DataSourceStatusResponse;
 }
 
-export async function listLlmProposalRuns(limit = 50, offset = 0): Promise<LlmProposalRunListResponse> {
+export async function listLlmProposalRuns(
+  limit = 50,
+  offset = 0,
+  filters: LlmProposalRunListFilters = {}
+): Promise<LlmProposalRunListResponse> {
   const search = new URLSearchParams();
   search.set('limit', String(limit));
   search.set('offset', String(offset));
+  if ((filters.skill_pack_id ?? '').trim()) {
+    search.set('skill_pack_id', String(filters.skill_pack_id).trim());
+  }
+  if (typeof filters.executed === 'boolean') {
+    search.set('executed', String(filters.executed));
+  }
+  if (typeof filters.dry_run === 'boolean') {
+    search.set('dry_run', String(filters.dry_run));
+  }
+  if ((filters.selected_decision ?? '').trim()) {
+    search.set('selected_decision', String(filters.selected_decision).trim());
+  }
+  if ((filters.generated_after ?? '').trim()) {
+    search.set('generated_after', String(filters.generated_after).trim());
+  }
+  if ((filters.generated_before ?? '').trim()) {
+    search.set('generated_before', String(filters.generated_before).trim());
+  }
   return request<LlmProposalRunListResponse>(`/skill-packs/proposals/runs?${search.toString()}`);
 }
 

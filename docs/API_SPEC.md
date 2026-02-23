@@ -87,10 +87,20 @@
 - `POST /skill-packs/promotions/run`
 - `POST /skill-packs/{skill_pack_id}/champion/switch`
 - 行为约束：
+  - `GET /skill-packs/proposals/runs` 支持审计筛选参数：
+    - `skill_pack_id`
+    - `executed`
+    - `dry_run`
+    - `selected_decision`
+    - `generated_after`
+    - `generated_before`
+  - 提案 runs 列表返回 `summary` 聚合（执行数、dry-run 数、决策分布、平均增量指标）。
   - `LIVE` 模式运行时强制绑定 champion skill（忽略显式非 champion 版本）。
   - `promotion gate` 默认启用稳健性门禁：`walk_forward_stability`、`bootstrap_significance`。
   - champion 健康检查可在 gate 失败时触发自动回滚（支持 `rollback_dry_run`）。
   - champion watchdog 可生成告警清单与回滚建议（支持“先跑健康检查再评估”）。
+  - watchdog 运行可选 `execute_rollback_on_recommendation=true`，按建议目标版本执行自动回滚（支持 dry-run、operator/reason 审计）并返回 `rollback_execution`。
+  - watchdog runs 列表补充回滚联动字段：`rollback_executed`、`rollback_release_event_id`。
   - watchdog 运行默认可自动生成工单（`auto_create_ticket=true`），告警支持 ACK/关闭生命周期。
 
 ### 2.6 数据源可见化

@@ -60,6 +60,19 @@ def _safe_text(value: Any) -> str:
     return str(value or '').strip()
 
 
+def _parse_iso_datetime(value: Any) -> datetime | None:
+    text = _safe_text(value)
+    if not text:
+        return None
+    try:
+        parsed = datetime.fromisoformat(text.replace('Z', '+00:00'))
+    except ValueError:
+        return None
+    if parsed.tzinfo is None:
+        return parsed.replace(tzinfo=timezone.utc)
+    return parsed.astimezone(timezone.utc)
+
+
 def _resolve_base_version(skill_pack_id: str, base_version: str, *, root_dir: str | Path | None = None) -> str:
     normalized = _safe_text(base_version)
     if normalized and normalized.lower() not in {'champion', 'auto'}:
@@ -228,13 +241,42 @@ def list_llm_proposal_runs(
     *,
     limit: int = 50,
     offset: int = 0,
+    skill_pack_id: str = '',
+    executed: bool | None = None,
+    dry_run: bool | None = None,
+    selected_decision: str = '',
+    generated_after: str = '',
+    generated_before: str = '',
     root_dir: str | Path | None = None,
 ) -> dict[str, Any]:
     normalized_limit = max(1, min(500, _safe_int(limit, 50)))
     normalized_offset = max(0, _safe_int(offset, 0))
+    skill_pack_filter = _safe_text(skill_pack_id)
+    decision_filter = _safe_text(selected_decision).upper()
+    generated_after_dt = _parse_iso_datetime(generated_after) if _safe_text(generated_after) else None
+    generated_before_dt = _parse_iso_datetime(generated_before) if _safe_text(generated_before) else None
+    if _safe_text(generated_after) and generated_after_dt is None:
+        raise ValueError('generated_after must be valid ISO datetime')
+    if _safe_text(generated_before) and generated_before_dt is None:
+        raise ValueError('generated_before must be valid ISO datetime')
+    if generated_after_dt and generated_before_dt and generated_after_dt > generated_before_dt:
+        raise ValueError('generated_after must be less than or equal to generated_before')
+
     root = _proposal_run_root(root_dir)
     if not root.exists() or not root.is_dir():
-        return {'total': 0, 'limit': normalized_limit, 'offset': normalized_offset, 'items': []}
+        return {
+            'total': 0,
+            'limit': normalized_limit,
+            'offset': normalized_offset,
+            'summary': {
+                'executed_runs': 0,
+                'dry_run_runs': 0,
+                'selected_decision_counts': {},
+                'avg_selected_excess_return_delta_pct': 0.0,
+                'avg_selected_segment_win_rate': 0.0,
+            },
+            'items': [],
+        }
 
     rows: list[dict[str, Any]] = []
     for path in root.glob('*.json'):
@@ -243,26 +285,75 @@ def list_llm_proposal_runs(
             continue
         run_id = _safe_text(payload.get('run_id')) or path.stem
         selected = payload.get('selected_candidate') if isinstance(payload.get('selected_candidate'), dict) else {}
+        selected_evaluation = selected.get('evaluation') if isinstance(selected.get('evaluation'), dict) else {}
+        selected_candidate_metrics = (
+            selected_evaluation.get('candidate_metrics')
+            if isinstance(selected_evaluation.get('candidate_metrics'), dict)
+            else {}
+        )
         execution = payload.get('execution') if isinstance(payload.get('execution'), dict) else {}
+        row = {
+            'run_id': run_id,
+            'generated_at': _safe_text(payload.get('generated_at')),
+            'skill_pack_id': _safe_text(payload.get('skill_pack_id')),
+            'base_version': _safe_text(payload.get('base_version')),
+            'proposal_count': _safe_int(payload.get('proposal_count'), 0),
+            'dry_run': bool(payload.get('dry_run', False)),
+            'selected_candidate_version': _safe_text(selected.get('candidate_version')),
+            'selected_decision': _safe_text(selected_evaluation.get('decision')).upper(),
+            'selected_excess_return_delta_pct': round(
+                _safe_float(selected_candidate_metrics.get('excess_return_delta_pct'), 0.0),
+                6,
+            ),
+            'selected_segment_win_rate': round(
+                _safe_float(selected_candidate_metrics.get('segment_win_rate'), 0.0),
+                6,
+            ),
+            'executed': bool(execution.get('executed', False)),
+        }
+        generated_at_dt = _parse_iso_datetime(row.get('generated_at'))
+        if skill_pack_filter and _safe_text(row.get('skill_pack_id')) != skill_pack_filter:
+            continue
+        if executed is not None and bool(row.get('executed')) != bool(executed):
+            continue
+        if dry_run is not None and bool(row.get('dry_run')) != bool(dry_run):
+            continue
+        if decision_filter and _safe_text(row.get('selected_decision')).upper() != decision_filter:
+            continue
+        if generated_after_dt and (generated_at_dt is None or generated_at_dt < generated_after_dt):
+            continue
+        if generated_before_dt and (generated_at_dt is None or generated_at_dt > generated_before_dt):
+            continue
+
         rows.append(
-            {
-                'run_id': run_id,
-                'generated_at': _safe_text(payload.get('generated_at')),
-                'skill_pack_id': _safe_text(payload.get('skill_pack_id')),
-                'base_version': _safe_text(payload.get('base_version')),
-                'proposal_count': _safe_int(payload.get('proposal_count'), 0),
-                'dry_run': bool(payload.get('dry_run', False)),
-                'selected_candidate_version': _safe_text(selected.get('candidate_version')),
-                'executed': bool(execution.get('executed', False)),
-            }
+            row
         )
     rows.sort(key=lambda item: (_safe_text(item.get('generated_at')), _safe_text(item.get('run_id'))), reverse=True)
     total = len(rows)
     paged = rows[normalized_offset : normalized_offset + normalized_limit]
+    decision_counts: dict[str, int] = {}
+    excess_values: list[float] = []
+    segment_values: list[float] = []
+    for item in rows:
+        decision = _safe_text(item.get('selected_decision')).upper()
+        if decision:
+            decision_counts[decision] = decision_counts.get(decision, 0) + 1
+        excess_values.append(_safe_float(item.get('selected_excess_return_delta_pct'), 0.0))
+        segment_values.append(_safe_float(item.get('selected_segment_win_rate'), 0.0))
+
+    avg_excess = round(sum(excess_values) / len(excess_values), 6) if excess_values else 0.0
+    avg_segment = round(sum(segment_values) / len(segment_values), 6) if segment_values else 0.0
     return {
         'total': total,
         'limit': normalized_limit,
         'offset': normalized_offset,
+        'summary': {
+            'executed_runs': sum(1 for item in rows if bool(item.get('executed', False))),
+            'dry_run_runs': sum(1 for item in rows if bool(item.get('dry_run', False))),
+            'selected_decision_counts': decision_counts,
+            'avg_selected_excess_return_delta_pct': avg_excess,
+            'avg_selected_segment_win_rate': avg_segment,
+        },
         'items': paged,
     }
 

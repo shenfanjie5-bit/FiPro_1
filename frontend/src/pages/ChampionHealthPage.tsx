@@ -42,6 +42,7 @@ interface FormState {
   maxRuns: number;
   evaluationHorizonDays: number;
   autoRollback: boolean;
+  watchdogAutoRollback: boolean;
   rollbackDryRun: boolean;
   rollbackReason: string;
   operator: string;
@@ -182,6 +183,7 @@ export function ChampionHealthPage() {
     maxRuns: 60,
     evaluationHorizonDays: 5,
     autoRollback: false,
+    watchdogAutoRollback: false,
     rollbackDryRun: true,
     rollbackReason: 'monitoring_gate_block',
     operator: 'monitor_engine'
@@ -402,6 +404,10 @@ export function ChampionHealthPage() {
         fail_rate_warn: 0.25,
         fail_rate_critical: 0.5,
         rollback_storm_critical: 2,
+        execute_rollback_on_recommendation: form.watchdogAutoRollback,
+        rollback_dry_run: form.rollbackDryRun,
+        rollback_reason: form.rollbackReason.trim() || 'watchdog_recommendation',
+        rollback_operator: form.operator.trim() || 'watchdog_engine',
         auto_create_ticket: true
       });
       setWatchdogDetail(payload);
@@ -471,6 +477,9 @@ export function ChampionHealthPage() {
   const watchdogRecommendation = (watchdogDetail?.rollback_recommendation || {}) as Record<string, unknown>;
   const watchdogShouldRollback = Boolean(watchdogRecommendation.should_rollback);
   const watchdogTargetVersion = String(watchdogRecommendation.target_version || '');
+  const watchdogRollbackExecution = (watchdogDetail?.rollback_execution || null) as Record<string, unknown> | null;
+  const watchdogRollbackExecuted = Boolean((watchdogRollbackExecution || {}).executed);
+  const watchdogRollbackReleaseEventId = String((watchdogRollbackExecution || {}).release_event_id || '');
   const selectedRunAlerts = useMemo(() => {
     if (!selectedWatchdogRunId.trim()) {
       return watchdogAlerts;
@@ -739,6 +748,14 @@ export function ChampionHealthPage() {
           <button type="button" className="secondary-button" onClick={() => void refreshWatchdogList()}>
             刷新 Watchdog
           </button>
+          <label className="checkbox-row">
+            <input
+              type="checkbox"
+              checked={form.watchdogAutoRollback}
+              onChange={(event) => setForm((prev) => ({ ...prev, watchdogAutoRollback: event.target.checked }))}
+            />
+            命中建议后自动回滚
+          </label>
           <button type="button" onClick={() => void handleRunWatchdog()} disabled={watchdogSubmitting}>
             {watchdogSubmitting ? '运行中...' : '运行 Watchdog'}
           </button>
@@ -757,6 +774,8 @@ export function ChampionHealthPage() {
                 <th>最新健康</th>
                 <th>建议回滚</th>
                 <th>目标版本</th>
+                <th>已执行回滚</th>
+                <th>发布事件</th>
                 <th>工单</th>
               </tr>
             </thead>
@@ -781,12 +800,14 @@ export function ChampionHealthPage() {
                   <td>{statusLabel(item.latest_health_status)}</td>
                   <td>{boolLabel(item.should_rollback)}</td>
                   <td>{item.rollback_target_version || '-'}</td>
+                  <td>{boolLabel(Boolean(item.rollback_executed))}</td>
+                  <td>{item.rollback_release_event_id || '-'}</td>
                   <td>{item.ticket_id || '-'}</td>
                 </tr>
               ))}
               {!watchdogLoadingList && watchdogRuns.length === 0 ? (
                 <tr>
-                  <td colSpan={9} className="helper-text">暂无 Watchdog 记录。</td>
+                  <td colSpan={11} className="helper-text">暂无 Watchdog 记录。</td>
                 </tr>
               ) : null}
             </tbody>
@@ -938,6 +959,14 @@ export function ChampionHealthPage() {
         <article>
           <h2>Watchdog 目标版本</h2>
           <p>{watchdogTargetVersion || '-'}</p>
+        </article>
+        <article>
+          <h2>Watchdog 回滚执行</h2>
+          <p>{boolLabel(watchdogRollbackExecuted)}</p>
+        </article>
+        <article>
+          <h2>Watchdog 发布事件</h2>
+          <p>{watchdogRollbackReleaseEventId || '-'}</p>
         </article>
       </section>
 

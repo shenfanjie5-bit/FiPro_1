@@ -258,3 +258,76 @@ def test_watchdog_alert_ack_and_close(monkeypatch, tmp_path) -> None:
 
     open_alerts = watchdog_module.list_champion_watchdog_alerts(limit=100, offset=0, status='OPEN', root_dir=tmp_path)
     assert all(item['alert_id'] != alert_id for item in open_alerts['items'])
+
+
+def test_run_champion_watchdog_executes_rollback_on_recommendation(monkeypatch, tmp_path) -> None:
+    monkeypatch.setattr(
+        watchdog_module,
+        'list_champion_health_checks',
+        lambda limit, offset, root_dir=None: {  # noqa: ARG005
+            'total': 2,
+            'items': [
+                {
+                    'run_id': 'hc_010',
+                    'generated_at': '2026-02-14T10:00:00+00:00',
+                    'skill_pack_id': 'cn_a_core',
+                    'health_status': 'FAIL',
+                    'decision': 'BLOCK',
+                    'champion_version': '0.1.4',
+                    'baseline_version': '0.1.3',
+                    'rollback_executed': False,
+                },
+                {
+                    'run_id': 'hc_009',
+                    'generated_at': '2026-02-14T09:00:00+00:00',
+                    'skill_pack_id': 'cn_a_core',
+                    'health_status': 'FAIL',
+                    'decision': 'BLOCK',
+                    'champion_version': '0.1.4',
+                    'baseline_version': '0.1.3',
+                    'rollback_executed': False,
+                },
+            ],
+        },
+    )
+    monkeypatch.setattr(
+        watchdog_module,
+        'list_release_events',
+        lambda limit, offset, root_dir=None: {'total': 0, 'items': []},  # noqa: ARG005
+    )
+    captured: dict = {}
+
+    def fake_switch_skill_pack_champion(**kwargs):  # noqa: ANN003
+        captured.update(kwargs)
+        return {
+            'executed': True,
+            'dry_run': kwargs.get('dry_run', False),
+            'skill_pack_id': kwargs.get('skill_pack_id'),
+            'target_version': kwargs.get('target_version'),
+            'champion_version_before': kwargs.get('champion_version_hint', ''),
+            'champion_version_after': kwargs.get('target_version'),
+            'archived_previous_champion': True,
+            'reason': kwargs.get('reason', ''),
+            'operator': kwargs.get('operator', ''),
+            'switch_mode': kwargs.get('switch_mode', ''),
+            'release_event_id': 'release_rollback_001',
+        }
+
+    monkeypatch.setattr(watchdog_module, 'switch_skill_pack_champion', fake_switch_skill_pack_champion)
+
+    result = watchdog_module.run_champion_watchdog(
+        run_health_check=False,
+        lookback_runs=20,
+        execute_rollback_on_recommendation=True,
+        rollback_dry_run=True,
+        rollback_reason='watchdog_recommendation',
+        rollback_operator='watchdog_engine',
+        root_dir=tmp_path,
+    )
+
+    assert captured['skill_pack_id'] == 'cn_a_core'
+    assert captured['target_version'] == '0.1.3'
+    assert captured['switch_mode'] == 'watchdog_auto_rollback'
+    assert result['rollback_execution'] is not None
+    assert result['rollback_execution']['executed'] is True
+    assert result['rollback_execution']['release_event_id'] == 'release_rollback_001'

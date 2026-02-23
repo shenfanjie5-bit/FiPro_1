@@ -741,13 +741,23 @@ def test_skill_pack_llm_proposal_run_endpoint(monkeypatch: pytest.MonkeyPatch) -
 
 
 def test_skill_pack_llm_proposal_run_query_endpoints(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setattr(
-        routes_module,
-        'list_llm_proposal_runs',
-        lambda limit, offset: {  # noqa: ARG005
+    captured: dict = {}
+
+    def fake_list_llm_proposal_runs(**kwargs):  # noqa: ANN003
+        if kwargs.get('generated_after') == 'invalid-datetime':
+            raise ValueError('generated_after must be valid ISO datetime')
+        captured.update(kwargs)
+        return {
             'total': 1,
-            'limit': 50,
-            'offset': 0,
+            'limit': kwargs.get('limit', 50),
+            'offset': kwargs.get('offset', 0),
+            'summary': {
+                'executed_runs': 0,
+                'dry_run_runs': 0,
+                'selected_decision_counts': {'BLOCK': 1},
+                'avg_selected_excess_return_delta_pct': -0.2,
+                'avg_selected_segment_win_rate': 0.42,
+            },
             'items': [
                 {
                     'run_id': 'run_demo_001',
@@ -757,10 +767,18 @@ def test_skill_pack_llm_proposal_run_query_endpoints(monkeypatch: pytest.MonkeyP
                     'proposal_count': 2,
                     'dry_run': False,
                     'selected_candidate_version': '0.1.2',
+                    'selected_decision': 'BLOCK',
+                    'selected_excess_return_delta_pct': -0.2,
+                    'selected_segment_win_rate': 0.42,
                     'executed': False,
                 }
             ],
-        },
+        }
+
+    monkeypatch.setattr(
+        routes_module,
+        'list_llm_proposal_runs',
+        fake_list_llm_proposal_runs,
     )
     monkeypatch.setattr(
         routes_module,
@@ -768,11 +786,24 @@ def test_skill_pack_llm_proposal_run_query_endpoints(monkeypatch: pytest.MonkeyP
         lambda run_id: {'run_id': run_id, 'skill_pack_id': 'cn_a_core'} if run_id == 'run_demo_001' else None,
     )
 
-    list_resp = client.get('/skill-packs/proposals/runs')
+    list_resp = client.get(
+        '/skill-packs/proposals/runs'
+        '?skill_pack_id=cn_a_core&executed=false&dry_run=false'
+        '&selected_decision=BLOCK&generated_after=2026-02-13T00:00:00Z'
+        '&generated_before=2026-02-15T00:00:00Z'
+    )
     assert list_resp.status_code == 200
     list_body = list_resp.json()
     assert list_body['total'] == 1
     assert list_body['items'][0]['run_id'] == 'run_demo_001'
+    assert list_body['summary']['selected_decision_counts']['BLOCK'] == 1
+    assert captured['skill_pack_id'] == 'cn_a_core'
+    assert captured['executed'] is False
+    assert captured['dry_run'] is False
+    assert captured['selected_decision'] == 'BLOCK'
+
+    invalid_time = client.get('/skill-packs/proposals/runs?generated_after=invalid-datetime')
+    assert invalid_time.status_code == 422
 
     get_resp = client.get('/skill-packs/proposals/runs/run_demo_001')
     assert get_resp.status_code == 200
@@ -901,16 +932,23 @@ def test_skill_pack_release_event_query_endpoints(monkeypatch: pytest.MonkeyPatc
 
 
 def test_skill_pack_champion_watchdog_endpoints(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setattr(
-        routes_module,
-        'run_champion_watchdog',
-        lambda **kwargs: {  # noqa: ARG005
+    captured: dict = {}
+
+    def fake_run_champion_watchdog(**kwargs):  # noqa: ANN003
+        captured.update(kwargs)
+        return {
             'run_id': 'wd_demo_001',
             'overall_status': 'WARN',
             'alert_count': 1,
             'summary': {'latest_health_status': 'FAIL'},
             'rollback_recommendation': {'should_rollback': True, 'target_version': '0.1.3'},
-        },
+            'rollback_execution': {'executed': False, 'dry_run': True},
+        }
+
+    monkeypatch.setattr(
+        routes_module,
+        'run_champion_watchdog',
+        fake_run_champion_watchdog,
     )
     monkeypatch.setattr(
         routes_module,
@@ -944,11 +982,19 @@ def test_skill_pack_champion_watchdog_endpoints(monkeypatch: pytest.MonkeyPatch)
         'fail_rate_warn': 0.25,
         'fail_rate_critical': 0.5,
         'rollback_storm_critical': 2,
+        'execute_rollback_on_recommendation': True,
+        'rollback_dry_run': True,
+        'rollback_reason': 'watchdog_recommendation',
+        'rollback_operator': 'watchdog_engine',
     }
 
     run_resp = client.post('/skill-packs/champion/watchdog/run', json=payload)
     assert run_resp.status_code == 200
     assert run_resp.json()['run_id'] == 'wd_demo_001'
+    assert captured['execute_rollback_on_recommendation'] is True
+    assert captured['rollback_dry_run'] is True
+    assert captured['rollback_reason'] == 'watchdog_recommendation'
+    assert captured['rollback_operator'] == 'watchdog_engine'
 
     list_resp = client.get('/skill-packs/champion/watchdog/runs')
     assert list_resp.status_code == 200

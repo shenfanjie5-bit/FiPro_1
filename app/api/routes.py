@@ -549,6 +549,10 @@ class ChampionWatchdogRunRequest(BaseModel):
     fail_rate_warn: float = Field(default=0.25, ge=0.0, le=1.0)
     fail_rate_critical: float = Field(default=0.50, ge=0.0, le=1.0)
     rollback_storm_critical: int = Field(default=2, ge=1, le=20)
+    execute_rollback_on_recommendation: bool = False
+    rollback_dry_run: bool = True
+    rollback_reason: str = Field(default='watchdog_recommendation', min_length=1, max_length=256)
+    rollback_operator: str = Field(default='watchdog_engine', min_length=1, max_length=128)
     auto_create_ticket: bool = True
 
 
@@ -886,8 +890,26 @@ def run_skill_pack_llm_proposal(payload: SkillPackLLMProposalRunRequest) -> dict
 def list_skill_pack_llm_proposal_runs(
     limit: int = Query(default=50, ge=1, le=500),
     offset: int = Query(default=0, ge=0),
+    skill_pack_id: str = Query(default=''),
+    executed: bool | None = Query(default=None),
+    dry_run: bool | None = Query(default=None),
+    selected_decision: str = Query(default=''),
+    generated_after: str = Query(default=''),
+    generated_before: str = Query(default=''),
 ) -> dict:
-    return list_llm_proposal_runs(limit=limit, offset=offset)
+    try:
+        return list_llm_proposal_runs(
+            limit=limit,
+            offset=offset,
+            skill_pack_id=skill_pack_id,
+            executed=executed,
+            dry_run=dry_run,
+            selected_decision=selected_decision,
+            generated_after=generated_after,
+            generated_before=generated_before,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
 
 
 @router.get('/skill-packs/proposals/runs/{run_id}')
@@ -950,6 +972,10 @@ def run_skill_pack_champion_watchdog(payload: ChampionWatchdogRunRequest) -> dic
             fail_rate_warn=payload.fail_rate_warn,
             fail_rate_critical=payload.fail_rate_critical,
             rollback_storm_critical=payload.rollback_storm_critical,
+            execute_rollback_on_recommendation=payload.execute_rollback_on_recommendation,
+            rollback_dry_run=payload.rollback_dry_run,
+            rollback_reason=payload.rollback_reason.strip(),
+            rollback_operator=payload.rollback_operator.strip(),
             auto_create_ticket=payload.auto_create_ticket,
         )
     except ValueError as exc:

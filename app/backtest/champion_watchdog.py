@@ -10,6 +10,7 @@ from app.backtest.champion_monitor import (
     list_champion_health_checks,
     run_champion_health_check,
 )
+from app.backtest.promotion import switch_skill_pack_champion
 from app.backtest.release_events import list_release_events
 
 
@@ -436,6 +437,7 @@ def list_champion_watchdog_runs(
         enriched = _attach_watchdog_run_runtime_fields(payload, root_dir=root_dir)
         summary = enriched.get('summary') if isinstance(enriched.get('summary'), dict) else {}
         recommendation = enriched.get('rollback_recommendation') if isinstance(enriched.get('rollback_recommendation'), dict) else {}
+        rollback_execution = enriched.get('rollback_execution') if isinstance(enriched.get('rollback_execution'), dict) else {}
         ticket = enriched.get('ticket') if isinstance(enriched.get('ticket'), dict) else {}
         rows.append(
             {
@@ -450,6 +452,8 @@ def list_champion_watchdog_runs(
                 'latest_decision': _safe_text(summary.get('latest_decision')),
                 'should_rollback': bool(recommendation.get('should_rollback', False)),
                 'rollback_target_version': _safe_text(recommendation.get('target_version')),
+                'rollback_executed': bool(rollback_execution.get('executed', False)),
+                'rollback_release_event_id': _safe_text(rollback_execution.get('release_event_id')),
                 'ticket_id': _safe_text(ticket.get('ticket_id')),
             }
         )
@@ -855,12 +859,16 @@ def run_champion_watchdog(
     fail_rate_warn: float = 0.25,
     fail_rate_critical: float = 0.50,
     rollback_storm_critical: int = 2,
+    execute_rollback_on_recommendation: bool = False,
+    rollback_dry_run: bool = True,
+    rollback_reason: str = 'watchdog_recommendation',
+    rollback_operator: str = 'watchdog_engine',
     auto_create_ticket: bool = True,
     root_dir: str | Path | None = None,
 ) -> dict[str, Any]:
     executed_health_check = None
+    request_payload = health_check_request if isinstance(health_check_request, dict) else {}
     if run_health_check:
-        request_payload = health_check_request if isinstance(health_check_request, dict) else {}
         if runner is None or snapshot_loader is None or benchmark_loader is None:
             raise ValueError('runner/snapshot_loader/benchmark_loader are required when run_health_check=true')
         executed_health_check = run_champion_health_check(
@@ -900,6 +908,53 @@ def run_champion_watchdog(
         fail_rate_critical=fail_rate_critical,
         rollback_storm_critical=rollback_storm_critical,
     )
+    recommendation = (
+        evaluated.get('rollback_recommendation')
+        if isinstance(evaluated.get('rollback_recommendation'), dict)
+        else {}
+    )
+    rollback_execution = None
+    if execute_rollback_on_recommendation and bool(recommendation.get('should_rollback', False)):
+        target_version = _safe_text(recommendation.get('target_version'))
+        latest = items[0] if items and isinstance(items[0], dict) else {}
+        latest_champion_version = _safe_text(latest.get('champion_version'))
+        resolved_skill_pack_id = (
+            _safe_text(latest.get('skill_pack_id'))
+            or _safe_text(request_payload.get('skill_pack_id'))
+            or 'cn_a_core'
+        )
+        if not target_version:
+            rollback_execution = {
+                'executed': False,
+                'dry_run': bool(rollback_dry_run),
+                'skill_pack_id': resolved_skill_pack_id,
+                'target_version': '',
+                'reason': 'watchdog recommendation missing target_version',
+                'operator': _safe_text(rollback_operator) or 'watchdog_engine',
+                'switch_mode': 'watchdog_auto_rollback',
+            }
+        else:
+            try:
+                rollback_execution = switch_skill_pack_champion(
+                    skill_pack_id=resolved_skill_pack_id,
+                    target_version=target_version,
+                    reason=_safe_text(rollback_reason) or 'watchdog_recommendation',
+                    operator=_safe_text(rollback_operator) or 'watchdog_engine',
+                    switch_mode='watchdog_auto_rollback',
+                    champion_version_hint=latest_champion_version or None,
+                    dry_run=bool(rollback_dry_run),
+                    root_dir=root_dir,
+                )
+            except ValueError as exc:
+                rollback_execution = {
+                    'executed': False,
+                    'dry_run': bool(rollback_dry_run),
+                    'skill_pack_id': resolved_skill_pack_id,
+                    'target_version': target_version,
+                    'reason': str(exc),
+                    'operator': _safe_text(rollback_operator) or 'watchdog_engine',
+                    'switch_mode': 'watchdog_auto_rollback',
+                }
 
     run_id = f'wd_{uuid.uuid4().hex[:10]}'
     generated_at = _now_iso()
@@ -918,10 +973,13 @@ def run_champion_watchdog(
             'fail_rate_warn': round(_safe_float(fail_rate_warn, 0.25), 6),
             'fail_rate_critical': round(_safe_float(fail_rate_critical, 0.50), 6),
             'rollback_storm_critical': int(rollback_storm_critical),
+            'execute_rollback_on_recommendation': bool(execute_rollback_on_recommendation),
+            'rollback_dry_run': bool(rollback_dry_run),
         },
         'summary': evaluated.get('summary', {}),
         'alerts': alerts,
-        'rollback_recommendation': evaluated.get('rollback_recommendation', {}),
+        'rollback_recommendation': recommendation,
+        'rollback_execution': rollback_execution,
         'ticket': ticket,
         'executed_health_check': (
             {
@@ -944,6 +1002,7 @@ def run_champion_watchdog(
 def render_champion_watchdog_markdown(report: dict[str, Any]) -> str:
     summary = report.get('summary') if isinstance(report.get('summary'), dict) else {}
     recommendation = report.get('rollback_recommendation') if isinstance(report.get('rollback_recommendation'), dict) else {}
+    rollback_execution = report.get('rollback_execution') if isinstance(report.get('rollback_execution'), dict) else {}
     lines = [
         '# Champion Watchdog',
         '',
@@ -1002,4 +1061,17 @@ def render_champion_watchdog_markdown(report: dict[str, Any]) -> str:
             f"- suggested_action: {recommendation.get('suggested_action', '')}",
         ]
     )
+    if rollback_execution:
+        lines.extend(
+            [
+                '',
+                '## Rollback Execution',
+                '',
+                f"- executed: `{rollback_execution.get('executed', False)}`",
+                f"- dry_run: `{rollback_execution.get('dry_run', False)}`",
+                f"- target_version: `{rollback_execution.get('target_version', '')}`",
+                f"- release_event_id: `{rollback_execution.get('release_event_id', '')}`",
+                f"- reason: `{rollback_execution.get('reason', '')}`",
+            ]
+        )
     return '\n'.join(lines) + '\n'
