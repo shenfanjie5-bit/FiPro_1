@@ -1,0 +1,25 @@
+{
+  "skill_pack_id": "cn_a_core",
+  "champion_version": "",
+  "baseline_version": "",
+  "auto_rollback": false,
+  "rollback_dry_run": true,
+  "rollback_reason": "monitoring_gate_block",
+  "operator": "monitor_engine",
+  "manual_approved": true,
+  "anti_overfit_evidence": {},
+  "backtest": {
+    "ticker": "600519.SH",
+    "market": "CN_A",
+    "strategy_version_id": "stg_v1",
+    "tier": "TIER0",
+    "start_date": "2026-01-01",
+    "end_date": "2026-01-31",
+    "step_days": 1,
+    "trading_days_only": true,
+    "asof_time": "09:30",
+    "timezone_offset": "+08:00",
+    "max_runs": 60,
+    "evaluation_horizon_days": 5
+  }
+}

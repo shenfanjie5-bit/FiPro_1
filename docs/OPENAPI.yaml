@@ -31,6 +31,29 @@ components:
         tier:
           type: string
           enum: [TIER0, TIER1, TIER2]
+        run_mode:
+          type: string
+          enum: [LIVE, SHADOW, BACKTEST]
+        analysis_mode:
+          type: string
+          enum: [BASELINE, TA_HYBRID, AUTO]
+        ta_hybrid_mode:
+          type: string
+          enum: [OFF, ANALYZE_ONLY, BLEND]
+        ta_research_rounds:
+          type: integer
+          minimum: 1
+          maximum: 3
+        ta_risk_rounds:
+          type: integer
+          minimum: 1
+          maximum: 3
+        ta_llm_call_cap:
+          type: integer
+          minimum: 0
+          maximum: 20
+        ta_require_evidence_refs:
+          type: boolean
     GenerateReportResponse:
       type: object
       required: [report_id, final_report]
@@ -87,7 +110,7 @@ components:
             required: [evidence_id, type, title, source, captured_at]
             properties:
               evidence_id: { type: string }
-              type: { type: string, enum: [SNAPSHOT_FIELD, NEWS_DOC, FILINGS, MACRO_SERIES, GRAPH_QUERY, MANUAL_NOTE] }
+              type: { type: string, enum: [SNAPSHOT_FIELD, NEWS_DOC, FILINGS, MACRO_SERIES, GRAPH_QUERY, MANUAL_NOTE, AGENT_REASONING] }
               title: { type: string }
               source: { type: string }
               captured_at: { type: string, format: date-time }
@@ -126,6 +149,98 @@ components:
         items:
           type: array
           items: { $ref: '#/components/schemas/ReportFeedbackItem' }
+    LlmProposalRunListSummary:
+      type: object
+      properties:
+        executed_runs: { type: integer }
+        dry_run_runs: { type: integer }
+        selected_decision_counts:
+          type: object
+          additionalProperties: { type: integer }
+        avg_selected_excess_return_delta_pct: { type: number }
+        avg_selected_segment_win_rate: { type: number }
+    LlmProposalRunListItem:
+      type: object
+      properties:
+        run_id: { type: string }
+        generated_at: { type: string, format: date-time }
+        skill_pack_id: { type: string }
+        base_version: { type: string }
+        proposal_count: { type: integer }
+        dry_run: { type: boolean }
+        selected_candidate_version: { type: string }
+        selected_decision: { type: string, enum: [ALLOW, PENDING_MANUAL_APPROVAL, BLOCK] }
+        selected_excess_return_delta_pct: { type: number }
+        selected_segment_win_rate: { type: number }
+        executed: { type: boolean }
+    LlmProposalRunListResponse:
+      type: object
+      required: [total, limit, offset, items]
+      properties:
+        total: { type: integer }
+        limit: { type: integer }
+        offset: { type: integer }
+        summary: { $ref: '#/components/schemas/LlmProposalRunListSummary' }
+        items:
+          type: array
+          items: { $ref: '#/components/schemas/LlmProposalRunListItem' }
+    ChampionWatchdogRunRequest:
+      type: object
+      properties:
+        run_health_check: { type: boolean, default: false }
+        health_check: { type: object, additionalProperties: true }
+        lookback_runs: { type: integer, minimum: 1, maximum: 500, default: 20 }
+        consecutive_fail_critical: { type: integer, minimum: 1, maximum: 20, default: 2 }
+        fail_rate_warn: { type: number, minimum: 0, maximum: 1, default: 0.25 }
+        fail_rate_critical: { type: number, minimum: 0, maximum: 1, default: 0.5 }
+        rollback_storm_critical: { type: integer, minimum: 1, maximum: 20, default: 2 }
+        execute_rollback_on_recommendation: { type: boolean, default: false }
+        rollback_dry_run: { type: boolean, default: true }
+        rollback_reason: { type: string, default: watchdog_recommendation }
+        rollback_operator: { type: string, default: watchdog_engine }
+        auto_create_ticket: { type: boolean, default: true }
+    ChampionWatchdogRunListItem:
+      type: object
+      properties:
+        run_id: { type: string }
+        generated_at: { type: string, format: date-time }
+        overall_status: { type: string }
+        alert_count: { type: integer }
+        open_alert_count: { type: integer }
+        critical_open_alert_count: { type: integer }
+        warning_open_alert_count: { type: integer }
+        latest_health_status: { type: string }
+        latest_decision: { type: string }
+        should_rollback: { type: boolean }
+        rollback_target_version: { type: string }
+        rollback_executed: { type: boolean }
+        rollback_release_event_id: { type: string }
+        ticket_id: { type: string }
+    ChampionWatchdogRunListResponse:
+      type: object
+      required: [total, limit, offset, items]
+      properties:
+        total: { type: integer }
+        limit: { type: integer }
+        offset: { type: integer }
+        items:
+          type: array
+          items: { $ref: '#/components/schemas/ChampionWatchdogRunListItem' }
+    GenericObjectResponse:
+      type: object
+      additionalProperties: true
+    GenericListResponse:
+      type: object
+      required: [total, limit, offset, items]
+      properties:
+        total: { type: integer }
+        limit: { type: integer }
+        offset: { type: integer }
+        items:
+          type: array
+          items:
+            type: object
+            additionalProperties: true
 paths:
   /health:
     get:
@@ -340,3 +455,322 @@ paths:
                   items: { type: string }
       responses:
         '201': { description: Created }
+  /skill-packs/proposals/runs:
+    get:
+      summary: List LLM proposal runs with audit filters
+      parameters:
+        - in: query
+          name: limit
+          required: false
+          schema: { type: integer, minimum: 1, maximum: 500, default: 50 }
+        - in: query
+          name: offset
+          required: false
+          schema: { type: integer, minimum: 0, default: 0 }
+        - in: query
+          name: skill_pack_id
+          required: false
+          schema: { type: string }
+        - in: query
+          name: executed
+          required: false
+          schema: { type: boolean }
+        - in: query
+          name: dry_run
+          required: false
+          schema: { type: boolean }
+        - in: query
+          name: selected_decision
+          required: false
+          schema: { type: string, enum: [ALLOW, PENDING_MANUAL_APPROVAL, BLOCK] }
+        - in: query
+          name: generated_after
+          required: false
+          schema: { type: string, format: date-time }
+        - in: query
+          name: generated_before
+          required: false
+          schema: { type: string, format: date-time }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/LlmProposalRunListResponse' }
+        '422':
+          description: Validation Error
+          content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } }
+  /skill-packs/proposals/runs/{run_id}:
+    get:
+      summary: Get LLM proposal run detail
+      parameters:
+        - in: path
+          name: run_id
+          required: true
+          schema: { type: string }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/GenericObjectResponse' }
+        '404':
+          description: Not Found
+          content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } }
+  /skill-packs/champion/health-check:
+    post:
+      summary: Run champion health check
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/GenericObjectResponse' }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/GenericObjectResponse' }
+        '422':
+          description: Validation Error
+          content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } }
+  /skill-packs/champion/health-checks:
+    get:
+      summary: List champion health checks
+      parameters:
+        - in: query
+          name: limit
+          required: false
+          schema: { type: integer, minimum: 1, maximum: 500, default: 50 }
+        - in: query
+          name: offset
+          required: false
+          schema: { type: integer, minimum: 0, default: 0 }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/GenericListResponse' }
+  /skill-packs/champion/health-checks/{run_id}:
+    get:
+      summary: Get champion health check detail
+      parameters:
+        - in: path
+          name: run_id
+          required: true
+          schema: { type: string }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/GenericObjectResponse' }
+        '404':
+          description: Not Found
+          content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } }
+  /skill-packs/champion/watchdog/run:
+    post:
+      summary: Run champion watchdog monitor
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ChampionWatchdogRunRequest' }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/GenericObjectResponse' }
+        '422':
+          description: Validation Error
+          content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } }
+  /skill-packs/champion/watchdog/runs:
+    get:
+      summary: List champion watchdog runs
+      parameters:
+        - in: query
+          name: limit
+          required: false
+          schema: { type: integer, minimum: 1, maximum: 500, default: 50 }
+        - in: query
+          name: offset
+          required: false
+          schema: { type: integer, minimum: 0, default: 0 }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ChampionWatchdogRunListResponse' }
+  /skill-packs/champion/watchdog/runs/{run_id}:
+    get:
+      summary: Get champion watchdog run detail
+      parameters:
+        - in: path
+          name: run_id
+          required: true
+          schema: { type: string }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/GenericObjectResponse' }
+        '404':
+          description: Not Found
+          content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } }
+  /skill-packs/champion/watchdog/alerts:
+    get:
+      summary: List champion watchdog alerts
+      parameters:
+        - in: query
+          name: limit
+          required: false
+          schema: { type: integer, minimum: 1, maximum: 1000, default: 50 }
+        - in: query
+          name: offset
+          required: false
+          schema: { type: integer, minimum: 0, default: 0 }
+        - in: query
+          name: status
+          required: false
+          schema: { type: string, enum: [OPEN, ACKED, CLOSED] }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/GenericObjectResponse' }
+  /skill-packs/champion/watchdog/alerts/{alert_id}:
+    get:
+      summary: Get champion watchdog alert detail
+      parameters:
+        - in: path
+          name: alert_id
+          required: true
+          schema: { type: string }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/GenericObjectResponse' }
+        '404':
+          description: Not Found
+          content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } }
+  /skill-packs/champion/watchdog/alerts/{alert_id}/ack:
+    post:
+      summary: Acknowledge champion watchdog alert
+      parameters:
+        - in: path
+          name: alert_id
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/GenericObjectResponse' }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/GenericObjectResponse' }
+        '404':
+          description: Not Found
+          content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } }
+  /skill-packs/champion/watchdog/alerts/{alert_id}/close:
+    post:
+      summary: Close champion watchdog alert
+      parameters:
+        - in: path
+          name: alert_id
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/GenericObjectResponse' }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/GenericObjectResponse' }
+        '404':
+          description: Not Found
+          content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } }
+  /skill-packs/champion/watchdog/tickets:
+    get:
+      summary: List champion watchdog tickets
+      parameters:
+        - in: query
+          name: limit
+          required: false
+          schema: { type: integer, minimum: 1, maximum: 500, default: 50 }
+        - in: query
+          name: offset
+          required: false
+          schema: { type: integer, minimum: 0, default: 0 }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/GenericListResponse' }
+  /skill-packs/champion/watchdog/tickets/{ticket_id}:
+    get:
+      summary: Get champion watchdog ticket detail
+      parameters:
+        - in: path
+          name: ticket_id
+          required: true
+          schema: { type: string }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/GenericObjectResponse' }
+        '404':
+          description: Not Found
+          content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } }
+  /skill-packs/releases:
+    get:
+      summary: List skill pack release events
+      parameters:
+        - in: query
+          name: limit
+          required: false
+          schema: { type: integer, minimum: 1, maximum: 500, default: 50 }
+        - in: query
+          name: offset
+          required: false
+          schema: { type: integer, minimum: 0, default: 0 }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/GenericListResponse' }
+  /skill-packs/releases/{event_id}:
+    get:
+      summary: Get skill pack release event detail
+      parameters:
+        - in: path
+          name: event_id
+          required: true
+          schema: { type: string }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/GenericObjectResponse' }
+        '404':
+          description: Not Found
+          content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } }

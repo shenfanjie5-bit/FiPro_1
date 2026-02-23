@@ -47,7 +47,7 @@ def _retry_policy(tool_name: str) -> dict[str, int]:
     if tool_name in NON_RETRYABLE_TOOLS:
         max_attempts = 1
     elif tool_name.startswith('llm_'):
-        max_attempts = _env_int('LLM_RETRY_MAX_ATTEMPTS', 2, minimum=1, maximum=5)
+        max_attempts = _env_int('LLM_RETRY_MAX_ATTEMPTS', 3, minimum=1, maximum=5)
     else:
         max_attempts = _env_int('TOOL_RETRY_MAX_ATTEMPTS', 3, minimum=1, maximum=5)
     return {

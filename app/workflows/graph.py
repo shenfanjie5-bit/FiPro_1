@@ -1,11 +1,12 @@
 from __future__ import annotations
 
 import os
+import sqlite3
 from typing import Literal
 
 from langgraph.graph import END, START, StateGraph
 
-from app.workflows.checkpoint import get_checkpointer, get_latest_checkpoint
+from app.workflows.checkpoint import get_checkpointer, get_latest_checkpoint, reset_checkpointer
 from app.workflows.nodes import (
     build_context,
     build_facts,
@@ -24,6 +25,7 @@ from app.workflows.nodes import (
     rerank_docs_node,
     retrieve_memory_node,
     search_docs_node,
+    ta_hybrid_node,
     risk_gate_node,
     score_signal_node,
     extract_events_node,
@@ -58,6 +60,41 @@ def _route_after_memory(state: ResearchState) -> Literal['direct_context', 'rag_
     if tier in ('TIER1', 'TIER2'):
         return 'graph_chain'
     return 'direct_context'
+
+
+def _route_ta_hybrid(state: ResearchState) -> Literal['direct_draft', 'ta_hybrid_chain']:
+    req = state.get('request', {})
+    analysis_mode = str(req.get('analysis_mode', 'BASELINE')).strip().upper() or 'BASELINE'
+    ta_hybrid_mode = str(req.get('ta_hybrid_mode', 'OFF')).strip().upper() or 'OFF'
+    if analysis_mode not in {'TA_HYBRID', 'AUTO'}:
+        return 'direct_draft'
+    if ta_hybrid_mode not in {'ANALYZE_ONLY', 'BLEND'}:
+        return 'direct_draft'
+    tier = str(req.get('tier', 'TIER0')).strip().upper() or 'TIER0'
+    if tier not in {'TIER0', 'TIER1', 'TIER2'}:
+        return 'direct_draft'
+    if analysis_mode == 'AUTO' and tier == 'TIER0':
+        return 'direct_draft'
+
+    matrix = state.get('degradation_matrix', {})
+    llm_entry = matrix.get('llm', {}) if isinstance(matrix, dict) else {}
+    llm_status = str(llm_entry.get('status', 'OK')).strip().upper() if isinstance(llm_entry, dict) else 'OK'
+    if llm_status != 'OK':
+        return 'direct_draft'
+
+    budget = state.get('budget', {})
+    budget_degraded = bool(budget.get('degraded', False))
+    max_calls = int(budget.get('max_tool_calls', 0))
+    used_calls = int(budget.get('used_tool_calls', 0))
+    budget_exhausted = max_calls > 0 and used_calls >= max_calls
+    if budget_degraded or budget_exhausted:
+        return 'direct_draft'
+    return 'ta_hybrid_chain'
+
+
+def _route_after_context(state: ResearchState) -> Literal['direct_draft', 'ta_hybrid_chain']:
+    # Backward-compatible alias for previous test imports.
+    return _route_ta_hybrid(state)
 
 
 def _route_need_review(state: ResearchState) -> Literal['review', 'validate']:
@@ -99,6 +136,7 @@ def _build_graph():
     builder.add_node('graph_subtree_node', graph_subtree_node)
     builder.add_node('impact_paths_node', impact_paths_node)
     builder.add_node('build_context', build_context)
+    builder.add_node('ta_hybrid_node', ta_hybrid_node)
     builder.add_node('draft_report_node', draft_report_node)
     builder.add_node('risk_gate_node', risk_gate_node)
     builder.add_node('reviewer_node', reviewer_node)
@@ -129,7 +167,15 @@ def _build_graph():
     builder.add_edge('extract_events_node', 'graph_subtree_node')
     builder.add_edge('graph_subtree_node', 'impact_paths_node')
     builder.add_edge('impact_paths_node', 'build_context')
-    builder.add_edge('build_context', 'draft_report_node')
+    builder.add_conditional_edges(
+        'build_context',
+        _route_ta_hybrid,
+        {
+            'direct_draft': 'draft_report_node',
+            'ta_hybrid_chain': 'ta_hybrid_node',
+        },
+    )
+    builder.add_edge('ta_hybrid_node', 'draft_report_node')
     builder.add_edge('draft_report_node', 'risk_gate_node')
     builder.add_conditional_edges(
         'risk_gate_node',
@@ -156,11 +202,18 @@ def _build_graph():
     return builder.compile(checkpointer=get_checkpointer())
 
 
-RESEARCH_GRAPH = _build_graph()
+_RESEARCH_GRAPH = None
 
 
 def recover_research_state(thread_id: str) -> dict | None:
     return get_latest_checkpoint(thread_id)
+
+
+def _get_research_graph(*, force_rebuild: bool = False):
+    global _RESEARCH_GRAPH
+    if force_rebuild or _RESEARCH_GRAPH is None:
+        _RESEARCH_GRAPH = _build_graph()
+    return _RESEARCH_GRAPH
 
 
 def _shadow_enabled() -> bool:
@@ -168,10 +221,17 @@ def _shadow_enabled() -> bool:
 
 
 def _run_single_workflow(request_data: dict, thread_id: str) -> dict:
-    state = RESEARCH_GRAPH.invoke(
-        {'thread_id': thread_id, 'request': request_data},
-        config={'configurable': {'thread_id': thread_id}},
-    )
+    invoke_payload = {'thread_id': thread_id, 'request': request_data}
+    invoke_config = {'configurable': {'thread_id': thread_id}}
+    graph = _get_research_graph()
+    try:
+        state = graph.invoke(invoke_payload, config=invoke_config)
+    except sqlite3.ProgrammingError as exc:
+        if 'closed database' not in str(exc).lower():
+            raise
+        reset_checkpointer()
+        graph = _get_research_graph(force_rebuild=True)
+        state = graph.invoke(invoke_payload, config=invoke_config)
     return {
         'final_report': state['final_report'],
         'persist_refs': state.get('persist_refs', {}),

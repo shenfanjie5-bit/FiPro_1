@@ -1,0 +1,1586 @@
+{
+  "api_map": [
+    {
+      "api": "stock_basic",
+      "label": "股票列表",
+      "relative_path": "股票数据/基础数据/股票列表",
+      "exists": true,
+      "reason": ""
+    },
+    {
+      "api": "stk_premarket",
+      "label": "每日股本（盘前）",
+      "relative_path": "股票数据/基础数据/每日股本（盘前）",
+      "exists": true,
+      "reason": ""
+    },
+    {
+      "api": "trade_cal",
+      "label": "交易日历",
+      "relative_path": "股票数据/基础数据/交易日历",
+      "exists": true,
+      "reason": ""
+    },
+    {
+      "api": "stock_st",
+      "label": "ST股票列表",
+      "relative_path": "股票数据/基础数据/ST股票列表",
+      "exists": true,
+      "reason": ""
+    },
+    {
+      "api": "st",
+      "label": "ST风险警示板股票",
+      "relative_path": "股票数据/基础数据/ST风险警示板股票",
+      "exists": true,
+      "reason": ""
+    },
+    {
+      "api": "stock_hsgt",
+      "label": "沪深港通股票列表",
+      "relative_path": "股票数据/基础数据/沪深港通股票列表",
+      "exists": true,
+      "reason": ""
+    },
+    {
+      "api": "namechange",
+      "label": "股票曾用名",
+      "relative_path": "股票数据/基础数据/股票曾用名",
+      "exists": true,
+      "reason": ""
+    },
+    {
+      "api": "stock_company",
+      "label": "上市公司基本信息",
+      "relative_path": "股票数据/基础数据/上市公司基本信息",
+      "exists": true,
+      "reason": ""
+    },
+    {
+      "api": "stk_managers",
+      "label": "上市公司管理层",
+      "relative_path": "股票数据/基础数据/上市公司管理层",
+      "exists": true,
+      "reason": ""
+    },
+    {
+      "api": "stk_rewards",
+      "label": "管理层薪酬和持股",
+      "relative_path": "股票数据/基础数据/管理层薪酬和持股",
+      "exists": true,
+      "reason": ""
+    },
+    {
+      "api": "bse_mapping",
+      "label": "北交所新旧代码对照",
+      "relative_path": "股票数据/基础数据/北交所新旧代码对照",
+      "exists": true,
+      "reason": ""
+    },
+    {
+      "api": "new_share",
+      "label": "IPO新股上市",
+      "relative_path": "股票数据/基础数据/IPO新股上市",
+      "exists": true,
+      "reason": ""
+    },
+    {
+      "api": "bak_basic",
+      "label": "股票历史列表",
+      "relative_path": "股票数据/基础数据/股票历史列表",
+      "exists": true,
+      "reason": ""
+    },
+    {
+      "api": "daily",
+      "label": "历史日线",
+      "relative_path": "股票数据/行情数据/历史日线",
+      "exists": true,
+      "reason": ""
+    },
+    {
+      "api": "rt_k",
+      "label": "实时日线",
+      "relative_path": "股票数据/行情数据/实时日线",
+      "exists": true,
+      "reason": ""
+    },
+    {
+      "api": "stk_mins",
+      "label": "历史分钟",
+      "relative_path": "股票数据/行情数据/历史分钟",
+      "exists": true,
+      "reason": ""
+    },
+    {
+      "api": "rt_min",
+      "label": "实时分钟",
+      "relative_path": "股票数据/行情数据/实时分钟",
+      "exists": true,
+      "reason": ""
+    },
+    {
+      "api": "weekly",
+      "label": "周线行情",
+      "relative_path": "股票数据/行情数据/周线行情",
+      "exists": true,
+      "reason": ""
+    },
+    {
+      "api": "monthly",
+      "label": "月线行情",
+      "relative_path": "股票数据/行情数据/月线行情",
+      "exists": true,
+      "reason": ""
+    },
+    {
+      "api": "stk_weekly_monthly",
+      "label": "周/月线行情(每日更新)",
+      "relative_path": "股票数据/行情数据/周／月线行情(每日更新)",
+      "exists": true,
+      "reason": "normalized_for_filesystem"
+    },
+    {
+      "api": "stk_week_month_adj",
+      "label": "周/月线复权行情(每日更新)",
+      "relative_path": "股票数据/行情数据/周／月线复权行情(每日更新)",
+      "exists": true,
+      "reason": "normalized_for_filesystem"
+    },
+    {
+      "api": "adj_factor",
+      "label": "复权因子",
+      "relative_path": "股票数据/行情数据/复权因子",
+      "exists": true,
+      "reason": ""
+    },
+    {
+      "api": "realtime_quote",
+      "label": "实时Tick（爬虫）",
+      "relative_path": "股票数据/行情数据/实时Tick（爬虫）",
+      "exists": true,
+      "reason": ""
+    },
+    {
+      "api": "realtime_tick",
+      "label": "实时成交（爬虫）",
+      "relative_path": "股票数据/行情数据/实时成交（爬虫）",
+      "exists": true,
+      "reason": ""
+    },
+    {
+      "api": "realtime_list",
+      "label": "实时排名（爬虫）",
+      "relative_path": "股票数据/行情数据/实时排名（爬虫）",
+      "exists": true,
+      "reason": ""
+    },
+    {
+      "api": "daily_basic",
+      "label": "每日指标",
+      "relative_path": "股票数据/行情数据/每日指标",
+      "exists": true,
+      "reason": ""
+    },
+    {
+      "api": "stk_limit",
+      "label": "每日涨跌停价格",
+      "relative_path": "股票数据/行情数据/每日涨跌停价格",
+      "exists": true,
+      "reason": ""
+    },
+    {
+      "api": "suspend_d",
+      "label": "每日停复牌信息",
+      "relative_path": "股票数据/行情数据/每日停复牌信息",
+      "exists": true,
+      "reason": ""
+    },
+    {
+      "api": "ggt_daily",
+      "label": "港股通每日成交统计",
+      "relative_path": "股票数据/行情数据/港股通每日成交统计",
+      "exists": true,
+      "reason": ""
+    },
+    {
+      "api": "ggt_monthly",
+      "label": "港股通每月成交统计",
+      "relative_path": "股票数据/行情数据/港股通每月成交统计",
+      "exists": true,
+      "reason": ""
+    },
+    {
+      "api": "bak_daily",
+      "label": "备用行情",
+      "relative_path": "股票数据/行情数据/备用行情",
+      "exists": true,
+      "reason": ""
+    },
+    {
+      "api": "income",
+      "label": "利润表",
+      "relative_path": "股票数据/财务数据/利润表",
+      "exists": true,
+      "reason": ""
+    },
+    {
+      "api": "balancesheet",
+      "label": "资产负债表",
+      "relative_path": "股票数据/财务数据/资产负债表",
+      "exists": true,
+      "reason": ""
+    },
+    {
+      "api": "cashflow",
+      "label": "现金流量表",
+      "relative_path": "股票数据/财务数据/现金流量表",
+      "exists": true,
+      "reason": ""
+    },
+    {
+      "api": "forecast",
+      "label": "业绩预告",
+      "relative_path": "股票数据/财务数据/业绩预告",
+      "exists": true,
+      "reason": ""
+    },
+    {
+      "api": "express",
+      "label": "业绩快报",
+      "relative_path": "股票数据/财务数据/业绩快报",
+      "exists": true,
+      "reason": ""
+    },
+    {
+      "api": "dividend",
+      "label": "分红送股数据",
+      "relative_path": "股票数据/财务数据/分红送股数据",
+      "exists": true,
+      "reason": ""
+    },
+    {
+      "api": "fina_indicator",
+      "label": "财务指标数据",
+      "relative_path": "股票数据/财务数据/财务指标数据",
+      "exists": true,
+      "reason": ""
+    },
+    {
+      "api": "fina_audit",
+      "label": "财务审计意见",
+      "relative_path": "股票数据/财务数据/财务审计意见",
+      "exists": true,
+      "reason": ""
+    },
+    {
+      "api": "fina_mainbz",
+      "label": "主营业务构成",
+      "relative_path": "股票数据/财务数据/主营业务构成",
+      "exists": true,
+      "reason": ""
+    },
+    {
+      "api": "disclosure_date",
+      "label": "财报披露日期表",
+      "relative_path": "股票数据/财务数据/财报披露日期表",
+      "exists": true,
+      "reason": ""
+    },
+    {
+      "api": "pledge_stat",
+      "label": "股权质押统计数据",
+      "relative_path": "股票数据/参考数据/股权质押统计数据",
+      "exists": true,
+      "reason": ""
+    },
+    {
+      "api": "pledge_detail",
+      "label": "股权质押明细数据",
+      "relative_path": "股票数据/参考数据/股权质押明细数据",
+      "exists": true,
+      "reason": ""
+    },
+    {
+      "api": "repurchase",
+      "label": "股票回购",
+      "relative_path": "股票数据/参考数据/股票回购",
+      "exists": true,
+      "reason": ""
+    },
+    {
+      "api": "share_float",
+      "label": "限售股解禁",
+      "relative_path": "股票数据/参考数据/限售股解禁",
+      "exists": true,
+      "reason": ""
+    },
+    {
+      "api": "block_trade",
+      "label": "大宗交易",
+      "relative_path": "股票数据/参考数据/大宗交易",
+      "exists": true,
+      "reason": ""
+    },
+    {
+      "api": "stk_account",
+      "label": "股票开户数据（停）",
+      "relative_path": "股票数据/参考数据/股票开户数据（停）",
+      "exists": true,
+      "reason": ""
+    },
+    {
+      "api": "stk_account_old",
+      "label": "股票开户数据（旧）",
+      "relative_path": "股票数据/参考数据/股票开户数据（旧）",
+      "exists": true,
+      "reason": ""
+    },
+    {
+      "api": "stk_holdernumber",
+      "label": "股东人数",
+      "relative_path": "股票数据/参考数据/股东人数",
+      "exists": true,
+      "reason": ""
+    },
+    {
+      "api": "stk_holdertrade",
+      "label": "股东增减持",
+      "relative_path": "股票数据/参考数据/股东增减持",
+      "exists": true,
+      "reason": ""
+    },
+    {
+      "api": "report_rc",
+      "label": "券商盈利预测数据",
+      "relative_path": "股票数据/特色数据/券商盈利预测数据",
+      "exists": true,
+      "reason": ""
+    },
+    {
+      "api": "cyq_perf",
+      "label": "每日筹码及胜率",
+      "relative_path": "股票数据/特色数据/每日筹码及胜率",
+      "exists": true,
+      "reason": ""
+    },
+    {
+      "api": "cyq_chips",
+      "label": "每日筹码分布",
+      "relative_path": "股票数据/特色数据/每日筹码分布",
+      "exists": true,
+      "reason": ""
+    },
+    {
+      "api": "stk_factor_pro",
+      "label": "股票技术面因子(专业版）",
+      "relative_path": "股票数据/特色数据/股票技术面因子(专业版）",
+      "exists": true,
+      "reason": ""
+    },
+    {
+      "api": "ccass_hold",
+      "label": "中央结算系统持股统计",
+      "relative_path": "股票数据/特色数据/中央结算系统持股统计",
+      "exists": true,
+      "reason": ""
+    },
+    {
+      "api": "ccass_hold_detail",
+      "label": "中央结算系统持股明细",
+      "relative_path": "股票数据/特色数据/中央结算系统持股明细",
+      "exists": true,
+      "reason": ""
+    },
+    {
+      "api": "hk_hold",
+      "label": "沪深股通持股明细",
+      "relative_path": "股票数据/特色数据/沪深股通持股明细",
+      "exists": true,
+      "reason": ""
+    },
+    {
+      "api": "stk_auction_o",
+      "label": "股票开盘集合竞价数据",
+      "relative_path": "股票数据/特色数据/股票开盘集合竞价数据",
+      "exists": true,
+      "reason": ""
+    },
+    {
+      "api": "stk_auction_c",
+      "label": "股票收盘集合竞价数据",
+      "relative_path": "股票数据/特色数据/股票收盘集合竞价数据",
+      "exists": true,
+      "reason": ""
+    },
+    {
+      "api": "stk_nineturn",
+      "label": "神奇九转指标",
+      "relative_path": "股票数据/特色数据/神奇九转指标",
+      "exists": true,
+      "reason": ""
+    },
+    {
+      "api": "stk_ah_comparison",
+      "label": "AH股比价",
+      "relative_path": "股票数据/特色数据/AH股比价",
+      "exists": true,
+      "reason": ""
+    },
+    {
+      "api": "stk_surv",
+      "label": "机构调研数据",
+      "relative_path": "股票数据/特色数据/机构调研数据",
+      "exists": true,
+      "reason": ""
+    },
+    {
+      "api": "broker_recommend",
+      "label": "券商月度金股",
+      "relative_path": "股票数据/特色数据/券商月度金股",
+      "exists": true,
+      "reason": ""
+    },
+    {
+      "api": "margin",
+      "label": "融资融券交易汇总",
+      "relative_path": "股票数据/两融及转融通/融资融券交易汇总",
+      "exists": true,
+      "reason": ""
+    },
+    {
+      "api": "margin_detail",
+      "label": "融资融券交易明细",
+      "relative_path": "股票数据/两融及转融通/融资融券交易明细",
+      "exists": true,
+      "reason": ""
+    },
+    {
+      "api": "margin_secs",
+      "label": "融资融券标的（盘前）",
+      "relative_path": "股票数据/两融及转融通/融资融券标的（盘前）",
+      "exists": true,
+      "reason": ""
+    },
+    {
+      "api": "slb_sec",
+      "label": "转融券交易汇总(停）",
+      "relative_path": "股票数据/两融及转融通/转融券交易汇总(停）",
+      "exists": true,
+      "reason": ""
+    },
+    {
+      "api": "slb_len",
+      "label": "转融资交易汇总",
+      "relative_path": "股票数据/两融及转融通/转融资交易汇总",
+      "exists": true,
+      "reason": ""
+    },
+    {
+      "api": "slb_sec_detail",
+      "label": "转融券交易明细(停）",
+      "relative_path": "股票数据/两融及转融通/转融券交易明细(停）",
+      "exists": true,
+      "reason": ""
+    },
+    {
+      "api": "slb_len_mm",
+      "label": "做市借券交易汇总(停）",
+      "relative_path": "股票数据/两融及转融通/做市借券交易汇总(停）",
+      "exists": true,
+      "reason": ""
+    },
+    {
+      "api": "moneyflow",
+      "label": "个股资金流向",
+      "relative_path": "股票数据/资金流向数据/个股资金流向",
+      "exists": true,
+      "reason": ""
+    },
+    {
+      "api": "moneyflow_ths",
+      "label": "个股资金流向（THS）",
+      "relative_path": "股票数据/资金流向数据/个股资金流向（THS）",
+      "exists": true,
+      "reason": ""
+    },
+    {
+      "api": "moneyflow_dc",
+      "label": "个股资金流向（DC）",
+      "relative_path": "股票数据/资金流向数据/个股资金流向（DC）",
+      "exists": true,
+      "reason": ""
+    },
+    {
+      "api": "moneyflow_cnt_ths",
+      "label": "板块资金流向（THS)",
+      "relative_path": "股票数据/资金流向数据/板块资金流向（THS)",
+      "exists": true,
+      "reason": ""
+    },
+    {
+      "api": "moneyflow_ind_ths",
+      "label": "行业资金流向（THS）",
+      "relative_path": "股票数据/资金流向数据/行业资金流向（THS）",
+      "exists": true,
+      "reason": ""
+    },
+    {
+      "api": "moneyflow_ind_dc",
+      "label": "板块资金流向（DC）",
+      "relative_path": "股票数据/资金流向数据/板块资金流向（DC）",
+      "exists": true,
+      "reason": ""
+    },
+    {
+      "api": "moneyflow_mkt_dc",
+      "label": "大盘资金流向（DC）",
+      "relative_path": "股票数据/资金流向数据/大盘资金流向（DC）",
+      "exists": true,
+      "reason": ""
+    },
+    {
+      "api": "moneyflow_hsgt",
+      "label": "沪深港通资金流向",
+      "relative_path": "股票数据/资金流向数据/沪深港通资金流向",
+      "exists": true,
+      "reason": ""
+    },
+    {
+      "api": "top_list",
+      "label": "龙虎榜每日统计单",
+      "relative_path": "股票数据/打板专题数据/龙虎榜每日统计单",
+      "exists": true,
+      "reason": ""
+    },
+    {
+      "api": "top_inst",
+      "label": "龙虎榜机构交易单",
+      "relative_path": "股票数据/打板专题数据/龙虎榜机构交易单",
+      "exists": true,
+      "reason": ""
+    },
+    {
+      "api": "limit_list_ths",
+      "label": "同花顺涨跌停榜单",
+      "relative_path": "股票数据/打板专题数据/同花顺涨跌停榜单",
+      "exists": true,
+      "reason": ""
+    },
+    {
+      "api": "limit_list_d",
+      "label": "涨跌停和炸板数据",
+      "relative_path": "股票数据/打板专题数据/涨跌停和炸板数据",
+      "exists": true,
+      "reason": ""
+    },
+    {
+      "api": "limit_step",
+      "label": "涨停股票连板天梯",
+      "relative_path": "股票数据/打板专题数据/涨停股票连板天梯",
+      "exists": true,
+      "reason": ""
+    },
+    {
+      "api": "limit_cpt_list",
+      "label": "涨停最强板块统计",
+      "relative_path": "股票数据/打板专题数据/涨停最强板块统计",
+      "exists": true,
+      "reason": ""
+    },
+    {
+      "api": "ths_index",
+      "label": "同花顺行业概念板块",
+      "relative_path": "股票数据/打板专题数据/同花顺行业概念板块",
+      "exists": true,
+      "reason": ""
+    },
+    {
+      "api": "ths_daily",
+      "label": "同花顺概念和行业指数行情",
+      "relative_path": "股票数据/打板专题数据/同花顺概念和行业指数行情",
+      "exists": true,
+      "reason": ""
+    },
+    {
+      "api": "ths_member",
+      "label": "同花顺行业概念成分",
+      "relative_path": "股票数据/打板专题数据/同花顺行业概念成分",
+      "exists": true,
+      "reason": ""
+    },
+    {
+      "api": "dc_index",
+      "label": "东方财富概念板块",
+      "relative_path": "股票数据/打板专题数据/东方财富概念板块",
+      "exists": true,
+      "reason": ""
+    },
+    {
+      "api": "dc_member",
+      "label": "东方财富概念成分",
+      "relative_path": "股票数据/打板专题数据/东方财富概念成分",
+      "exists": true,
+      "reason": ""
+    },
+    {
+      "api": "dc_daily",
+      "label": "东财概念和行业指数行情",
+      "relative_path": "股票数据/打板专题数据/东财概念和行业指数行情",
+      "exists": true,
+      "reason": ""
+    },
+    {
+      "api": "stk_auction",
+      "label": "开盘竞价成交（当日）",
+      "relative_path": "股票数据/打板专题数据/开盘竞价成交（当日）",
+      "exists": true,
+      "reason": ""
+    },
+    {
+      "api": "hm_list",
+      "label": "市场游资最全名录",
+      "relative_path": "股票数据/打板专题数据/市场游资最全名录",
+      "exists": true,
+      "reason": ""
+    },
+    {
+      "api": "hm_detail",
+      "label": "游资交易每日明细",
+      "relative_path": "股票数据/打板专题数据/游资交易每日明细",
+      "exists": true,
+      "reason": ""
+    },
+    {
+      "api": "ths_hot",
+      "label": "同花顺App热榜数",
+      "relative_path": "股票数据/打板专题数据/同花顺App热榜数",
+      "exists": true,
+      "reason": ""
+    },
+    {
+      "api": "dc_hot",
+      "label": "东方财富App热榜",
+      "relative_path": "股票数据/打板专题数据/东方财富App热榜",
+      "exists": true,
+      "reason": ""
+    },
+    {
+      "api": "tdx_index",
+      "label": "通达信板块信息",
+      "relative_path": "股票数据/打板专题数据/通达信板块信息",
+      "exists": true,
+      "reason": ""
+    },
+    {
+      "api": "tdx_member",
+      "label": "通达信板块成分",
+      "relative_path": "股票数据/打板专题数据/通达信板块成分",
+      "exists": true,
+      "reason": ""
+    },
+    {
+      "api": "tdx_daily",
+      "label": "通达信板块行情",
+      "relative_path": "股票数据/打板专题数据/通达信板块行情",
+      "exists": true,
+      "reason": ""
+    },
+    {
+      "api": "kpl_list",
+      "label": "榜单数据（开盘啦）",
+      "relative_path": "股票数据/打板专题数据/榜单数据（开盘啦）",
+      "exists": true,
+      "reason": ""
+    },
+    {
+      "api": "kpl_concept",
+      "label": "题材数据（开盘啦）",
+      "relative_path": "股票数据/打板专题数据/题材数据（开盘啦）",
+      "exists": true,
+      "reason": ""
+    },
+    {
+      "api": "etf_basic",
+      "label": "ETF基本信息",
+      "relative_path": "ETF专题/ETF基本信息",
+      "exists": true,
+      "reason": ""
+    },
+    {
+      "api": "etf_index",
+      "label": "ETF基准指数",
+      "relative_path": "ETF专题/ETF基准指数",
+      "exists": true,
+      "reason": ""
+    },
+    {
+      "api": "rt_min",
+      "label": "ETF实时分钟",
+      "relative_path": "ETF专题/ETF实时分钟",
+      "exists": true,
+      "reason": ""
+    },
+    {
+      "api": "stk_mins",
+      "label": "ETF历史分钟",
+      "relative_path": "ETF专题/ETF历史分钟",
+      "exists": true,
+      "reason": ""
+    },
+    {
+      "api": "rt_etf_k",
+      "label": "ETF实时日线",
+      "relative_path": "ETF专题/ETF实时日线",
+      "exists": true,
+      "reason": ""
+    },
+    {
+      "api": "fund_daily",
+      "label": "ETF日线行情",
+      "relative_path": "ETF专题/ETF日线行情",
+      "exists": true,
+      "reason": ""
+    },
+    {
+      "api": "fund_adj",
+      "label": "ETF复权因子",
+      "relative_path": "ETF专题/ETF复权因子",
+      "exists": true,
+      "reason": ""
+    },
+    {
+      "api": "etf_share_size",
+      "label": "ETF份额规模",
+      "relative_path": "ETF专题/ETF份额规模",
+      "exists": true,
+      "reason": ""
+    },
+    {
+      "api": "index_basic",
+      "label": "指数基本信息",
+      "relative_path": "指数专题/指数基本信息",
+      "exists": true,
+      "reason": ""
+    },
+    {
+      "api": "index_daily",
+      "label": "指数日线行情",
+      "relative_path": "指数专题/指数日线行情",
+      "exists": true,
+      "reason": ""
+    },
+    {
+      "api": "rt_idx_k",
+      "label": "指数实时日线",
+      "relative_path": "指数专题/指数实时日线",
+      "exists": true,
+      "reason": ""
+    },
+    {
+      "api": "rt_idx_min",
+      "label": "指数实时分钟",
+      "relative_path": "指数专题/指数实时分钟",
+      "exists": true,
+      "reason": ""
+    },
+    {
+      "api": "index_weekly",
+      "label": "指数周线行情",
+      "relative_path": "指数专题/指数周线行情",
+      "exists": true,
+      "reason": ""
+    },
+    {
+      "api": "idx_mins",
+      "label": "指数历史分钟",
+      "relative_path": "指数专题/指数历史分钟",
+      "exists": true,
+      "reason": ""
+    },
+    {
+      "api": "index_monthly",
+      "label": "指数月线行情",
+      "relative_path": "指数专题/指数月线行情",
+      "exists": true,
+      "reason": ""
+    },
+    {
+      "api": "index_weight",
+      "label": "指数成分和权重",
+      "relative_path": "指数专题/指数成分和权重",
+      "exists": true,
+      "reason": ""
+    },
+    {
+      "api": "index_dailybasic",
+      "label": "大盘指数每日指标",
+      "relative_path": "指数专题/大盘指数每日指标",
+      "exists": true,
+      "reason": ""
+    },
+    {
+      "api": "index_classify",
+      "label": "申万行业分类",
+      "relative_path": "指数专题/申万行业分类",
+      "exists": true,
+      "reason": ""
+    },
+    {
+      "api": "index_member_all",
+      "label": "申万行业成分（分级）",
+      "relative_path": "指数专题/申万行业成分（分级）",
+      "exists": true,
+      "reason": ""
+    },
+    {
+      "api": "sw_daily",
+      "label": "申万行业指数日行情",
+      "relative_path": "指数专题/申万行业指数日行情",
+      "exists": true,
+      "reason": ""
+    },
+    {
+      "api": "rt_sw_k",
+      "label": "申万实时行情",
+      "relative_path": "指数专题/申万实时行情",
+      "exists": true,
+      "reason": ""
+    },
+    {
+      "api": "ci_index_member",
+      "label": "中信行业成分",
+      "relative_path": "指数专题/中信行业成分",
+      "exists": true,
+      "reason": ""
+    },
+    {
+      "api": "ci_daily",
+      "label": "中信行业指数日行情",
+      "relative_path": "指数专题/中信行业指数日行情",
+      "exists": true,
+      "reason": ""
+    },
+    {
+      "api": "index_global",
+      "label": "国际主要指数",
+      "relative_path": "指数专题/国际主要指数",
+      "exists": true,
+      "reason": ""
+    },
+    {
+      "api": "idx_factor_pro",
+      "label": "指数技术面因子(专业版)",
+      "relative_path": "指数专题/指数技术面因子(专业版)",
+      "exists": true,
+      "reason": ""
+    },
+    {
+      "api": "daily_info",
+      "label": "沪深市场每日交易统计",
+      "relative_path": "指数专题/沪深市场每日交易统计",
+      "exists": true,
+      "reason": ""
+    },
+    {
+      "api": "sz_daily_info",
+      "label": "深圳市场每日交易情况",
+      "relative_path": "指数专题/深圳市场每日交易情况",
+      "exists": true,
+      "reason": ""
+    },
+    {
+      "api": "fund_basic",
+      "label": "基金列表",
+      "relative_path": "公募基金/基金列表",
+      "exists": true,
+      "reason": ""
+    },
+    {
+      "api": "fund_company",
+      "label": "基金管理人",
+      "relative_path": "公募基金/基金管理人",
+      "exists": true,
+      "reason": ""
+    },
+    {
+      "api": "fund_manager",
+      "label": "基金经理",
+      "relative_path": "公募基金/基金经理",
+      "exists": true,
+      "reason": ""
+    },
+    {
+      "api": "fund_share",
+      "label": "基金规模",
+      "relative_path": "公募基金/基金规模",
+      "exists": true,
+      "reason": ""
+    },
+    {
+      "api": "fund_nav",
+      "label": "基金净值",
+      "relative_path": "公募基金/基金净值",
+      "exists": true,
+      "reason": ""
+    },
+    {
+      "api": "fund_div",
+      "label": "基金分红",
+      "relative_path": "公募基金/基金分红",
+      "exists": true,
+      "reason": ""
+    },
+    {
+      "api": "fund_portfolio",
+      "label": "基金持仓",
+      "relative_path": "公募基金/基金持仓",
+      "exists": true,
+      "reason": ""
+    },
+    {
+      "api": "fund_factor_pro",
+      "label": "基金技术面因子(专业版)",
+      "relative_path": "公募基金/基金技术面因子(专业版)",
+      "exists": true,
+      "reason": ""
+    },
+    {
+      "api": "fut_basic",
+      "label": "合约信息",
+      "relative_path": "期货数据/合约信息",
+      "exists": true,
+      "reason": ""
+    },
+    {
+      "api": "trade_cal",
+      "label": "交易日历",
+      "relative_path": "期货数据/交易日历",
+      "exists": true,
+      "reason": ""
+    },
+    {
+      "api": "fut_daily",
+      "label": "日线行情",
+      "relative_path": "期货数据/日线行情",
+      "exists": true,
+      "reason": ""
+    },
+    {
+      "api": "fut_weekly_monthly",
+      "label": "期货周/月线行情(每日更新)",
+      "relative_path": "期货数据/期货周／月线行情(每日更新)",
+      "exists": true,
+      "reason": "normalized_for_filesystem"
+    },
+    {
+      "api": "ft_mins",
+      "label": "历史分钟行情",
+      "relative_path": "期货数据/历史分钟行情",
+      "exists": true,
+      "reason": ""
+    },
+    {
+      "api": "rt_fut_min",
+      "label": "实时分钟行情",
+      "relative_path": "期货数据/实时分钟行情",
+      "exists": true,
+      "reason": ""
+    },
+    {
+      "api": "fut_wsr",
+      "label": "仓单日报",
+      "relative_path": "期货数据/仓单日报",
+      "exists": true,
+      "reason": ""
+    },
+    {
+      "api": "fut_settle",
+      "label": "每日结算参数",
+      "relative_path": "期货数据/每日结算参数",
+      "exists": true,
+      "reason": ""
+    },
+    {
+      "api": "fut_holding",
+      "label": "每日持仓排名",
+      "relative_path": "期货数据/每日持仓排名",
+      "exists": true,
+      "reason": ""
+    },
+    {
+      "api": "index_daily",
+      "label": "南华期货指数行情",
+      "relative_path": "期货数据/南华期货指数行情",
+      "exists": true,
+      "reason": ""
+    },
+    {
+      "api": "fut_mapping",
+      "label": "期货主力与连续合约",
+      "relative_path": "期货数据/期货主力与连续合约",
+      "exists": true,
+      "reason": ""
+    },
+    {
+      "api": "fut_weekly_detail",
+      "label": "期货主要品种交易周报",
+      "relative_path": "期货数据/期货主要品种交易周报",
+      "exists": true,
+      "reason": ""
+    },
+    {
+      "api": "ft_limit",
+      "label": "期货合约涨跌停价格",
+      "relative_path": "期货数据/期货合约涨跌停价格",
+      "exists": true,
+      "reason": ""
+    },
+    {
+      "api": "sge_basic",
+      "label": "上海黄金基础信息",
+      "relative_path": "现货数据/上海黄金基础信息",
+      "exists": true,
+      "reason": ""
+    },
+    {
+      "api": "sge_daily",
+      "label": "上海黄金现货日行情",
+      "relative_path": "现货数据/上海黄金现货日行情",
+      "exists": true,
+      "reason": ""
+    },
+    {
+      "api": "opt_basic",
+      "label": "期权合约信息",
+      "relative_path": "期权数据/期权合约信息",
+      "exists": true,
+      "reason": ""
+    },
+    {
+      "api": "opt_daily",
+      "label": "期权日线行情",
+      "relative_path": "期权数据/期权日线行情",
+      "exists": true,
+      "reason": ""
+    },
+    {
+      "api": "opt_mins",
+      "label": "期权分钟行情",
+      "relative_path": "期权数据/期权分钟行情",
+      "exists": true,
+      "reason": ""
+    },
+    {
+      "api": "cb_basic",
+      "label": "可转债基础信息",
+      "relative_path": "债券专题/可转债基础信息",
+      "exists": true,
+      "reason": ""
+    },
+    {
+      "api": "cb_issue",
+      "label": "可转债发行",
+      "relative_path": "债券专题/可转债发行",
+      "exists": true,
+      "reason": ""
+    },
+    {
+      "api": "cb_call",
+      "label": "可转债赎回信息",
+      "relative_path": "债券专题/可转债赎回信息",
+      "exists": true,
+      "reason": ""
+    },
+    {
+      "api": "cb_rate",
+      "label": "可转债票面利率",
+      "relative_path": "债券专题/可转债票面利率",
+      "exists": true,
+      "reason": ""
+    },
+    {
+      "api": "cb_daily",
+      "label": "可转债行情",
+      "relative_path": "债券专题/可转债行情",
+      "exists": true,
+      "reason": ""
+    },
+    {
+      "api": "cb_factor_pro",
+      "label": "可转债技术面因子(专业版）",
+      "relative_path": "债券专题/可转债技术面因子(专业版）",
+      "exists": true,
+      "reason": ""
+    },
+    {
+      "api": "cb_price_chg",
+      "label": "可转债转股价变动",
+      "relative_path": "债券专题/可转债转股价变动",
+      "exists": true,
+      "reason": ""
+    },
+    {
+      "api": "cb_share",
+      "label": "可转债转股结果",
+      "relative_path": "债券专题/可转债转股结果",
+      "exists": true,
+      "reason": ""
+    },
+    {
+      "api": "repo_daily",
+      "label": "债券回购日行情",
+      "relative_path": "债券专题/债券回购日行情",
+      "exists": true,
+      "reason": ""
+    },
+    {
+      "api": "bc_otcqt",
+      "label": "柜台流通式债券报价",
+      "relative_path": "债券专题/柜台流通式债券报价",
+      "exists": true,
+      "reason": ""
+    },
+    {
+      "api": "bc_bestotcqt",
+      "label": "柜台流通式债券最优报价",
+      "relative_path": "债券专题/柜台流通式债券最优报价",
+      "exists": true,
+      "reason": ""
+    },
+    {
+      "api": "bond_blk",
+      "label": "大宗交易",
+      "relative_path": "债券专题/大宗交易",
+      "exists": true,
+      "reason": ""
+    },
+    {
+      "api": "bond_blk_detail",
+      "label": "大宗交易明细",
+      "relative_path": "债券专题/大宗交易明细",
+      "exists": true,
+      "reason": ""
+    },
+    {
+      "api": "yc_cb",
+      "label": "国债收益率曲线",
+      "relative_path": "债券专题/国债收益率曲线",
+      "exists": true,
+      "reason": ""
+    },
+    {
+      "api": "eco_cal",
+      "label": "全球财经事件",
+      "relative_path": "债券专题/全球财经事件",
+      "exists": true,
+      "reason": ""
+    },
+    {
+      "api": "fx_obasic",
+      "label": "外汇基础信息（海外）",
+      "relative_path": "外汇数据/外汇基础信息（海外）",
+      "exists": true,
+      "reason": ""
+    },
+    {
+      "api": "fx_daily",
+      "label": "外汇日线行情",
+      "relative_path": "外汇数据/外汇日线行情",
+      "exists": true,
+      "reason": ""
+    },
+    {
+      "api": "hk_basic",
+      "label": "港股基础信息",
+      "relative_path": "港股数据/港股基础信息",
+      "exists": true,
+      "reason": ""
+    },
+    {
+      "api": "hk_tradecal",
+      "label": "港股交易日历",
+      "relative_path": "港股数据/港股交易日历",
+      "exists": true,
+      "reason": ""
+    },
+    {
+      "api": "hk_daily",
+      "label": "港股日线行情",
+      "relative_path": "港股数据/港股日线行情",
+      "exists": true,
+      "reason": ""
+    },
+    {
+      "api": "hk_daily_adj",
+      "label": "港股复权行情",
+      "relative_path": "港股数据/港股复权行情",
+      "exists": true,
+      "reason": ""
+    },
+    {
+      "api": "hk_adjfactor",
+      "label": "港股复权因子",
+      "relative_path": "港股数据/港股复权因子",
+      "exists": true,
+      "reason": ""
+    },
+    {
+      "api": "hk_mins",
+      "label": "港股分钟行情",
+      "relative_path": "港股数据/港股分钟行情",
+      "exists": true,
+      "reason": ""
+    },
+    {
+      "api": "rt_hk_k",
+      "label": "港股实时日线",
+      "relative_path": "港股数据/港股实时日线",
+      "exists": true,
+      "reason": ""
+    },
+    {
+      "api": "hk_income",
+      "label": "港股利润表",
+      "relative_path": "港股数据/港股利润表",
+      "exists": true,
+      "reason": ""
+    },
+    {
+      "api": "hk_balancesheet",
+      "label": "港股资产负债表",
+      "relative_path": "港股数据/港股资产负债表",
+      "exists": true,
+      "reason": ""
+    },
+    {
+      "api": "hk_cashflow",
+      "label": "港股现金流量表",
+      "relative_path": "港股数据/港股现金流量表",
+      "exists": true,
+      "reason": ""
+    },
+    {
+      "api": "hk_fina_indicator",
+      "label": "港股财务指标数据",
+      "relative_path": "港股数据/港股财务指标数据",
+      "exists": true,
+      "reason": ""
+    },
+    {
+      "api": "us_basic",
+      "label": "美股基础信息",
+      "relative_path": "美股数据/美股基础信息",
+      "exists": true,
+      "reason": ""
+    },
+    {
+      "api": "us_tradecal",
+      "label": "美股交易日历",
+      "relative_path": "美股数据/美股交易日历",
+      "exists": true,
+      "reason": ""
+    },
+    {
+      "api": "us_daily",
+      "label": "美股日线行情",
+      "relative_path": "美股数据/美股日线行情",
+      "exists": true,
+      "reason": ""
+    },
+    {
+      "api": "us_daily_adj",
+      "label": "美股复权行情",
+      "relative_path": "美股数据/美股复权行情",
+      "exists": true,
+      "reason": ""
+    },
+    {
+      "api": "us_adjfactor",
+      "label": "美股复权因子",
+      "relative_path": "美股数据/美股复权因子",
+      "exists": true,
+      "reason": ""
+    },
+    {
+      "api": "us_income",
+      "label": "美股利润表",
+      "relative_path": "美股数据/美股利润表",
+      "exists": true,
+      "reason": ""
+    },
+    {
+      "api": "us_balancesheet",
+      "label": "美股资产负债表",
+      "relative_path": "美股数据/美股资产负债表",
+      "exists": true,
+      "reason": ""
+    },
+    {
+      "api": "us_cashflow",
+      "label": "美股现金流量表",
+      "relative_path": "美股数据/美股现金流量表",
+      "exists": true,
+      "reason": ""
+    },
+    {
+      "api": "us_fina_indicator",
+      "label": "美股财务指标数据",
+      "relative_path": "美股数据/美股财务指标数据",
+      "exists": true,
+      "reason": ""
+    },
+    {
+      "api": "tmt_twincome",
+      "label": "台湾电子产业月营收",
+      "relative_path": "行业经济/TMT行业/台湾电子产业月营收",
+      "exists": true,
+      "reason": ""
+    },
+    {
+      "api": "tmt_twincomedetail",
+      "label": "台湾电子产业月营收明细",
+      "relative_path": "行业经济/TMT行业/台湾电子产业月营收明细",
+      "exists": true,
+      "reason": ""
+    },
+    {
+      "api": "bo_monthly",
+      "label": "电影月度票房",
+      "relative_path": "行业经济/TMT行业/电影月度票房",
+      "exists": true,
+      "reason": ""
+    },
+    {
+      "api": "bo_weekly",
+      "label": "电影周度票房",
+      "relative_path": "行业经济/TMT行业/电影周度票房",
+      "exists": true,
+      "reason": ""
+    },
+    {
+      "api": "bo_daily",
+      "label": "电影日度票房",
+      "relative_path": "行业经济/TMT行业/电影日度票房",
+      "exists": true,
+      "reason": ""
+    },
+    {
+      "api": "bo_cinema",
+      "label": "影院日度票房",
+      "relative_path": "行业经济/TMT行业/影院日度票房",
+      "exists": true,
+      "reason": ""
+    },
+    {
+      "api": "film_record",
+      "label": "全国电影剧本备案数据",
+      "relative_path": "行业经济/TMT行业/全国电影剧本备案数据",
+      "exists": true,
+      "reason": ""
+    },
+    {
+      "api": "teleplay_record",
+      "label": "全国电视剧备案公示数据",
+      "relative_path": "行业经济/TMT行业/全国电视剧备案公示数据",
+      "exists": true,
+      "reason": ""
+    },
+    {
+      "api": "shibor",
+      "label": "Shibor利率",
+      "relative_path": "宏观经济/国内宏观/利率数据/Shibor利率",
+      "exists": true,
+      "reason": ""
+    },
+    {
+      "api": "shibor_quote",
+      "label": "Shibor报价数据",
+      "relative_path": "宏观经济/国内宏观/利率数据/Shibor报价数据",
+      "exists": true,
+      "reason": ""
+    },
+    {
+      "api": "shibor_lpr",
+      "label": "LPR贷款基础利率",
+      "relative_path": "宏观经济/国内宏观/利率数据/LPR贷款基础利率",
+      "exists": true,
+      "reason": ""
+    },
+    {
+      "api": "libor",
+      "label": "Libor利率",
+      "relative_path": "宏观经济/国内宏观/利率数据/Libor利率",
+      "exists": true,
+      "reason": ""
+    },
+    {
+      "api": "hibor",
+      "label": "Hibor利率",
+      "relative_path": "宏观经济/国内宏观/利率数据/Hibor利率",
+      "exists": true,
+      "reason": ""
+    },
+    {
+      "api": "wz_index",
+      "label": "温州民间借贷利率",
+      "relative_path": "宏观经济/国内宏观/利率数据/温州民间借贷利率",
+      "exists": true,
+      "reason": ""
+    },
+    {
+      "api": "gz_index",
+      "label": "广州民间借贷利率",
+      "relative_path": "宏观经济/国内宏观/利率数据/广州民间借贷利率",
+      "exists": true,
+      "reason": ""
+    },
+    {
+      "api": "cn_gdp",
+      "label": "国内生产总值（GDP）",
+      "relative_path": "宏观经济/国内宏观/国民经济/国内生产总值（GDP）",
+      "exists": true,
+      "reason": ""
+    },
+    {
+      "api": "cn_cpi",
+      "label": "居民消费价格指数（CPI）",
+      "relative_path": "宏观经济/国内宏观/价格指数/居民消费价格指数（CPI）",
+      "exists": true,
+      "reason": ""
+    },
+    {
+      "api": "cn_ppi",
+      "label": "工业生产者出厂价格指数（PPI）",
+      "relative_path": "宏观经济/国内宏观/价格指数/工业生产者出厂价格指数（PPI）",
+      "exists": true,
+      "reason": ""
+    },
+    {
+      "api": "cn_m",
+      "label": "货币供应量（月）",
+      "relative_path": "宏观经济/国内宏观/金融/货币供应量",
+      "exists": true,
+      "reason": ""
+    },
+    {
+      "api": "sf_month",
+      "label": "社融增量（月度）",
+      "relative_path": "宏观经济/国内宏观/金融/社会融资",
+      "exists": true,
+      "reason": ""
+    },
+    {
+      "api": "cn_pmi",
+      "label": "采购经理指数（PMI）",
+      "relative_path": "宏观经济/国内宏观/景气度/采购经理指数（PMI）",
+      "exists": true,
+      "reason": ""
+    },
+    {
+      "api": "us_tycr",
+      "label": "国债收益率曲线利率",
+      "relative_path": "宏观经济/国际宏观/美国利率/国债收益率曲线利率",
+      "exists": true,
+      "reason": ""
+    },
+    {
+      "api": "us_trycr",
+      "label": "国债实际收益率曲线利率",
+      "relative_path": "宏观经济/国际宏观/美国利率/国债实际收益率曲线利率",
+      "exists": true,
+      "reason": ""
+    },
+    {
+      "api": "us_tbr",
+      "label": "短期国债利率",
+      "relative_path": "宏观经济/国际宏观/美国利率/短期国债利率",
+      "exists": true,
+      "reason": ""
+    },
+    {
+      "api": "us_tltr",
+      "label": "国债长期利率",
+      "relative_path": "宏观经济/国际宏观/美国利率/国债长期利率",
+      "exists": true,
+      "reason": ""
+    },
+    {
+      "api": "us_trltr",
+      "label": "国债长期利率平均值",
+      "relative_path": "宏观经济/国际宏观/美国利率/国债长期利率平均值",
+      "exists": true,
+      "reason": ""
+    },
+    {
+      "api": "npr",
+      "label": "国家政策库",
+      "relative_path": "大模型语料专题数据/国家政策库",
+      "exists": true,
+      "reason": ""
+    },
+    {
+      "api": "research_report",
+      "label": "券商研究报告",
+      "relative_path": "大模型语料专题数据/券商研究报告",
+      "exists": true,
+      "reason": ""
+    },
+    {
+      "api": "news",
+      "label": "新闻快讯（短讯）",
+      "relative_path": "大模型语料专题数据/新闻快讯（短讯）",
+      "exists": true,
+      "reason": ""
+    },
+    {
+      "api": "major_news",
+      "label": "新闻通讯（长篇）",
+      "relative_path": "大模型语料专题数据/新闻通讯（长篇）",
+      "exists": true,
+      "reason": ""
+    },
+    {
+      "api": "cctv_news",
+      "label": "新闻联播文字稿",
+      "relative_path": "大模型语料专题数据/新闻联播文字稿",
+      "exists": true,
+      "reason": ""
+    },
+    {
+      "api": "anns_d",
+      "label": "上市公司公告",
+      "relative_path": "大模型语料专题数据/上市公司公告",
+      "exists": true,
+      "reason": ""
+    },
+    {
+      "api": "irm_qa_sh",
+      "label": "上证e互动问答",
+      "relative_path": "大模型语料专题数据/上证e互动问答",
+      "exists": true,
+      "reason": ""
+    },
+    {
+      "api": "irm_qa_sz",
+      "label": "深证易互动问答",
+      "relative_path": "大模型语料专题数据/深证易互动问答",
+      "exists": true,
+      "reason": ""
+    },
+    {
+      "api": "fund_sales_ratio",
+      "label": "各渠道公募基金销售保有规模占比",
+      "relative_path": "财富管理/基金销售行业数据/各渠道公募基金销售保有规模占比",
+      "exists": true,
+      "reason": ""
+    },
+    {
+      "api": "fund_sales_vol",
+      "label": "销售机构公募基金销售保有规模",
+      "relative_path": "财富管理/基金销售行业数据/销售机构公募基金销售保有规模",
+      "exists": true,
+      "reason": ""
+    }
+  ]
+}

@@ -769,3 +769,159 @@
   - `tests/test_m7_monthly_review.py`
   - `tests/test_m7_feedback_api.py`
   - `tests/test_m7_shadow_routing.py`
+
+## 2026-02-16 - Batch 25 (TA Hybrid Workflow Closure + Checkpoint Resilience Fix)
+
+### Completed Operations
+- Completed TA Hybrid end-to-end integration in workflow and contracts:
+  - Added request controls in API/backtest payloads:
+    - `analysis_mode` (`BASELINE|TA_HYBRID|AUTO`)
+    - `ta_hybrid_mode` (`OFF|ANALYZE_ONLY|BLEND`)
+    - `ta_research_rounds`, `ta_risk_rounds`, `ta_llm_call_cap`, `ta_require_evidence_refs`
+  - Added workflow route after context build:
+    - `build_context -> ta_hybrid_node -> draft_report` when mode and budget allow.
+  - Added TA Hybrid subgraph module (`app/workflows/subgraphs/ta_hybrid.py`) to produce:
+    - research/risk views,
+    - normalized signal (`directional_bias/risk_bias/conviction/disagreement/horizon_days_hint`),
+    - `AGENT_REASONING` evidence references.
+  - Added BLEND application path in node layer:
+    - writes TA factors into `features`,
+    - re-runs deterministic `score_signal` and `generate_price_bands`,
+    - records applied/degraded status and reasons.
+- Completed persistence/consistency/report alignment:
+  - Extended report provenance with `ta_hybrid` state + signal fields.
+  - Extended report/request JSON schema with TA Hybrid fields and `AGENT_REASONING` evidence type.
+  - Extended consistency checks:
+    - require `AGENT_REASONING` evidence when `ta_hybrid.applied` and evidence is required,
+    - disallow `BUY` when TA disagreement is too high.
+- Completed backtest observability extension:
+  - Batch backtest now propagates TA Hybrid request params and records per-run TA metrics.
+  - Summary now reports TA Hybrid usage and signal aggregates (`applied_runs/rate`, avg bias/conviction/disagreement).
+  - Portfolio backtest now aggregates TA Hybrid summary statistics across components.
+- Fixed a cross-suite stability regression in checkpoint runtime:
+  - Root cause: test-side checkpoint connection close could leave graph-bound checkpointer stale (`closed database`).
+  - Added connection health probe and automatic checkpointer rebuild in `app/workflows/checkpoint.py`.
+  - Added workflow-level retry-once with graph/checkpointer rebuild in `app/workflows/graph.py`.
+  - Added regression test `test_get_checkpointer_rebuilds_when_connection_is_closed`.
+
+### Test Coverage Added/Updated
+- Added TA Hybrid coverage:
+  - `tests/test_ta_hybrid_mode.py` (route behavior, ANALYZE_ONLY payload, BLEND rescore application).
+  - `tests/test_backtest_api.py` TA Hybrid parameter propagation and summary metrics assertions.
+- Added checkpoint resilience coverage:
+  - `tests/test_checkpoint_maintenance.py::test_get_checkpointer_rebuilds_when_connection_is_closed`.
+
+### Validation Evidence
+- `.venv/bin/python -m pytest -q tests/test_ta_hybrid_mode.py tests/test_backtest_api.py` passed.
+- `.venv/bin/python -m pytest -q tests/test_checkpoint_maintenance.py tests/test_e2e_tier0.py tests/test_m3_data_layer.py tests/test_m4_tier1_enhancement.py tests/test_m5_tier2_graph_reviewer.py tests/test_m6_risk_and_resilience.py tests/test_m7_feedback_api.py tests/test_m7_shadow_routing.py` passed.
+- `.venv/bin/python -m pytest -q` passed (full suite green).
+
+## 2026-02-16 - Batch 26 (TA Hybrid BLEND Integrity Fix + LIVE Binding Gap Tests)
+
+### Completed Operations
+- Closed BLEND false-positive gap in `ta_hybrid_node`:
+  - BLEND now requires TA factors to be enabled in active skill pack (`ta.research_bias`, `ta.risk_bias`, `ta.disagreement_penalty`, `ta.conviction_support`).
+  - Added second-stage guard: even after re-score, BLEND is considered effective only when those TA factors are present in `score.factor_values`.
+  - When guards fail, status is forced to `ANALYZED_NO_BLEND`, `applied=false`, and explicit `degraded_reasons`/missing factor ids are recorded in provenance.
+- Closed test coverage gap for LIVE+BLEND fallback path:
+  - Added test to cover `LIVE + no champion + explicit non-champion version + BLEND` path:
+    - verifies `forced_default` to `0.1.0`,
+    - verifies TA BLEND is skipped (no false `BLENDED` state).
+  - Added node-level test that BLEND is skipped when skill pack lacks required TA factors.
+- Closed skill pack metadata consistency gap for `0.1.5`:
+  - Updated embedded `version` field from `0.1.0` to `0.1.5` in:
+    - `factors.json`, `formula.json`, `policy.json`, `risk.json`, `llm_mapping.json`, `gate.json`.
+
+### Test Coverage Added/Updated
+- `tests/test_ta_hybrid_mode.py`
+  - `test_ta_hybrid_node_blend_requires_ta_factors_in_skill_pack`
+- `tests/test_live_skill_pack_binding.py`
+  - `test_live_blend_without_champion_falls_back_and_skips_blend`
+
+### Validation Evidence
+- `.venv/bin/python -m pytest -q tests/test_ta_hybrid_mode.py tests/test_live_skill_pack_binding.py tests/test_backtest_api.py tests/test_consistency.py` passed.
+- `.venv/bin/python -m pytest -q` passed (full suite green).
+
+## 2026-02-16 - Batch 27 (Skill Pack Component Version Governance)
+
+### Completed Operations
+- Added strict component-version governance in skill pack loader:
+  - `load_skill_pack` now validates that each component file
+    (`factors/formula/policy/risk/llm_mapping/gate`) has a `version` field
+    and it must match `manifest.version`.
+  - Validation fails fast with explicit mismatch error.
+- Prevented future candidate drift at generation source:
+  - Updated candidate materialization logic to stamp generated component files
+    with the candidate semantic version (same as manifest).
+- Backfilled historical candidate package metadata for consistency:
+  - Updated `cn_a_core` versions `0.1.1` ~ `0.1.4` component file versions to match their manifest version.
+- Added regression test:
+  - `tests/test_skill_pack.py::test_skill_pack_validation_rejects_component_version_mismatch`
+  - Locks behavior so mismatched component version is rejected.
+
+### Validation Evidence
+- `.venv/bin/python -m pytest -q tests/test_skill_pack.py tests/test_skill_pack_candidates.py tests/test_skill_pack_promotion.py tests/test_live_skill_pack_binding.py tests/test_ta_hybrid_mode.py` passed.
+- `.venv/bin/ruff check app/backtest/skill_pack.py app/backtest/candidates.py tests/test_skill_pack.py` passed.
+- `.venv/bin/python -m pytest -q` passed (full suite green).
+
+## 2026-02-23 - Batch 28 (Institutional Plan M3/M4 Closure Hardening)
+
+### Completed Operations
+- M3 提案审计可观测性补强：
+  - `GET /skill-packs/proposals/runs` 新增筛选参数：
+    - `skill_pack_id`
+    - `executed`
+    - `dry_run`
+    - `selected_decision`
+    - `generated_after`
+    - `generated_before`
+  - 提案 runs 列表新增 `summary` 聚合输出：
+    - `executed_runs`
+    - `dry_run_runs`
+    - `selected_decision_counts`
+    - `avg_selected_excess_return_delta_pct`
+    - `avg_selected_segment_win_rate`
+  - 明细项补充：
+    - `selected_decision`
+    - `selected_excess_return_delta_pct`
+    - `selected_segment_win_rate`
+- M3 前端评审页补强（`/proposals`）：
+  - 新增筛选控件（skill pack / decision / executed / dry-run）。
+  - 新增审计摘要卡（总运行数、执行数、dry-run 数、平均增量、决策分布）。
+  - 列表新增“选中决策”列，支持快速审阅 gate 结果。
+- M4 监控告警与自动回滚联动补强：
+  - `POST /skill-packs/champion/watchdog/run` 新增参数：
+    - `execute_rollback_on_recommendation`
+    - `rollback_dry_run`
+    - `rollback_reason`
+    - `rollback_operator`
+  - Watchdog 在建议回滚时可自动触发 `switch_skill_pack_champion`（支持 dry-run），并把执行结果写入 run 审计字段 `rollback_execution`。
+  - Watchdog runs 列表新增回滚联动字段：
+    - `rollback_executed`
+    - `rollback_release_event_id`
+  - Champion 监控页新增“命中建议后自动回滚”开关，并展示 watchdog 回滚执行/发布事件状态。
+
+### Test Coverage Added/Updated
+- `tests/test_llm_proposals.py`
+  - 新增提案 runs 筛选与 summary 聚合测试。
+- `tests/test_backtest_api.py`
+  - 覆盖 proposals/runs 筛选参数透传与非法时间 422 行为。
+  - 覆盖 watchdog 新增回滚联动参数透传。
+- `tests/test_champion_watchdog.py`
+  - 新增 watchdog 建议触发自动回滚执行链路测试。
+
+### Validation Evidence
+- `.venv/bin/python -m pytest -q tests/test_llm_proposals.py tests/test_champion_watchdog.py tests/test_backtest_api.py tests/test_champion_watchdog_api.py` passed.
+- `npm --prefix frontend run build` passed (`tsc --noEmit` + `vite build`).
+
+### Documentation Sync
+- 更新 `docs/INSTITUTIONAL_TRANSFORMATION_PLAN.md`：
+  - M3 状态调整为“已完成”
+  - M4 状态调整为“已完成”
+- 更新 `docs/API_SPEC.md`：
+  - 补充 proposals/runs 筛选与 summary
+  - 补充 watchdog 自动回滚联动参数与返回字段
+- 更新 `docs/OPENAPI.yaml`：
+  - 补齐 skill-pack proposals/champion watchdog/health-check/releases 的契约路径
+  - `ChampionWatchdogRunRequest` 新增自动回滚联动参数定义
+  - `LlmProposalRunListResponse` 新增 audit summary 结构定义

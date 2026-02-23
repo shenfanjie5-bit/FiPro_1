@@ -10,6 +10,12 @@
     "asof": { "type": "string", "format": "date-time" },
     "strategy_version_id": { "type": "string", "minLength": 1 },
     "tier": { "type": "string", "enum": ["TIER0", "TIER1", "TIER2"] },
-    "run_mode": { "type": "string", "enum": ["LIVE", "SHADOW", "BACKTEST"] }
+    "run_mode": { "type": "string", "enum": ["LIVE", "SHADOW", "BACKTEST"] },
+    "analysis_mode": { "type": "string", "enum": ["BASELINE", "TA_HYBRID", "AUTO"] },
+    "ta_hybrid_mode": { "type": "string", "enum": ["OFF", "ANALYZE_ONLY", "BLEND"] },
+    "ta_research_rounds": { "type": "integer", "minimum": 1, "maximum": 3 },
+    "ta_risk_rounds": { "type": "integer", "minimum": 1, "maximum": 3 },
+    "ta_llm_call_cap": { "type": "integer", "minimum": 0, "maximum": 20 },
+    "ta_require_evidence_refs": { "type": "boolean" }
   }
 }

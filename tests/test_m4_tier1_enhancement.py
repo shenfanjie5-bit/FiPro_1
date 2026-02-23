@@ -84,6 +84,42 @@ def test_extract_events_from_docs_returns_structured_events() -> None:
         assert event['evidence_doc_ids']
 
 
+def test_event_signal_rollup_maps_policy_and_governance() -> None:
+    state = {
+        'extracted_events': [
+            {'type': 'POLICY', 'direction': 'POS', 'confidence': 0.8},
+            {'type': 'GEOPOLITICS', 'direction': 'NEG', 'confidence': 0.6},
+            {'type': 'EARNINGS', 'direction': 'POS', 'confidence': 0.7},
+        ]
+    }
+    rolled = nodes_module._event_signal_rollup(state)
+    assert rolled['event_count'] == 3
+    assert rolled['used_event_count'] == 3
+    assert isinstance(rolled['policy_signal'], float)
+    assert isinstance(rolled['governance_signal'], float)
+    assert -1.0 <= rolled['policy_signal'] <= 1.0
+    assert -1.0 <= rolled['governance_signal'] <= 1.0
+
+
+def test_load_strategy_config_prefers_champion_when_version_missing(monkeypatch) -> None:
+    monkeypatch.setattr(nodes_module, 'resolve_champion_version', lambda skill_pack_id: '0.9.0')  # noqa: ARG005
+
+    def fake_load_skill_pack(skill_pack_id: str, version: str) -> dict:
+        return {
+            'summary': {'skill_pack_id': skill_pack_id, 'version': version, 'market': 'CN_A', 'status': 'champion'},
+            'factors': {'factors': [{'factor_id': 'f1', 'enabled': True, 'weight': 0.1}]},
+        }
+
+    monkeypatch.setattr(nodes_module, 'load_skill_pack', fake_load_skill_pack)
+    state = {'request': {'ticker': '600519.SH', 'tier': 'TIER0', 'run_mode': 'LIVE'}}
+    updated = nodes_module.load_strategy_config(state)
+
+    assert updated['request']['skill_pack_id'] == 'cn_a_core'
+    assert updated['request']['skill_pack_version'] == '0.9.0'
+    assert updated['request']['skill_pack_version_source'] == 'champion'
+    assert updated['config']['skill_pack']['version'] == '0.9.0'
+
+
 def test_memory_write_and_retrieve_supports_dedupe(monkeypatch, tmp_path) -> None:
     runtime_db = tmp_path / 'memory-runtime.db'
     monkeypatch.setenv('WORKFLOW_RUNTIME_DB', str(runtime_db))
@@ -147,6 +183,14 @@ def test_tier1_workflow_runs_rag_chain_and_router_policy() -> None:
     assert checkpoint_state is not None
     tool_names = {trace.get('tool_name') for trace in checkpoint_state.get('tool_traces', [])}
     assert {'search_event_docs', 'rerank_docs', 'extract_events_from_docs'}.issubset(tool_names)
+    features = checkpoint_state.get('features', {})
+    assert 'event_feature_meta' in features
+    assert isinstance(features.get('event_policy_signal', 0.0), float)
+    assert isinstance(features.get('evidence_coverage', 0.0), float)
+    score = checkpoint_state.get('score', {})
+    assert isinstance(score.get('factor_values', {}), dict)
+    assert 'event.policy_signal' in score.get('factor_values', {})
+    assert 'event.governance_signal' in score.get('factor_values', {})
 
     assert final_report['provenance']['router_policy'] == 'router_m6_v1'
     assert any(ref.get('source', '').startswith('event_docs.') for ref in final_report['evidence_refs'])

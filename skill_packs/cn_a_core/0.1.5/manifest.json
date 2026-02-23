@@ -1,0 +1,27 @@
+{
+  "skill_pack_id": "cn_a_core",
+  "version": "0.1.5",
+  "market": "CN_A",
+  "author": "auto_calibration",
+  "status": "candidate",
+  "title": "CN_A Core Deterministic Pack",
+  "description": "MVP baseline pack for CN_A backtest with deterministic score and policy engines.",
+  "created_at": "2026-02-12T00:00:00Z",
+  "derived_from_job_id": "ta_hybrid_m2_blend_bootstrap",
+  "derived_from_champion_version": "0.1.4",
+  "inputs": {
+    "manifest_file": "manifest.json",
+    "factors_file": "factors.json",
+    "formula_file": "formula.json",
+    "policy_file": "policy.json",
+    "risk_file": "risk.json",
+    "llm_mapping_file": "llm_mapping.json",
+    "gate_file": "gate.json"
+  },
+  "runtime": {
+    "score_engine": "deterministic_v1",
+    "policy_engine": "state_machine_v1",
+    "risk_overlay": "cn_a_core_v1"
+  },
+  "updated_at": "2026-02-16T00:00:00Z"
+}

@@ -1,28 +1,65 @@
 from __future__ import annotations
 
 from datetime import datetime, timedelta, timezone
+import hashlib
+import json
 import os
 import uuid
 from typing import Any
 
+from app.backtest.promotion import resolve_champion_version
+from app.backtest.skill_pack import load_skill_pack
+from app.core.runtime_config import get_runtime_config
 from app.llm.provider import LLMProvider
-from app.tools.deterministic import generate_price_bands, risk_gate, score_signal
+from app.tools.deterministic import generate_price_bands, risk_gate, score_signal, score_signal_skill_pack
+from app.tools.factor_registry import get_tushare_registry_for_context
 from app.tools.facts import (
     get_flow_sentiment_snapshot,
     get_fundamentals_snapshot,
     get_macro_commodity_logistics_snapshot,
     get_market_snapshot,
 )
+from app.tools.local_data_gateway import default_backtest_window, query_local_datasets
 from app.tools.graph import compute_exposure_score, find_impact_paths, query_supply_chain_subtree
 from app.tools.memory import retrieve_memory_notes, write_memory_note
 from app.tools.qa import consistency_check, validate_report_schema_tool
 from app.tools.rag import extract_events_from_docs, rerank_docs, search_event_docs
+from app.tools.skills import retrieve_skill_notes, write_skill_from_report
 from app.tools.wrapper import execute_tool
 from app.workflows.persistence import persist_workflow_state
+from app.workflows.subgraphs import run_ta_hybrid_subgraph
 
 
 STATUS_RANK = {'OK': 0, 'PARTIAL': 1, 'DEGRADED': 2}
 DEGRADATION_DEPENDENCIES = ('budget', 'data_source', 'rag', 'graph', 'llm')
+
+DEFAULT_SKILL_PACK_ID = 'cn_a_core'
+DEFAULT_SKILL_PACK_VERSION = '0.1.0'
+
+TA_HYBRID_VERSION = 'ta_hybrid_m2_v1'
+TA_BLEND_REQUIRED_FACTOR_IDS = (
+    'ta.research_bias',
+    'ta.risk_bias',
+    'ta.disagreement_penalty',
+    'ta.conviction_support',
+)
+
+
+def _env_int(name: str, default: int, *, minimum: int = 1, maximum: int = 1000) -> int:
+    try:
+        value = int(os.getenv(name, str(default)))
+    except ValueError:
+        value = default
+    value = max(minimum, value)
+    value = min(maximum, value)
+    return value
+
+
+def _safe_float(value: Any, default: float = 0.0) -> float:
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return float(default)
 
 
 def _merge_status(a: str, b: str) -> str:
@@ -96,6 +133,62 @@ def _default_degradation_matrix() -> dict[str, dict[str, Any]]:
         key: {'status': 'OK', 'mode': 'PRIMARY', 'reasons': []}
         for key in DEGRADATION_DEPENDENCIES
     }
+
+
+def _default_ta_hybrid_signal() -> dict[str, Any]:
+    return {
+        'directional_bias': 0.0,
+        'risk_bias': 0.0,
+        'conviction': 0.0,
+        'disagreement': 0.0,
+        'horizon_days_hint': None,
+    }
+
+
+def _default_ta_hybrid_state(request: dict[str, Any] | None = None) -> dict[str, Any]:
+    req = request if isinstance(request, dict) else {}
+    mode = str(req.get('ta_hybrid_mode', 'OFF')).strip().upper() or 'OFF'
+    analysis_mode = str(req.get('analysis_mode', 'BASELINE')).strip().upper() or 'BASELINE'
+    if analysis_mode not in {'TA_HYBRID', 'AUTO'}:
+        mode = 'OFF'
+    return {
+        'mode': mode,
+        'status': 'OFF' if mode == 'OFF' else 'PENDING',
+        'applied': False,
+        'version': TA_HYBRID_VERSION,
+        'require_evidence_refs': bool(req.get('ta_require_evidence_refs', True)),
+        'research_rounds_used': 0,
+        'risk_rounds_used': 0,
+        'llm_calls_used': 0,
+        'llm_call_cap': max(0, min(20, int(req.get('ta_llm_call_cap', 6) or 0))),
+        'degraded_reasons': [],
+    }
+
+
+def _should_run_ta_hybrid(request: dict[str, Any] | None) -> bool:
+    req = request if isinstance(request, dict) else {}
+    analysis_mode = str(req.get('analysis_mode', 'BASELINE')).strip().upper() or 'BASELINE'
+    mode = str(req.get('ta_hybrid_mode', 'OFF')).strip().upper() or 'OFF'
+    return analysis_mode in {'TA_HYBRID', 'AUTO'} and mode in {'ANALYZE_ONLY', 'BLEND'}
+
+
+def _enabled_skill_pack_factor_ids(skill_pack: dict[str, Any] | None) -> set[str]:
+    pack = skill_pack if isinstance(skill_pack, dict) else {}
+    factors_payload = pack.get('factors', {})
+    factors = factors_payload.get('factors', []) if isinstance(factors_payload, dict) else []
+    enabled: set[str] = set()
+    if not isinstance(factors, list):
+        return enabled
+    for item in factors:
+        if not isinstance(item, dict):
+            continue
+        factor_id = str(item.get('factor_id', '')).strip()
+        if not factor_id:
+            continue
+        if not bool(item.get('enabled', True)):
+            continue
+        enabled.add(factor_id)
+    return enabled
 
 
 def _note_degradation(state: dict, dependency: str, *, status: str, reason: str, mode: str = 'DEGRADED') -> None:
@@ -202,11 +295,83 @@ def _budget_guardrail(
     return True
 
 
+def _resolve_skill_pack_version(skill_pack_id: str, requested_version: Any, *, run_mode: str) -> tuple[str, str, str]:
+    normalized = str(requested_version or '').strip()
+    normalized_mode = str(run_mode or 'LIVE').strip().upper() or 'LIVE'
+    if normalized_mode == 'LIVE' and normalized and normalized.lower() not in {'champion', 'auto'}:
+        champion_version = resolve_champion_version(skill_pack_id)
+        if champion_version:
+            return (
+                champion_version,
+                'forced_champion',
+                f'LIVE mode ignores explicit skill_pack_version={normalized}; forced champion',
+            )
+        return (
+            DEFAULT_SKILL_PACK_VERSION,
+            'forced_default',
+            (
+                f'LIVE mode ignores explicit skill_pack_version={normalized}; '
+                f'champion missing, fallback to default {DEFAULT_SKILL_PACK_VERSION}'
+            ),
+        )
+    if normalized and normalized.lower() not in {'champion', 'auto'}:
+        return normalized, 'explicit', ''
+    champion_version = resolve_champion_version(skill_pack_id)
+    if champion_version:
+        return champion_version, 'champion', ''
+    return DEFAULT_SKILL_PACK_VERSION, 'default', ''
+
+
 def load_strategy_config(state: dict) -> dict:
     tier_policy = _default_tier_policy()
     req = state.get('request', {})
     req_tier = str(req.get('tier', 'TIER0'))
+    run_mode = str(req.get('run_mode', 'LIVE')).strip().upper() or 'LIVE'
     selected_tier = tier_policy.get(req_tier, tier_policy['TIER0'])
+    skill_pack_id = str(req.get('skill_pack_id', DEFAULT_SKILL_PACK_ID) or DEFAULT_SKILL_PACK_ID).strip() or DEFAULT_SKILL_PACK_ID
+    skill_pack_version, skill_pack_version_source, version_note = _resolve_skill_pack_version(
+        skill_pack_id,
+        req.get('skill_pack_version'),
+        run_mode=run_mode,
+    )
+    skill_pack_warning = ''
+    if version_note:
+        skill_pack_warning = version_note
+    try:
+        resolved_skill_pack = load_skill_pack(skill_pack_id=skill_pack_id, version=skill_pack_version)
+    except ValueError as exc:
+        skill_pack_warning = f'{skill_pack_warning} | {exc}'.strip(' |')
+        resolved_skill_pack = load_skill_pack(skill_pack_id=DEFAULT_SKILL_PACK_ID, version=DEFAULT_SKILL_PACK_VERSION)
+        skill_pack_id = DEFAULT_SKILL_PACK_ID
+        skill_pack_version = DEFAULT_SKILL_PACK_VERSION
+        skill_pack_version_source = 'fallback_default'
+
+    summary = dict(resolved_skill_pack.get('summary', {}))
+    state['skill_pack'] = resolved_skill_pack
+    state['request'] = dict(req)
+    state['request']['skill_pack_id'] = str(summary.get('skill_pack_id', skill_pack_id))
+    state['request']['skill_pack_version'] = str(summary.get('version', skill_pack_version))
+    state['request']['skill_pack_version_source'] = skill_pack_version_source
+
+    factors_payload = resolved_skill_pack.get('factors', {})
+    factors = factors_payload.get('factors', []) if isinstance(factors_payload, dict) else []
+    weight_digest_payload = {
+        'skill_pack_id': state['request']['skill_pack_id'],
+        'version': state['request']['skill_pack_version'],
+        'weights': [
+            {
+                'factor_id': str(item.get('factor_id', '')),
+                'enabled': bool(item.get('enabled', True)),
+                'weight': float(item.get('weight', 0.0)),
+            }
+            for item in factors
+            if isinstance(item, dict) and str(item.get('factor_id', '')).strip()
+        ],
+    }
+    raw = json.dumps(weight_digest_payload, sort_keys=True, ensure_ascii=True, separators=(',', ':'))
+    weights_hash = f"w_skill_{hashlib.sha256(raw.encode('utf-8')).hexdigest()[:12]}"
+    factor_registry = get_tushare_registry_for_context(max_endpoints=260)
+
     state['config'] = {
         'weights': {
             'hotness': 0.25,
@@ -218,8 +383,12 @@ def load_strategy_config(state: dict) -> dict:
         'risk_profile': 'LOW',
         'router_policy_version': 'router_m6_v1',
         'tier_policy': tier_policy,
+        'skill_pack': summary,
+        'skill_pack_warning': skill_pack_warning,
+        'skill_pack_version_source': skill_pack_version_source,
+        'factor_registry': factor_registry,
     }
-    state['weights_hash'] = 'w_mock_hash_v1'
+    state['weights_hash'] = weights_hash
     state['budget'] = {
         'max_tool_calls': selected_tier['budget']['max_tool_calls'],
         'max_cost_usd': selected_tier['budget']['max_cost_usd'],
@@ -236,6 +405,8 @@ def init_data_quality(state: dict) -> dict:
     state['data_quality'] = {'status': 'OK', 'missing_fields': [], 'notes': ''}
     state['tool_traces'] = []
     state['tool_call_stats'] = {'tool_calls': 0, 'latency_ms': 0, 'cost_usd_est': 0, 'tool_failures': 0, 'retry_count': 0, 'retry_wait_ms': 0}
+    state['memory_notes'] = []
+    state['skill_notes'] = []
     state['doc_queries'] = []
     state['doc_candidates'] = []
     state['ranked_docs'] = []
@@ -256,6 +427,10 @@ def init_data_quality(state: dict) -> dict:
     state['reviewer_notes'] = []
     state['persist_refs'] = {}
     state['degradation_matrix'] = _default_degradation_matrix()
+    state['ta_hybrid_state'] = _default_ta_hybrid_state(state.get('request', {}))
+    state['ta_hybrid_views'] = {}
+    state['ta_hybrid_signal'] = _default_ta_hybrid_signal()
+    state['ta_hybrid_evidence_refs'] = []
     return state
 
 
@@ -424,7 +599,22 @@ def build_features(state: dict) -> dict:
 
 def score_signal_node(state: dict) -> dict:
     weights = state['config']['weights']
-    res = execute_tool('score_signal', {'features': state['features'], 'weights': weights}, score_signal)
+    skill_pack = state.get('skill_pack')
+    if isinstance(skill_pack, dict):
+        res = execute_tool(
+            'score_signal',
+            {
+                'features': state['features'],
+                'snapshots': state.get('snapshots', {}),
+                'skill_pack': skill_pack,
+                'data_quality_status': state.get('data_quality', {}).get('status', 'OK'),
+                'current_pos': 0.0,
+                'hard_risk_triggered': False,
+            },
+            score_signal_skill_pack,
+        )
+    else:
+        res = execute_tool('score_signal', {'features': state['features'], 'weights': weights}, score_signal)
     state['tool_traces'].append(res['trace'])
     state['score'] = res['output']
     state['score_id'] = res['output']['score_id']
@@ -451,6 +641,7 @@ def retrieve_memory_node(state: dict) -> dict:
     memory_window_days = int(memory_cfg.get('time_range_days', 180))
     if not _budget_guardrail(state, stage='memory.retrieve', reserve_tool_calls=1):
         state['memory_notes'] = []
+        state['skill_notes'] = []
         _sync_data_quality_from_matrix(state)
         return state
     res = execute_tool(
@@ -477,6 +668,20 @@ def retrieve_memory_node(state: dict) -> dict:
             },
         )
         _note_degradation(state, 'data_source', status='PARTIAL', reason='memory retrieval failed', mode='FALLBACK')
+
+    skill_query = f"{req['ticker']} action={state.get('score', {}).get('proposed_action', 'WATCH')} risks invalidations"
+    skill_result = retrieve_skill_notes(
+        ticker=req['ticker'],
+        query=skill_query,
+        top_k=4,
+        include_global=True,
+        lookback_days=365,
+    )
+    if isinstance(skill_result, dict) and isinstance(skill_result.get('error'), dict):
+        state['skill_notes'] = []
+        _note_degradation(state, 'data_source', status='PARTIAL', reason='skill retrieval failed', mode='FALLBACK')
+    else:
+        state['skill_notes'] = list(skill_result.get('skills', []))
     _refresh_tool_stats(state)
     rag_cfg = dict(_tier_params(state).get('rag', {}))
     req_tier = str(req.get('tier', 'TIER0'))
@@ -1096,6 +1301,160 @@ def _attempt_tier1_coverage_repair(state: dict, evidence_refs: list[dict[str, An
     _refresh_tool_stats(state)
 
 
+def _parse_iso_datetime(value: Any) -> datetime | None:
+    text = str(value or '').strip()
+    if not text:
+        return None
+    try:
+        parsed = datetime.fromisoformat(text.replace('Z', '+00:00'))
+    except ValueError:
+        return None
+    if parsed.tzinfo is None:
+        parsed = parsed.replace(tzinfo=timezone.utc)
+    return parsed
+
+
+def _direction_to_signal(direction: Any) -> float:
+    normalized = str(direction or '').strip().upper()
+    if normalized == 'POS':
+        return 1.0
+    if normalized == 'NEG':
+        return -1.0
+    if normalized in {'MIXED', 'UNCERTAIN'}:
+        return 0.0
+    return 0.0
+
+
+def _event_signal_rollup(state: dict) -> dict[str, Any]:
+    extracted_events = [item for item in state.get('extracted_events', []) if isinstance(item, dict)]
+    policy_types = {'POLICY', 'GEOPOLITICS', 'LOGISTICS', 'COMMODITY'}
+    governance_types = {'EARNINGS', 'COMPETITION', 'OTHER'}
+
+    policy_sum = 0.0
+    policy_weight = 0.0
+    governance_sum = 0.0
+    governance_weight = 0.0
+    used_events = 0
+
+    for event in extracted_events:
+        event_type = str(event.get('type', 'OTHER')).strip().upper()
+        direction = _direction_to_signal(event.get('direction'))
+        confidence = max(0.0, min(1.0, float(event.get('confidence', 0.0) or 0.0)))
+        if confidence <= 0:
+            continue
+        contribution = direction * confidence
+        if event_type in policy_types:
+            policy_sum += contribution
+            policy_weight += confidence
+            used_events += 1
+            continue
+        if event_type in governance_types:
+            governance_sum += contribution
+            governance_weight += confidence
+            used_events += 1
+            continue
+
+    policy_signal = (policy_sum / policy_weight) if policy_weight > 0 else None
+    governance_signal = (governance_sum / governance_weight) if governance_weight > 0 else None
+    return {
+        'policy_signal': policy_signal,
+        'governance_signal': governance_signal,
+        'used_event_count': used_events,
+        'event_count': len(extracted_events),
+    }
+
+
+def _event_staleness_score(state: dict) -> float:
+    req_asof = _parse_iso_datetime(state.get('request', {}).get('asof'))
+    if req_asof is None:
+        return 0.5
+    published_times: list[datetime] = []
+    for doc in state.get('event_docs', []):
+        if not isinstance(doc, dict):
+            continue
+        published = _parse_iso_datetime(doc.get('published_at'))
+        if published is None:
+            published = _parse_iso_datetime(doc.get('captured_at'))
+        if published is not None:
+            published_times.append(published)
+    if not published_times:
+        return 0.6
+    latest = max(published_times)
+    delta_days = max(0.0, (req_asof - latest).total_seconds() / 86400.0)
+    return max(0.0, min(1.0, delta_days / 14.0))
+
+
+def _evidence_coverage_score(state: dict) -> float:
+    coverage = state.get('evidence_coverage', {})
+    if not isinstance(coverage, dict):
+        return 0.5
+    min_total_refs = max(1, int(coverage.get('min_total_refs', 1)))
+    actual_total_refs = max(0, int(coverage.get('actual_total_refs', 0)))
+    min_type_count = max(1, int(coverage.get('min_type_count', 1)))
+    actual_type_count = max(0, int(coverage.get('actual_type_count', 0)))
+    total_ratio = min(1.0, actual_total_refs / float(min_total_refs))
+    type_ratio = min(1.0, actual_type_count / float(min_type_count))
+    base = 0.5 * total_ratio + 0.5 * type_ratio
+    missing_rules = [str(item) for item in coverage.get('missing_rules', []) if str(item).strip()]
+    if not missing_rules and bool(coverage.get('ok', False)):
+        base = max(base, 0.95)
+    if missing_rules:
+        base = max(0.0, base - min(0.4, 0.08 * len(missing_rules)))
+    return max(0.0, min(1.0, base))
+
+
+def _refresh_score_with_event_factors(state: dict) -> None:
+    skill_pack = state.get('skill_pack')
+    if not isinstance(skill_pack, dict):
+        return
+
+    features = dict(state.get('features', {}))
+    rollup = _event_signal_rollup(state)
+    policy_signal = rollup.get('policy_signal')
+    governance_signal = rollup.get('governance_signal')
+    if isinstance(policy_signal, (int, float)):
+        features['event_policy_signal'] = round(float(policy_signal), 6)
+    if isinstance(governance_signal, (int, float)):
+        features['event_governance_signal'] = round(float(governance_signal), 6)
+    features['evidence_coverage'] = round(_evidence_coverage_score(state), 6)
+    features['staleness'] = round(_event_staleness_score(state), 6)
+    features['event_feature_meta'] = {
+        'event_count': int(rollup.get('event_count', 0)),
+        'used_event_count': int(rollup.get('used_event_count', 0)),
+    }
+    state['features'] = features
+
+    try:
+        refreshed_score = score_signal_skill_pack(
+            features=features,
+            snapshots=state.get('snapshots', {}),
+            skill_pack=skill_pack,
+            data_quality_status=state.get('data_quality', {}).get('status', 'OK'),
+            current_pos=0.0,
+            hard_risk_triggered=False,
+        )
+    except Exception as exc:  # noqa: BLE001
+        state['data_quality'] = _merge_data_quality(
+            state['data_quality'],
+            {
+                'status': 'PARTIAL',
+                'missing_fields': ['score.event_factor_refresh'],
+                'notes': f'event factor refresh failed: {exc}',
+            },
+        )
+        _note_degradation(state, 'data_source', status='PARTIAL', reason='event factor refresh failed', mode='FALLBACK')
+        return
+
+    state['score'] = refreshed_score
+    state['score_id'] = str(refreshed_score.get('score_id', state.get('score_id', '')))
+
+    market = state.get('snapshots', {}).get('get_market_snapshot', {})
+    base_price = market.get('close', market.get('last_price', 100.0))
+    bands = generate_price_bands(base_price=base_price, score=int(refreshed_score.get('overall_score', 50)))
+    state['price_band_set_id'] = bands.get('price_band_set_id', state.get('price_band_set_id'))
+    state['price_bands'] = bands.get('price_bands', state.get('price_bands', []))
+
+
 def build_context(state: dict) -> dict:
     evidence_refs: list[dict[str, Any]] = []
     now_iso = datetime.now(timezone.utc).isoformat()
@@ -1135,6 +1494,21 @@ def build_context(state: dict) -> dict:
             }
         )
 
+    for skill in state.get('skill_notes', [])[:4]:
+        skill_id = str(skill.get('skill_id', '')).strip() or uuid.uuid4().hex[:8]
+        evidence_refs.append(
+            {
+                'evidence_id': f'ev_skill_{skill_id}',
+                'type': 'MANUAL_NOTE',
+                'title': f"skill {str(skill.get('title', skill_id))[:120]}",
+                'source': 'skills.runtime',
+                'captured_at': skill.get('created_at', now_iso),
+                'uri': None,
+                'snippet': str(skill.get('summary', ''))[:240],
+                'checksum': skill_id,
+            }
+        )
+
     _append_graph_evidence_refs(state, evidence_refs, now_iso)
 
     if not evidence_refs:
@@ -1156,10 +1530,32 @@ def build_context(state: dict) -> dict:
     if not coverage.get('ok', False):
         _attempt_tier1_coverage_repair(state, evidence_refs, now_iso)
         _enforce_evidence_coverage(state, evidence_refs)
+    _refresh_score_with_event_factors(state)
     _sync_data_quality_from_matrix(state)
     _refresh_tool_stats(state)
     req = state['request']
+    ta_hybrid_state = dict(state.get('ta_hybrid_state', _default_ta_hybrid_state(req)))
+    ta_hybrid_signal = dict(state.get('ta_hybrid_signal', _default_ta_hybrid_signal()))
+    ta_hybrid_views = dict(state.get('ta_hybrid_views', {}))
+    ta_hybrid_evidence_refs = [dict(item) for item in state.get('ta_hybrid_evidence_refs', []) if isinstance(item, dict)]
+    run_mode = str(req.get('run_mode', 'LIVE')).strip().upper() or 'LIVE'
+    state['local_data'] = _load_local_data_for_context(state, run_mode=run_mode)
+    factor_registry = dict(state.get('config', {}).get('factor_registry', {}))
+    if run_mode == 'BACKTEST':
+        factor_registry_context = factor_registry
+    else:
+        factor_registry_context = {
+            'source_id': factor_registry.get('source_id', 'TUSHARE'),
+            'source_name': factor_registry.get('source_name', 'TUSHARE数据'),
+            'total_endpoints': factor_registry.get('total_endpoints', 0),
+            'group_counts': factor_registry.get('group_counts', {}),
+            'domain_counts': factor_registry.get('domain_counts', {}),
+            'truncated': True,
+            'entries': [],
+            'endpoints': list(factor_registry.get('endpoints', []))[:32],
+        }
     state['context'] = {
+        'thread_id': state.get('thread_id', ''),
         'request': req,
         'features': state['features'],
         'score_id': state.get('score_id'),
@@ -1167,6 +1563,7 @@ def build_context(state: dict) -> dict:
         'price_band_set_id': state.get('price_band_set_id'),
         'price_bands': state['price_bands'],
         'memory_notes': state.get('memory_notes', []),
+        'skill_notes': state.get('skill_notes', []),
         'doc_queries': state.get('doc_queries', []),
         'event_docs': state.get('event_docs', []),
         'ranked_doc_ids': state.get('ranked_doc_ids', []),
@@ -1175,6 +1572,7 @@ def build_context(state: dict) -> dict:
         'impact_paths': state.get('impact_paths', []),
         'exposure_scores': state.get('exposure_scores', []),
         'graph_refs': state.get('graph_refs', []),
+        'local_data': state.get('local_data', {}),
         'evidence_refs': evidence_refs,
         'evidence_coverage': state.get('evidence_coverage', {}),
         'data_quality': state['data_quality'],
@@ -1183,9 +1581,307 @@ def build_context(state: dict) -> dict:
         'tool_call_stats': state['tool_call_stats'],
         'budget': state.get('budget', {}),
         'router_policy': state.get('config', {}).get('router_policy_version', 'router_m6_v1'),
+        'skill_pack': state.get('config', {}).get('skill_pack', {}),
+        'skill_pack_version_source': state.get('config', {}).get('skill_pack_version_source', ''),
+        'skill_pack_warning': state.get('config', {}).get('skill_pack_warning', ''),
+        'factor_registry': factor_registry_context,
         'degradation_matrix': state.get('degradation_matrix', {}),
+        'ta_hybrid': {
+            'state': ta_hybrid_state,
+            'signal': ta_hybrid_signal,
+            'views': ta_hybrid_views,
+            'evidence_refs': ta_hybrid_evidence_refs,
+            'summary': str((ta_hybrid_views.get('research_judge') or {}).get('summary', '')),
+        },
     }
     return state
+
+
+def ta_hybrid_node(state: dict) -> dict:
+    req = state.get('request', {})
+    default_state = _default_ta_hybrid_state(req)
+    state['ta_hybrid_state'] = dict(state.get('ta_hybrid_state', default_state))
+    state['ta_hybrid_views'] = dict(state.get('ta_hybrid_views', {}))
+    state['ta_hybrid_signal'] = dict(state.get('ta_hybrid_signal', _default_ta_hybrid_signal()))
+    state['ta_hybrid_evidence_refs'] = [dict(item) for item in state.get('ta_hybrid_evidence_refs', []) if isinstance(item, dict)]
+
+    context = dict(state.get('context', {}))
+    if not _should_run_ta_hybrid(req):
+        context['ta_hybrid'] = {
+            'state': state['ta_hybrid_state'],
+            'signal': state['ta_hybrid_signal'],
+            'views': state['ta_hybrid_views'],
+            'evidence_refs': state['ta_hybrid_evidence_refs'],
+            'summary': '',
+        }
+        state['context'] = context
+        return state
+
+    try:
+        ta_research_rounds = max(1, min(3, int(req.get('ta_research_rounds', 1) or 1)))
+    except (TypeError, ValueError):
+        ta_research_rounds = 1
+    try:
+        ta_risk_rounds = max(1, min(3, int(req.get('ta_risk_rounds', 1) or 1)))
+    except (TypeError, ValueError):
+        ta_risk_rounds = 1
+    try:
+        ta_llm_call_cap = max(0, min(20, int(req.get('ta_llm_call_cap', 6) or 0)))
+    except (TypeError, ValueError):
+        ta_llm_call_cap = 6
+
+    try:
+        result = run_ta_hybrid_subgraph(
+            request=req,
+            context=context,
+            ta_research_rounds=ta_research_rounds,
+            ta_risk_rounds=ta_risk_rounds,
+            ta_llm_call_cap=ta_llm_call_cap,
+        )
+    except Exception as exc:  # noqa: BLE001
+        _note_degradation(state, 'llm', status='PARTIAL', reason=f'ta_hybrid failed: {exc}', mode='FALLBACK')
+        fallback_state = _default_ta_hybrid_state(req)
+        fallback_state['status'] = 'FAILED'
+        fallback_state['degraded_reasons'] = [f'ta_hybrid failed: {exc}']
+        state['ta_hybrid_state'] = fallback_state
+        state['ta_hybrid_views'] = {}
+        state['ta_hybrid_signal'] = _default_ta_hybrid_signal()
+        state['ta_hybrid_evidence_refs'] = []
+        context['ta_hybrid'] = {
+            'state': fallback_state,
+            'signal': state['ta_hybrid_signal'],
+            'views': {},
+            'evidence_refs': [],
+            'summary': '',
+        }
+        state['context'] = context
+        return state
+
+    ta_state = dict(result.get('state', {}))
+    ta_views = dict(result.get('views', {}))
+    ta_signal = dict(result.get('signal', {}))
+    ta_evidence_refs = [dict(item) for item in result.get('evidence_refs', []) if isinstance(item, dict)]
+    if not bool(req.get('ta_require_evidence_refs', True)):
+        ta_evidence_refs = []
+
+    requested_mode = str(req.get('ta_hybrid_mode', 'OFF')).strip().upper() or 'OFF'
+    ta_state.setdefault('version', TA_HYBRID_VERSION)
+    ta_state.setdefault('applied', False)
+    ta_state.setdefault('status', 'ANALYZED')
+    ta_state.setdefault('mode', requested_mode)
+    ta_state.setdefault('require_evidence_refs', bool(req.get('ta_require_evidence_refs', True)))
+
+    if requested_mode == 'BLEND':
+        required_ta_factors = list(TA_BLEND_REQUIRED_FACTOR_IDS)
+        enabled_factor_ids = _enabled_skill_pack_factor_ids(state.get('skill_pack', {}))
+        missing_required_factors = [factor_id for factor_id in required_ta_factors if factor_id not in enabled_factor_ids]
+        ta_state['required_factor_ids'] = required_ta_factors
+        ta_state['effective_ta_factor_ids'] = [factor_id for factor_id in required_ta_factors if factor_id in enabled_factor_ids]
+        if missing_required_factors:
+            ta_state['applied'] = False
+            ta_state['status'] = 'ANALYZED_NO_BLEND'
+            ta_state['missing_ta_factor_ids'] = missing_required_factors
+            degraded_reasons = [str(item) for item in ta_state.get('degraded_reasons', []) if str(item).strip()]
+            degraded_reasons.append(
+                'BLEND skipped: skill pack missing enabled TA factors '
+                f"({', '.join(missing_required_factors)})"
+            )
+            ta_state['degraded_reasons'] = degraded_reasons[:8]
+        else:
+            features = dict(state.get('features', {}))
+            directional_bias = max(-1.0, min(1.0, _safe_float(ta_signal.get('directional_bias'), 0.0)))
+            risk_bias = max(-1.0, min(1.0, _safe_float(ta_signal.get('risk_bias'), 0.0)))
+            conviction = max(0.0, min(1.0, _safe_float(ta_signal.get('conviction'), 0.0)))
+            disagreement = max(0.0, min(1.0, _safe_float(ta_signal.get('disagreement'), 0.0)))
+            features['ta_research_bias'] = round(directional_bias, 6)
+            features['ta_risk_bias'] = round(risk_bias, 6)
+            features['ta_disagreement_penalty'] = round(disagreement, 6)
+            features['ta_conviction_support'] = round(conviction, 6)
+            state['features'] = features
+
+            score_res = execute_tool(
+                'score_signal',
+                {
+                    'features': state['features'],
+                    'snapshots': state.get('snapshots', {}),
+                    'skill_pack': state.get('skill_pack', {}),
+                    'data_quality_status': state.get('data_quality', {}).get('status', 'OK'),
+                    'current_pos': 0.0,
+                    'hard_risk_triggered': False,
+                },
+                score_signal_skill_pack,
+            )
+            state['tool_traces'].append(score_res['trace'])
+            if score_res['ok'] and isinstance(score_res.get('output', {}), dict):
+                score_payload = dict(score_res['output'])
+                factor_values_payload = score_payload.get('factor_values', {})
+                factor_values = factor_values_payload if isinstance(factor_values_payload, dict) else {}
+                missing_scored_factors = [factor_id for factor_id in required_ta_factors if factor_id not in factor_values]
+                if missing_scored_factors:
+                    ta_state['applied'] = False
+                    ta_state['status'] = 'ANALYZED_NO_BLEND'
+                    ta_state['missing_ta_factor_ids'] = missing_scored_factors
+                    degraded_reasons = [str(item) for item in ta_state.get('degraded_reasons', []) if str(item).strip()]
+                    degraded_reasons.append(
+                        'BLEND skipped: score output missing TA factor_values '
+                        f"({', '.join(missing_scored_factors)})"
+                    )
+                    ta_state['degraded_reasons'] = degraded_reasons[:8]
+                else:
+                    state['score'] = score_payload
+                    state['score_id'] = str(score_payload.get('score_id', state.get('score_id', '')))
+                    market = state.get('snapshots', {}).get('get_market_snapshot', {})
+                    base_price = market.get('close', market.get('last_price', 100.0))
+                    bands_res = execute_tool(
+                        'generate_price_bands',
+                        {'base_price': base_price, 'score': int(score_payload.get('overall_score', 50))},
+                        generate_price_bands,
+                    )
+                    state['tool_traces'].append(bands_res['trace'])
+                    if bands_res['ok'] and isinstance(bands_res.get('output', {}), dict):
+                        state['price_band_set_id'] = bands_res['output'].get('price_band_set_id', state.get('price_band_set_id'))
+                        state['price_bands'] = bands_res['output'].get('price_bands', state.get('price_bands', []))
+                        ta_state['applied'] = True
+                        ta_state['status'] = 'BLENDED'
+                    else:
+                        ta_state['applied'] = False
+                        ta_state['status'] = 'ANALYZED_NO_BLEND'
+                        degraded_reasons = [str(item) for item in ta_state.get('degraded_reasons', []) if str(item).strip()]
+                        degraded_reasons.append('BLEND score ok but price bands generation failed')
+                        ta_state['degraded_reasons'] = degraded_reasons[:8]
+                        _note_degradation(state, 'llm', status='PARTIAL', reason='ta_hybrid blend failed at price bands', mode='FALLBACK')
+            else:
+                ta_state['applied'] = False
+                ta_state['status'] = 'ANALYZED_NO_BLEND'
+                degraded_reasons = [str(item) for item in ta_state.get('degraded_reasons', []) if str(item).strip()]
+                degraded_reasons.append('BLEND score refresh failed')
+                ta_state['degraded_reasons'] = degraded_reasons[:8]
+                _note_degradation(state, 'llm', status='PARTIAL', reason='ta_hybrid blend failed at score refresh', mode='FALLBACK')
+            _refresh_tool_stats(state)
+
+    state['ta_hybrid_state'] = ta_state
+    state['ta_hybrid_views'] = ta_views
+    state['ta_hybrid_signal'] = {
+        **_default_ta_hybrid_signal(),
+        **ta_signal,
+    }
+    state['ta_hybrid_evidence_refs'] = ta_evidence_refs
+
+    context_refs = [dict(item) for item in context.get('evidence_refs', []) if isinstance(item, dict)]
+    existing_ids = {str(item.get('evidence_id', '')).strip() for item in context_refs}
+    for ref in ta_evidence_refs:
+        evidence_id = str(ref.get('evidence_id', '')).strip()
+        if evidence_id and evidence_id in existing_ids:
+            continue
+        context_refs.append(ref)
+        if evidence_id:
+            existing_ids.add(evidence_id)
+
+    context['evidence_refs'] = context_refs
+    context['features'] = state.get('features', context.get('features', {}))
+    context['score'] = state.get('score', context.get('score', {}))
+    context['score_id'] = state.get('score_id', context.get('score_id'))
+    context['price_band_set_id'] = state.get('price_band_set_id', context.get('price_band_set_id'))
+    context['price_bands'] = state.get('price_bands', context.get('price_bands', []))
+    context['ta_hybrid'] = {
+        'state': ta_state,
+        'signal': state['ta_hybrid_signal'],
+        'views': ta_views,
+        'evidence_refs': ta_evidence_refs,
+        'summary': str((ta_views.get('research_judge') or {}).get('summary', '')),
+    }
+    state['context'] = context
+    return state
+
+
+def _extract_tushare_endpoints_from_skill_pack(state: dict) -> list[str]:
+    skill_pack = state.get('skill_pack', {})
+    factors_payload = skill_pack.get('factors', {}) if isinstance(skill_pack, dict) else {}
+    factors = factors_payload.get('factors', []) if isinstance(factors_payload, dict) else []
+    endpoints: list[str] = []
+    for item in factors:
+        if not isinstance(item, dict):
+            continue
+        if not bool(item.get('enabled', True)):
+            continue
+        source_refs = item.get('source_refs', [])
+        if not isinstance(source_refs, list):
+            continue
+        for ref in source_refs:
+            if not isinstance(ref, dict):
+                continue
+            source = str(ref.get('source', '')).strip().lower()
+            endpoint = str(ref.get('endpoint', '')).strip()
+            if source != 'tushare' or not endpoint:
+                continue
+            if endpoint not in endpoints:
+                endpoints.append(endpoint)
+    return endpoints
+
+
+def _load_local_data_for_context(state: dict, *, run_mode: str) -> dict[str, Any]:
+    if run_mode != 'BACKTEST':
+        return {
+            'status': 'SKIPPED',
+            'message': 'local data slices are only preloaded in BACKTEST mode',
+            'requested_endpoints': [],
+            'resolved_endpoints': [],
+            'slices': [],
+            'audit': {'requested_count': 0, 'resolved_count': 0, 'ok_slices': 0, 'partial_slices': 0, 'error_slices': 0},
+        }
+
+    endpoints = _extract_tushare_endpoints_from_skill_pack(state)
+    if not endpoints:
+        return {
+            'status': 'EMPTY',
+            'message': 'no tushare endpoints found in skill pack factors',
+            'requested_endpoints': [],
+            'resolved_endpoints': [],
+            'slices': [],
+            'audit': {'requested_count': 0, 'resolved_count': 0, 'ok_slices': 0, 'partial_slices': 0, 'error_slices': 0},
+        }
+
+    req = state.get('request', {})
+    ticker = str(req.get('ticker', '')).strip()
+    asof = str(req.get('asof', '')).strip()
+    lookback_days = _env_int('BACKTEST_LOCAL_DATA_LOOKBACK_DAYS', 180, minimum=10, maximum=3650)
+    start_date, end_date = default_backtest_window(asof, lookback_days=lookback_days)
+
+    payload = {
+        'endpoints': endpoints,
+        'ticker': ticker,
+        'start_date': start_date,
+        'end_date': end_date,
+        'limit_per_endpoint': _env_int('BACKTEST_LOCAL_DATA_ROWS_PER_ENDPOINT', 12, minimum=1, maximum=200),
+        'max_endpoints': _env_int('BACKTEST_LOCAL_DATA_MAX_ENDPOINTS', 24, minimum=1, maximum=256),
+        'order': 'desc',
+        'include_rows': True,
+    }
+    result = execute_tool('local_data_query', payload, query_local_datasets)
+    state['tool_traces'].append(result['trace'])
+    if not result['ok']:
+        err = result['output'].get('error', {}) if isinstance(result['output'], dict) else {}
+        reason = f"local_data_query failed ({err.get('code', 'INTERNAL_ERROR')}): {err.get('message', 'unknown error')}"
+        _note_degradation(state, 'data_source', status='DEGRADED', reason=reason, mode='FALLBACK')
+        return {
+            'status': 'ERROR',
+            'message': reason,
+            'requested_endpoints': endpoints,
+            'resolved_endpoints': [],
+            'slices': [],
+            'audit': {'requested_count': len(endpoints), 'resolved_count': 0, 'ok_slices': 0, 'partial_slices': 0, 'error_slices': len(endpoints)},
+        }
+
+    output = result['output'] if isinstance(result['output'], dict) else {}
+    audit = output.get('audit', {}) if isinstance(output.get('audit', {}), dict) else {}
+    error_slices = int(audit.get('error_slices', 0))
+    partial_slices = int(audit.get('partial_slices', 0))
+    ok_slices = int(audit.get('ok_slices', 0))
+    if error_slices > 0:
+        _note_degradation(state, 'data_source', status='PARTIAL', reason=f'local_data_query error_slices={error_slices}', mode='FALLBACK')
+    if ok_slices == 0 and (error_slices > 0 or partial_slices > 0):
+        _note_degradation(state, 'data_source', status='DEGRADED', reason='local_data_query returned no healthy slices', mode='FALLBACK')
+    return output
 
 
 def _fallback_report_from_context(state: dict, reason: str) -> dict[str, Any]:
@@ -1290,6 +1986,11 @@ def _fallback_report_from_context(state: dict, reason: str) -> dict[str, Any]:
             'router_policy': state.get('config', {}).get('router_policy_version', 'router_m6_v1'),
             'snapshot_ids': list(context.get('snapshot_ids', [])),
             'weights_hash': context.get('weights_hash', state.get('weights_hash', 'w_mock_hash_v1')),
+            'skill_pack': context.get('skill_pack', state.get('config', {}).get('skill_pack', {})),
+            'skill_pack_version_source': context.get(
+                'skill_pack_version_source',
+                state.get('config', {}).get('skill_pack_version_source', ''),
+            ),
             'run_mode': req.get('run_mode', 'LIVE'),
             'tool_call_stats': dict(state.get('tool_call_stats', {})),
         },
@@ -1305,15 +2006,19 @@ def _fallback_report_from_context(state: dict, reason: str) -> dict[str, Any]:
 
 def draft_report_node(state: dict) -> dict:
     run_mode = str(state.get('request', {}).get('run_mode', 'LIVE')).strip().upper() or 'LIVE'
+    runtime_config = get_runtime_config()
+    strict_llm_required = run_mode == 'BACKTEST' and runtime_config.get('llm_provider', 'mock') != 'mock'
     if run_mode == 'SHADOW':
-        primary_model = os.getenv('LLM_SHADOW_MODEL', 'mock-challenger-v1').strip() or 'mock-challenger-v1'
-        reviewer_model = os.getenv('LLM_SHADOW_REVIEWER_MODEL', 'NONE').strip() or 'NONE'
+        primary_model = runtime_config['llm_shadow_model']
+        reviewer_model = runtime_config['llm_shadow_reviewer_model']
     else:
-        primary_model = os.getenv('LLM_PRIMARY_MODEL', 'mock-primary-v1').strip() or 'mock-primary-v1'
-        reviewer_model = os.getenv('LLM_REVIEWER_MODEL', 'NONE').strip() or 'NONE'
+        primary_model = runtime_config['llm_primary_model']
+        reviewer_model = runtime_config['llm_reviewer_model']
     provider = LLMProvider(primary_model=primary_model, reviewer_model=reviewer_model)
     if not _budget_guardrail(state, stage='llm.draft', reserve_tool_calls=1):
         reason = 'LLM draft skipped by budget guardrail'
+        if strict_llm_required:
+            raise RuntimeError(reason)
         _note_degradation(state, 'llm', status='DEGRADED', reason=reason, mode='DISABLED')
         state['report_draft'] = _fallback_report_from_context(state, reason)
         _sync_data_quality_from_matrix(state)
@@ -1328,6 +2033,8 @@ def draft_report_node(state: dict) -> dict:
     else:
         err = draft_result['output'].get('error', {})
         reason = f"LLM draft failed ({err.get('code', 'INTERNAL_ERROR')}): {err.get('message', 'unknown error')}"
+        if strict_llm_required:
+            raise RuntimeError(reason)
         _note_degradation(state, 'llm', status='DEGRADED', reason=reason, mode='FALLBACK')
         state['report_draft'] = _fallback_report_from_context(state, reason)
     _sync_data_quality_from_matrix(state)
@@ -1600,6 +2307,21 @@ def persist_node(state: dict) -> dict:
             reason=f"write_memory_note failed ({err.get('code', 'INTERNAL_ERROR')})",
             mode='FALLBACK',
         )
+    skill_refs: dict[str, str] = {}
+    run_mode = str(report.get('provenance', {}).get('run_mode', state.get('request', {}).get('run_mode', 'LIVE'))).upper()
+    if run_mode == 'BACKTEST':
+        write_skill = write_skill_from_report(report)
+        if isinstance(write_skill, dict) and write_skill.get('ok'):
+            skill_refs['skill_note_id'] = str(write_skill.get('skill_id', ''))
+        elif isinstance(write_skill, dict) and isinstance(write_skill.get('error'), dict):
+            err = write_skill.get('error', {})
+            _note_degradation(
+                state,
+                'data_source',
+                status='PARTIAL',
+                reason=f"write_skill_from_report failed ({err.get('code', 'INTERNAL_ERROR')})",
+                mode='FALLBACK',
+            )
     _refresh_tool_stats(state)
     _sync_data_quality_from_matrix(state)
     report['data_quality'] = _merge_data_quality(_normalize_report_data_quality(report), state.get('data_quality', {}))
@@ -1607,9 +2329,44 @@ def persist_node(state: dict) -> dict:
     report['provenance']['tool_call_stats'] = state['tool_call_stats']
     report['provenance']['router_policy'] = state.get('config', {}).get('router_policy_version', 'router_m6_v1')
     report['provenance']['budget'] = state.get('budget', {})
+    report['provenance']['skill_pack'] = state.get('config', {}).get('skill_pack', {})
+    report['provenance']['skill_pack_version_source'] = state.get('config', {}).get('skill_pack_version_source', '')
     report['provenance']['degradation_matrix'] = state.get('degradation_matrix', {})
+    report['provenance']['ta_hybrid'] = {
+        **_default_ta_hybrid_state(state.get('request', {})),
+        **(state.get('ta_hybrid_state', {}) if isinstance(state.get('ta_hybrid_state', {}), dict) else {}),
+        **(state.get('ta_hybrid_signal', {}) if isinstance(state.get('ta_hybrid_signal', {}), dict) else {}),
+    }
+    local_data = state.get('context', {}).get('local_data', {}) if isinstance(state.get('context', {}), dict) else {}
+    if isinstance(local_data, dict):
+        audit = local_data.get('audit', {}) if isinstance(local_data.get('audit', {}), dict) else {}
+        slices = local_data.get('slices', []) if isinstance(local_data.get('slices', []), list) else []
+        report['provenance']['local_data_access'] = {
+            'status': local_data.get('status', ''),
+            'message': local_data.get('message', ''),
+            'requested_endpoints': list(local_data.get('requested_endpoints', []))[:128],
+            'resolved_endpoints': list(local_data.get('resolved_endpoints', []))[:128],
+            'ok_slices': int(audit.get('ok_slices', 0)),
+            'partial_slices': int(audit.get('partial_slices', 0)),
+            'error_slices': int(audit.get('error_slices', 0)),
+        }
+        report['provenance']['local_data_slices'] = [
+            {
+                'endpoint': str(item.get('endpoint', '')),
+                'status': str(item.get('status', '')),
+                'message': str(item.get('message', '')),
+                'file': str(item.get('file', '')),
+                'date_field': str(item.get('date_field', '')),
+                'latest_date': str(item.get('latest_date', '')),
+                'returned_rows': int(item.get('returned_rows', 0)),
+                'stale': bool(item.get('stale', False)),
+            }
+            for item in slices[:40]
+            if isinstance(item, dict)
+        ]
     persist_refs = persist_workflow_state(state, thread_id=state['thread_id'])
     persist_refs['memory_note_id'] = write_memory['output'].get('note_id', persist_refs.get('memory_note_id', ''))
+    persist_refs.update(skill_refs)
     state['persist_refs'] = persist_refs
     state['final_report'] = report
     return state

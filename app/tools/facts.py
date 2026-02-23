@@ -2,10 +2,12 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import datetime, timezone
+from functools import lru_cache
 import hashlib
 import json
 import math
 import os
+from pathlib import Path
 from typing import Any
 
 import httpx
@@ -21,6 +23,8 @@ MACRO_TTL_SECONDS = 60 * 60
 
 _SNAPSHOT_CACHE: TTLCache[dict[str, Any]] = TTLCache()
 _TUSHARE_ADAPTER: 'TushareProAdapter | None' = None
+_PROJECT_ROOT = Path(__file__).resolve().parents[2]
+_ENV_FILE_PATH = _PROJECT_ROOT / '.env'
 
 
 def _now_utc() -> datetime:
@@ -49,6 +53,29 @@ def _deepcopy_json(value: Any) -> Any:
 def _hash_digest(payload: Any, length: int = 16) -> str:
     raw = json.dumps(payload, sort_keys=True, ensure_ascii=True, default=str)
     return hashlib.sha256(raw.encode('utf-8')).hexdigest()[:length]
+
+
+@lru_cache(maxsize=1)
+def _read_dotenv_values() -> dict[str, str]:
+    try:
+        lines = _ENV_FILE_PATH.read_text(encoding='utf-8').splitlines()
+    except OSError:
+        return {}
+
+    values: dict[str, str] = {}
+    for raw_line in lines:
+        line = raw_line.strip()
+        if not line or line.startswith('#') or '=' not in line:
+            continue
+        key, raw_value = line.split('=', 1)
+        key = key.strip()
+        if not key:
+            continue
+        value = raw_value.strip()
+        if len(value) >= 2 and value[0] == value[-1] and value[0] in {"'", '"'}:
+            value = value[1:-1]
+        values[key] = value
+    return values
 
 
 def _to_float(value: Any) -> float | None:
@@ -457,6 +484,48 @@ class TushareProAdapter:
             'captured_at': _now_utc().isoformat(),
         }
 
+    def fetch_index_market_snapshot(self, ticker: str, asof_utc: str) -> dict[str, Any]:
+        trade_date = _parse_iso_to_utc(asof_utc).strftime('%Y%m%d')
+        params_index_daily = {'ts_code': ticker, 'trade_date': trade_date}
+        rows = self._request(
+            api_name='index_daily',
+            params=params_index_daily,
+            fields='ts_code,trade_date,open,high,low,close,vol,amount,pct_chg',
+        )
+        if not rows:
+            raise ValueError('DATA_UNAVAILABLE: index_daily rows empty')
+        row = rows[0]
+        close = _to_float(row.get('close'))
+        pct_chg = _to_float(row.get('pct_chg'))
+        day_return = None
+        if pct_chg is not None:
+            day_return = round(pct_chg / 100.0, 6)
+        volatility = _estimate_volatility(day_return)
+        amount = _to_float(row.get('amount'))
+        volume = _to_float(row.get('vol'))
+        # index_daily has no daily_basic turnover fields, so we proxy liquidity from volume/amount.
+        turnover_proxy = amount if amount is not None else volume
+        spread_proxy = None
+        if volatility is not None:
+            spread_proxy = round(max(0.0002, volatility / 60), 6)
+        return {
+            'currency': 'CNY',
+            'last_price': close,
+            'close': close,
+            'returns': {'d1': day_return, 'w1': None, 'm1': None},
+            'volatility': {'atr_14': None, 'stdev_20': volatility},
+            'volatility_20d': volatility,
+            'trend': {'ma_20': None, 'ma_60': None, 'regime': _estimate_market_regime(day_return)},
+            'liquidity': {'avg_turnover_20d': turnover_proxy, 'spread_est': spread_proxy},
+            'volume_ratio': _estimate_volume_ratio(volume),
+            '_upstream_trace': {
+                'ts_code': ticker,
+                'endpoints': ['index_daily'],
+                'params_digest': _hash_digest({'index_daily': params_index_daily}, length=16),
+            },
+            'captured_at': _now_utc().isoformat(),
+        }
+
     def fetch_fundamentals_snapshot(self, ticker: str, asof_utc: str) -> dict[str, Any]:
         trade_date = _parse_iso_to_utc(asof_utc).strftime('%Y%m%d')
         params_basic = {'ts_code': ticker, 'trade_date': trade_date}
@@ -573,11 +642,24 @@ class TushareProAdapter:
 
 def _get_tushare_adapter() -> TushareProAdapter | None:
     global _TUSHARE_ADAPTER
-    token = os.getenv('TUSHARE_TOKEN', '').strip()
+    dotenv_values = _read_dotenv_values()
+    token = os.getenv('TUSHARE_TOKEN', '').strip() or dotenv_values.get('TUSHARE_TOKEN', '').strip()
     if not token:
         return None
-    base_url = os.getenv('TUSHARE_BASE_URL', 'https://api.tushare.pro').strip() or 'https://api.tushare.pro'
-    timeout_seconds = float(os.getenv('DATASOURCE_TIMEOUT_SECONDS', '6'))
+    base_url = (
+        os.getenv('TUSHARE_BASE_URL', '').strip()
+        or dotenv_values.get('TUSHARE_BASE_URL', '').strip()
+        or 'https://api.tushare.pro'
+    )
+    timeout_raw = (
+        os.getenv('DATASOURCE_TIMEOUT_SECONDS', '').strip()
+        or dotenv_values.get('DATASOURCE_TIMEOUT_SECONDS', '').strip()
+        or '6'
+    )
+    try:
+        timeout_seconds = float(timeout_raw)
+    except ValueError:
+        timeout_seconds = 6.0
     if _TUSHARE_ADAPTER is None or _TUSHARE_ADAPTER.token != token or _TUSHARE_ADAPTER.base_url != base_url:
         _TUSHARE_ADAPTER = TushareProAdapter(token=token, base_url=base_url, timeout_seconds=timeout_seconds)
     return _TUSHARE_ADAPTER
@@ -588,6 +670,13 @@ def _fetch_market_live(ticker: str, asof_utc: str) -> dict[str, Any]:
     if adapter is None:
         raise ValueError('DATA_UNAVAILABLE: TOKEN_NOT_CONFIGURED')
     return adapter.fetch_market_snapshot(ticker=ticker, asof_utc=asof_utc)
+
+
+def _fetch_index_market_live(ticker: str, asof_utc: str) -> dict[str, Any]:
+    adapter = _get_tushare_adapter()
+    if adapter is None:
+        raise ValueError('DATA_UNAVAILABLE: TOKEN_NOT_CONFIGURED')
+    return adapter.fetch_index_market_snapshot(ticker=ticker, asof_utc=asof_utc)
 
 
 def _fetch_fundamentals_live(ticker: str, asof_utc: str) -> dict[str, Any]:
@@ -687,6 +776,30 @@ def get_market_snapshot(ticker: str, asof: str) -> dict:
     )
 
 
+def get_index_market_snapshot(ticker: str, asof: str) -> dict:
+    asof_utc = _utc_iso(asof)
+    cache_key = f'index_market:{ticker}:{asof_utc}'
+    return _load_snapshot(
+        cache_key=cache_key,
+        ttl_seconds=MARKET_TTL_SECONDS,
+        ticker=ticker,
+        asof_utc=asof_utc,
+        snapshot_type='MARKET',
+        source_id_live='tushare.index_daily',
+        source_id_fallback='synthetic.market.index',
+        required_fields=('last_price', 'returns.d1', 'volatility.stdev_20', 'liquidity.avg_turnover_20d'),
+        numeric_bounds={
+            'last_price': (0.0001, None),
+            'returns.d1': (-0.35, 0.35),
+            'volatility.stdev_20': (0, 1),
+            'volume_ratio': (0, 10),
+        },
+        freshness_seconds=5 * 60,
+        live_loader=_fetch_index_market_live,
+        fallback_loader=_synthetic_market_snapshot,
+    )
+
+
 def get_fundamentals_snapshot(ticker: str, asof: str) -> dict:
     asof_utc = _utc_iso(asof)
     cache_key = f'fundamentals:{ticker}:{asof_utc[:10]}'
@@ -762,3 +875,4 @@ def reset_facts_runtime_state() -> None:
     global _TUSHARE_ADAPTER
     _SNAPSHOT_CACHE.clear()
     _TUSHARE_ADAPTER = None
+    _read_dotenv_values.cache_clear()

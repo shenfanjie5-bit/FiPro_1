@@ -1,0 +1,45 @@
+{
+  "version": "0.1.2",
+  "constraints": {
+    "max_single_position": 0.6,
+    "max_drawdown_pct": 12.0,
+    "max_daily_turnover": 1.0,
+    "min_data_quality_status_for_buy": "PARTIAL"
+  },
+  "hard_stops": [
+    {
+      "rule_id": "stop_on_hard_risk",
+      "when": "hard_risk_triggered == true",
+      "action": "SELL",
+      "priority": 120
+    },
+    {
+      "rule_id": "stop_on_extreme_drawdown",
+      "when": "drawdown_pct >= max_drawdown_pct",
+      "action": "SELL",
+      "priority": 115
+    }
+  ],
+  "penalty_rules": [
+    {
+      "rule_id": "penalty_high_volatility",
+      "when": "volatility_20d > 0.45",
+      "penalty": 8.0
+    },
+    {
+      "rule_id": "penalty_event_cluster_negative",
+      "when": "negative_event_cluster_score > 0.7",
+      "penalty": 6.0
+    },
+    {
+      "rule_id": "penalty_data_quality_partial",
+      "when": "data_quality_status == 'PARTIAL'",
+      "penalty": 4.0
+    },
+    {
+      "rule_id": "penalty_data_quality_degraded",
+      "when": "data_quality_status == 'DEGRADED'",
+      "penalty": 10.0
+    }
+  ]
+}
